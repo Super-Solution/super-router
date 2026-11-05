@@ -1,0 +1,20 @@
+{
+  "name": "@superrouter/billing-presets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@superrouter/contracts": "0.1.0",
+    "@superrouter/storage-postgres": "0.1.0",
+    "@superrouter/core": "0.1.0"
+  }
+}

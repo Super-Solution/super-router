@@ -1,0 +1,26 @@
+{
+  "name": "@superrouter/storage-postgres",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@superrouter/contracts": "0.1.0",
+    "pg": "8.23.1",
+    "@superrouter/core": "0.1.0",
+    "@superrouter/payments": "0.1.0"
+  }
+}

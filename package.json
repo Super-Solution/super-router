@@ -1,0 +1,50 @@
+{
+  "name": "superrouter",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "packages/contracts",
+    "packages/core",
+    "packages/payments",
+    "packages/storage-postgres",
+    "packages/provider-openai",
+    "packages/provider-anthropic",
+    "packages/sdk",
+    "packages/billing-presets",
+    "packages/ui",
+    "examples/paid-chat"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run build && tsc --noEmit -p tsconfig.json",
+    "test": "npm run build && tsx --test --test-concurrency=1 tests/*.test.ts",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "demo": "tsx examples/minimal-chat/index.ts",
+    "start": "tsx apps/server/main.ts",
+    "worker": "tsx apps/worker/main.ts",
+    "contracts": "tsx scripts/contracts.ts",
+    "smoke:live": "tsx scripts/live-smoke.ts",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\" \"apps/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"examples/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\" \"apps/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"examples/**/*.{ts,tsx}\"",
+    "demo:subscription": "tsx examples/subscription-credits/index.ts",
+    "demo:payments": "npm run build && tsx examples/payments/index.ts",
+    "demo:paid-chat": "npm run build && tsx examples/paid-chat/server.ts",
+    "build:paid-chat": "npm run build",
+    "test:paid-chat:browser": "npm run build && tsx scripts/paid-chat-browser.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/pg": "8.23.1",
+    "playwright": "1.56.1",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

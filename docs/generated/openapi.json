@@ -1,0 +1,3129 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SuperRouter P1 + P2 billing slice API",
+    "version": "0.1.0",
+    "description": "Implemented routes. P2 control routes require database-authenticated ControlPlane. Hosted payments support Stripe, OEN and Epay V1. Broader target design is docs/API_SPEC.md."
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "CreditRateConfig": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "object",
+                "properties": {
+                  "units": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  },
+                  "credits": {
+                    "default": "1",
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "units",
+                  "credits"
+                ],
+                "additionalProperties": false
+              },
+              "cached": {
+                "type": "object",
+                "properties": {
+                  "units": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  },
+                  "credits": {
+                    "default": "1",
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "units",
+                  "credits"
+                ],
+                "additionalProperties": false
+              },
+              "cache_write": {
+                "type": "object",
+                "properties": {
+                  "units": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  },
+                  "credits": {
+                    "default": "1",
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "units",
+                  "credits"
+                ],
+                "additionalProperties": false
+              },
+              "output": {
+                "type": "object",
+                "properties": {
+                  "units": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  },
+                  "credits": {
+                    "default": "1",
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "units",
+                  "credits"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "input",
+              "cached",
+              "cache_write",
+              "output"
+            ],
+            "additionalProperties": false
+          },
+          "media": {
+            "type": "object",
+            "properties": {
+              "images": {
+                "type": "object",
+                "properties": {
+                  "units": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  },
+                  "credits": {
+                    "default": "1",
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "units",
+                  "credits"
+                ],
+                "additionalProperties": false
+              },
+              "video_ms": {
+                "type": "object",
+                "properties": {
+                  "units": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  },
+                  "credits": {
+                    "default": "1",
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "units",
+                  "credits"
+                ],
+                "additionalProperties": false
+              },
+              "audio_ms": {
+                "type": "object",
+                "properties": {
+                  "units": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  },
+                  "credits": {
+                    "default": "1",
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "units",
+                  "credits"
+                ],
+                "additionalProperties": false
+              },
+              "tasks": {
+                "type": "object",
+                "properties": {
+                  "units": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  },
+                  "credits": {
+                    "default": "1",
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "units",
+                  "credits"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "asset"
+        ],
+        "additionalProperties": false
+      },
+      "Invocation": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "service_version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "payer_mode": {
+            "default": "developer",
+            "type": "string",
+            "const": "developer"
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "default": [],
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "system",
+                        "user",
+                        "assistant"
+                      ]
+                    },
+                    "content": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32000
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "video",
+                      "audio",
+                      "task"
+                    ]
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32000
+                  }
+                },
+                "required": [
+                  "kind",
+                  "prompt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "messages"
+            ],
+            "additionalProperties": false
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "max_output_tokens": {
+                "default": 1,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8192
+              },
+              "max_usage": {
+                "type": "object",
+                "properties": {
+                  "images": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "video_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "audio_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "tasks": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "timeout_ms": {
+                "default": 30000,
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 120000
+              },
+              "max_charge": {
+                "type": "object",
+                "properties": {
+                  "asset": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "pattern": "^[a-zA-Z0-9_.:/-]+$"
+                  },
+                  "atoms": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,29})$"
+                  },
+                  "scale": {
+                    "type": "number",
+                    "const": 9
+                  }
+                },
+                "required": [
+                  "asset",
+                  "atoms",
+                  "scale"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "max_output_tokens",
+              "timeout_ms"
+            ],
+            "additionalProperties": false
+          },
+          "stream": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "service",
+          "customer_id",
+          "payer_mode",
+          "input",
+          "limits",
+          "stream"
+        ],
+        "additionalProperties": false
+      },
+      "Service": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "task_kind": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "audio",
+              "task"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "specific",
+              "pool",
+              "tier"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "tier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "offerings": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[a-zA-Z0-9_.:/-]+$"
+                },
+                "task_kind": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "video",
+                    "audio",
+                    "task"
+                  ]
+                },
+                "max_usage": {
+                  "type": "object",
+                  "properties": {
+                    "images": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "video_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "audio_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "tasks": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "provider": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[a-zA-Z0-9_.:/-]+$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[a-zA-Z0-9_.:/-]+$"
+                },
+                "upstream_model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[a-zA-Z0-9_.:/-]+$"
+                },
+                "region": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[a-zA-Z0-9_.:/-]+$"
+                },
+                "labels": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "pattern": "^[a-zA-Z0-9_.:/-]+$"
+                  }
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "platform",
+                    "byok"
+                  ]
+                },
+                "max_input_tokens": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000
+                },
+                "max_output_tokens": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8192
+                },
+                "price": {
+                  "type": "object",
+                  "properties": {
+                    "media": {
+                      "type": "object",
+                      "properties": {
+                        "images": {
+                          "type": "object",
+                          "properties": {
+                            "atoms": {
+                              "type": "string",
+                              "pattern": "^(0|[1-9][0-9]{0,29})$"
+                            },
+                            "per": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 1000000000
+                            }
+                          },
+                          "required": [
+                            "atoms",
+                            "per"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "video_ms": {
+                          "type": "object",
+                          "properties": {
+                            "atoms": {
+                              "type": "string",
+                              "pattern": "^(0|[1-9][0-9]{0,29})$"
+                            },
+                            "per": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 1000000000
+                            }
+                          },
+                          "required": [
+                            "atoms",
+                            "per"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "audio_ms": {
+                          "type": "object",
+                          "properties": {
+                            "atoms": {
+                              "type": "string",
+                              "pattern": "^(0|[1-9][0-9]{0,29})$"
+                            },
+                            "per": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 1000000000
+                            }
+                          },
+                          "required": [
+                            "atoms",
+                            "per"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "tasks": {
+                          "type": "object",
+                          "properties": {
+                            "atoms": {
+                              "type": "string",
+                              "pattern": "^(0|[1-9][0-9]{0,29})$"
+                            },
+                            "per": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 1000000000
+                            }
+                          },
+                          "required": [
+                            "atoms",
+                            "per"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "asset": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "pattern": "^[a-zA-Z0-9_.:/-]+$"
+                    },
+                    "input": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,29})$"
+                    },
+                    "cached": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,29})$"
+                    },
+                    "cache_write": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,29})$"
+                    },
+                    "output": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,29})$"
+                    },
+                    "per": {
+                      "default": 1,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1000000000
+                    }
+                  },
+                  "required": [
+                    "asset",
+                    "input",
+                    "cached",
+                    "cache_write",
+                    "output",
+                    "per"
+                  ],
+                  "additionalProperties": false
+                },
+                "latency_ms": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "reliability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "quality": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "id",
+                "provider",
+                "model",
+                "upstream_model",
+                "region",
+                "labels",
+                "enabled",
+                "source",
+                "max_input_tokens",
+                "max_output_tokens",
+                "price"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "regions": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[a-zA-Z0-9_.:/-]+$"
+            }
+          },
+          "required_labels": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[a-zA-Z0-9_.:/-]+$"
+            }
+          },
+          "price": {
+            "type": "object",
+            "properties": {
+              "media": {
+                "type": "object",
+                "properties": {
+                  "images": {
+                    "type": "object",
+                    "properties": {
+                      "atoms": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,29})$"
+                      },
+                      "per": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "atoms",
+                      "per"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "video_ms": {
+                    "type": "object",
+                    "properties": {
+                      "atoms": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,29})$"
+                      },
+                      "per": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "atoms",
+                      "per"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "audio_ms": {
+                    "type": "object",
+                    "properties": {
+                      "atoms": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,29})$"
+                      },
+                      "per": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "atoms",
+                      "per"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tasks": {
+                    "type": "object",
+                    "properties": {
+                      "atoms": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,29})$"
+                      },
+                      "per": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "atoms",
+                      "per"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "asset": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "pattern": "^[a-zA-Z0-9_.:/-]+$"
+              },
+              "input": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,29})$"
+              },
+              "cached": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,29})$"
+              },
+              "cache_write": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,29})$"
+              },
+              "output": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,29})$"
+              },
+              "per": {
+                "default": 1,
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 1000000000
+              }
+            },
+            "required": [
+              "asset",
+              "input",
+              "cached",
+              "cache_write",
+              "output",
+              "per"
+            ],
+            "additionalProperties": false
+          },
+          "platform_price": {
+            "type": "object",
+            "properties": {
+              "media": {
+                "type": "object",
+                "properties": {
+                  "images": {
+                    "type": "object",
+                    "properties": {
+                      "atoms": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,29})$"
+                      },
+                      "per": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "atoms",
+                      "per"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "video_ms": {
+                    "type": "object",
+                    "properties": {
+                      "atoms": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,29})$"
+                      },
+                      "per": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "atoms",
+                      "per"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "audio_ms": {
+                    "type": "object",
+                    "properties": {
+                      "atoms": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,29})$"
+                      },
+                      "per": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "atoms",
+                      "per"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tasks": {
+                    "type": "object",
+                    "properties": {
+                      "atoms": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9][0-9]{0,29})$"
+                      },
+                      "per": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "atoms",
+                      "per"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "asset": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "pattern": "^[a-zA-Z0-9_.:/-]+$"
+              },
+              "input": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,29})$"
+              },
+              "cached": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,29})$"
+              },
+              "cache_write": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,29})$"
+              },
+              "output": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,29})$"
+              },
+              "per": {
+                "default": 1,
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 1000000000
+              }
+            },
+            "required": [
+              "asset",
+              "input",
+              "cached",
+              "cache_write",
+              "output",
+              "per"
+            ],
+            "additionalProperties": false
+          },
+          "requires_subscription": {
+            "type": "boolean"
+          },
+          "max_attempts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "max_provider_cost": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,29})$"
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 8192
+          },
+          "weights": {
+            "type": "object",
+            "properties": {
+              "cost": {
+                "type": "number",
+                "minimum": 0
+              },
+              "latency": {
+                "type": "number",
+                "minimum": 0
+              },
+              "reliability": {
+                "type": "number",
+                "minimum": 0
+              },
+              "quality": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "cost",
+              "latency",
+              "reliability",
+              "quality"
+            ],
+            "additionalProperties": false
+          },
+          "cost_scale": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,29})$"
+          },
+          "latency_scale_ms": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "unknown_score": {
+            "default": 0,
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "mode",
+          "offerings",
+          "regions",
+          "required_labels",
+          "price",
+          "max_attempts",
+          "max_provider_cost",
+          "max_output_tokens",
+          "weights",
+          "cost_scale",
+          "latency_scale_ms",
+          "unknown_score"
+        ],
+        "additionalProperties": false
+      },
+      "DomainEvent": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "billing.settled",
+              "billing.released",
+              "reconciliation.required"
+            ]
+          },
+          "schema_version": {
+            "type": "number",
+            "const": 1
+          },
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "environment_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "schema_version",
+          "workspace_id",
+          "environment_id",
+          "request_id",
+          "occurred_at"
+        ],
+        "additionalProperties": false
+      },
+      "MemberInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "service_admin",
+              "billing_admin",
+              "viewer",
+              "app"
+            ]
+          },
+          "active": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          }
+        },
+        "required": [
+          "id",
+          "external_id"
+        ],
+        "additionalProperties": false
+      },
+      "KeyInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "scopes": {
+            "minItems": 1,
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "service_ids": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[a-zA-Z0-9_.:/-]+$"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "member_id",
+          "customer_id",
+          "scopes",
+          "expires_at"
+        ],
+        "additionalProperties": false
+      },
+      "PlanInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "period_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 366
+          },
+          "asset": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "credits": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,29}$"
+          },
+          "service_ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[a-zA-Z0-9_.:/-]+$"
+            }
+          },
+          "amount_minor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,29}$"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "period_days",
+          "asset",
+          "credits",
+          "service_ids",
+          "amount_minor",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "SubscriptionInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "plan_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "plan_version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "customer_id",
+          "plan_id",
+          "plan_version"
+        ],
+        "additionalProperties": false
+      },
+      "PlanChangeInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "plan_version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "plan_id",
+          "plan_version"
+        ],
+        "additionalProperties": false
+      },
+      "PaymentInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "order_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "succeeded",
+              "failed"
+            ]
+          },
+          "amount_minor": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,29}$"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          }
+        },
+        "required": [
+          "id",
+          "order_id",
+          "revision",
+          "status",
+          "amount_minor",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "CreditGrantInput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "asset": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[a-zA-Z0-9_.:/-]+$"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,29}$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          },
+          "source_kind": {
+            "default": "promotion",
+            "type": "string",
+            "enum": [
+              "promotion",
+              "purchased"
+            ]
+          },
+          "service_ids": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[a-zA-Z0-9_.:/-]+$"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "customer_id",
+          "asset",
+          "amount",
+          "reason",
+          "source_kind"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "paths": {
+    "/v1/admin/payment-orders/{id}/checkout": {
+      "post": {
+        "operationId": "checkoutPayment",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hosted checkout or authoritative reconciliation result."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/payment-orders/{id}/reconcile": {
+      "post": {
+        "operationId": "reconcilePayment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hosted checkout or authoritative reconciliation result."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/integrations/payments/{id}/notify": {
+      "get": {
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Provider-authenticated callback. GET Epay V1 signed query; POST Stripe/OEN raw signed JSON. No bearer key can assert payment.",
+        "responses": {
+          "200": {
+            "description": "Provider acknowledgement after authoritative lookup and atomic settlement."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      },
+      "post": {
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Provider-authenticated callback. GET Epay V1 signed query; POST Stripe/OEN raw signed JSON. No bearer key can assert payment.",
+        "responses": {
+          "200": {
+            "description": "Provider acknowledgement after authoritative lookup and atomic settlement."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/inferences": {
+      "post": {
+        "operationId": "infer",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Invocation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result or SSE events; billing may be pending."
+          },
+          "303": {
+            "description": "Replay: Location points to request status; output not retained."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/services": {
+      "get": {
+        "operationId": "listServices",
+        "responses": {
+          "200": {
+            "description": "Authorized published Service summaries (P1 max 100)."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/requests/{id}": {
+      "get": {
+        "operationId": "getRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execution and billing states only; no stored answer."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/requests/{id}/cancel": {
+      "post": {
+        "operationId": "cancelRequest",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cancellation intent recorded; not confirmation of upstream cancellation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/services/{id}/credit-rates": {
+      "post": {
+        "operationId": "publishCreditRateVersion",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expected_version",
+                  "config"
+                ],
+                "properties": {
+                  "expected_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "config": {
+                    "$ref": "#/components/schemas/CreditRateConfig"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New immutable customer-sale pricing version; platform supply unchanged."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/service-versions": {
+      "post": {
+        "operationId": "publishServiceVersion",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Service"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Immutable version published; P1 single-step workflow."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/balance": {
+      "get": {
+        "operationId": "getBoundBalances",
+        "responses": {
+          "200": {
+            "description": "Bound customer and platform account balances."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/routing/dry-run": {
+      "post": {
+        "operationId": "dryRun",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Invocation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Eligible scores and excluded reasons. No upstream calls or reservations."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/members": {
+      "post": {
+        "operationId": "create_members",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/customers": {
+      "post": {
+        "operationId": "create_customers",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/keys": {
+      "post": {
+        "operationId": "create_keys",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/plans": {
+      "post": {
+        "operationId": "create_plans",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/subscriptions": {
+      "post": {
+        "operationId": "create_subscriptions",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/credits/grants": {
+      "post": {
+        "operationId": "create_credits_grants",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditGrantInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/keys/{id}/revoke": {
+      "post": {
+        "operationId": "revokeKey",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/keys/{id}/rotate": {
+      "post": {
+        "operationId": "rotateKey",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/subscriptions/{id}/cancel": {
+      "post": {
+        "operationId": "subscription_cancel",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/subscriptions/{id}/plan": {
+      "post": {
+        "operationId": "subscription_plan",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanChangeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/subscriptions/{id}/payment-orders": {
+      "post": {
+        "operationId": "subscription_payment-orders",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "201": {
+            "description": "Idempotent command; API key token is returned only on initial creation."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "integration_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "integration_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/subscriptions/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription period, cancellation and scheduled plan."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/customers/{id}/balance": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer balances with expiry-aware buckets."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/credits": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Only the authenticated customer credit buckets."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/audit-events": {
+      "get": {
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant/environment audit log, limit 1..100, opaque cursor."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/integrations/payments/{id}/events": {
+      "post": {
+        "operationId": "sandboxPaymentEvent",
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Payment-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Payment-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Committed atomically. outcome is granted, failed, ignored or review_required. HMAC(raw body) required; bearer credentials do not authorize payment."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    }
+  }
+}
