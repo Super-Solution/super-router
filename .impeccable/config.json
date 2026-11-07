@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "apps/site/src/pages/developers.astro"
+        ],
+        "createdAt": "2026-11-07T15:54:57.503Z",
+        "reason": "user chose developer option 1 (gradient-word halftone direction) on the design canvas, 2026-11-07"
+      }
+    ]
+  }
+}

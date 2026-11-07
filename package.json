@@ -17,7 +17,8 @@
     "packages/sdk",
     "packages/billing-presets",
     "packages/ui",
-    "examples/paid-chat"
+    "examples/paid-chat",
+    "apps/site"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
@@ -37,7 +38,9 @@
     "demo:payments": "npm run build && tsx examples/payments/index.ts",
     "demo:paid-chat": "npm run build && tsx examples/paid-chat/server.ts",
     "build:paid-chat": "npm run build",
-    "test:paid-chat:browser": "npm run build && tsx scripts/paid-chat-browser.ts"
+    "test:paid-chat:browser": "npm run build && tsx scripts/paid-chat-browser.ts",
+    "site:dev": "npm run dev -w @superrouter/site",
+    "site:build": "npm run build -w @superrouter/site"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

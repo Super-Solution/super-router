@@ -1,0 +1,105 @@
+/* Shared base and the Liquid Glass material used by both homepages. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+svg {
+  display: block;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/*
+ * Liquid Glass: a translucent pane that blurs and saturates what sits behind it,
+ * a bright specular rim on the top edge, a softer rim underneath, and a sheen
+ * that catches light from the upper left. Use only over colour or imagery;
+ * over a flat background it has nothing to refract.
+ */
+.glass {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-tint, rgb(255 255 255 / 0.52));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 22px)) saturate(185%);
+  backdrop-filter: blur(var(--glass-blur, 22px)) saturate(185%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    inset 0 -1px 0 rgb(255 255 255 / 0.28),
+    inset 0 0 0 1px rgb(255 255 255 / 0.42),
+    0 10px 32px -14px rgb(18 14 40 / 0.38);
+}
+
+.glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 12% 0%, rgb(255 255 255 / 0.55), transparent 55%),
+    linear-gradient(to top, rgb(255 255 255 / 0.12), transparent 40%);
+}
+
+.glass--dark {
+  --glass-tint: rgb(28 27 34 / 0.42);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 0 0 1px rgb(255 255 255 / 0.14),
+    0 10px 32px -14px rgb(0 0 0 / 0.6);
+}
+
+.glass--dark::after {
+  background: radial-gradient(120% 80% at 12% 0%, rgb(255 255 255 / 0.18), transparent 55%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    --glass-tint: rgb(255 255 255 / 0.92);
+  }
+  .glass--dark {
+    --glass-tint: rgb(28 27 34 / 0.92);
+  }
+}
