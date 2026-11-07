@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Super-Solution/super-router/backends/go/contracts"
 	"github.com/Super-Solution/super-router/backends/go/router"
@@ -197,6 +198,12 @@ func (h *handler) route(w http.ResponseWriter, r *http.Request, requestID *strin
 			return err
 		}
 		return h.creditRates(w, r, p, segments[3], body)
+	case r.Method == http.MethodPost && path == "/v1/admin/credits/grants":
+		body, err := readBody(w, r)
+		if err != nil {
+			return err
+		}
+		return h.grant(w, r, p, body, key)
 	case r.Method == http.MethodPost && path == "/v1/admin/service-versions":
 		body, err := readBody(w, r)
 		if err != nil {
@@ -245,6 +252,42 @@ func (h *handler) route(w http.ResponseWriter, r *http.Request, requestID *strin
 		return nil
 	}
 	return contracts.NewError("resource_not_found", 404)
+}
+
+// grant funds the principal's own customer (or the platform account) from the request body. The
+// Idempotency-Key names the grant, so a retried request never funds twice.
+func (h *handler) grant(w http.ResponseWriter, r *http.Request, p contracts.Principal, body []byte, key string) error {
+	var in struct {
+		Kind      string  `json:"kind"`
+		Asset     string  `json:"asset"`
+		Amount    string  `json:"amount"`
+		ExpiresAt *string `json:"expires_at"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil || in.Asset == "" || in.Amount == "" {
+		return contracts.NewError("invalid_request", 400)
+	}
+	if in.Kind == "" {
+		in.Kind = "customer_sale"
+	}
+	if in.Kind != "customer_sale" && in.Kind != "platform_sale" {
+		return contracts.NewError("invalid_request", 400)
+	}
+	var expires *time.Time
+	if in.ExpiresAt != nil {
+		t, err := time.Parse(time.RFC3339, *in.ExpiresAt)
+		if err != nil {
+			return contracts.NewError("invalid_request", 400)
+		}
+		expires = &t
+	}
+	account, err := h.Store.Grant(r.Context(), p, in.Kind, in.Asset, in.Amount, "http:"+key, expires)
+	if err != nil {
+		return err
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"account": account})
+	return nil
 }
 
 func (h *handler) creditRates(w http.ResponseWriter, r *http.Request, p contracts.Principal, id string, body []byte) error {

@@ -6,8 +6,8 @@ One folder per language. Each implements the same contract and is tested against
 | Folder | Status |
 | --- | --- |
 | `typescript/` | Reference implementation: server, worker, billing presets |
-| `go/` | Proof of concept: the pricing core (`charge`, `bound`, `CompileCreditPrice`) and offering routing (`routing.Route`) |
+| `go/` | Data plane: contracts, pricing, routing, `router.Infer`, memory and PostgreSQL stores, OpenAI and Anthropic providers, `net/http` server and binary |
 | `python/` | Proof of concept: the same pricing core and routing (`route`) |
 
-The proofs of concept cover exact money arithmetic, rate validation and offering selection only. They have no HTTP server,
-storage or provider adapters yet.
+Go and Python are real servers for the data plane (routing, metering, reserve and settle, provider adapters, swappable
+storage). Payments and the control plane (members, keys, plans, subscriptions) exist only in TypeScript for now.

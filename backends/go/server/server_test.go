@@ -301,3 +301,30 @@ func TestPublishAndDryRun(t *testing.T) {
 		t.Fatalf("healthz %d", res.StatusCode)
 	}
 }
+
+func TestGrantEndpoint(t *testing.T) {
+	f := setup(t, "success", 0)
+	grant := `{"asset":"credit:demo","amount":"500"}`
+	if res := f.do(t, "POST", "/v1/admin/credits/grants", "owner-key", "g-http", grant); res.StatusCode != 201 {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	// The same Idempotency-Key with the same body does not fund twice; a different body conflicts.
+	if res := f.do(t, "POST", "/v1/admin/credits/grants", "owner-key", "g-http", grant); res.StatusCode != 201 {
+		t.Fatalf("replay status %d", res.StatusCode)
+	}
+	if res := f.do(t, "POST", "/v1/admin/credits/grants", "owner-key", "g-http", `{"asset":"credit:demo","amount":"501"}`); res.StatusCode != 409 {
+		t.Fatalf("conflict status %d", res.StatusCode)
+	}
+	rows := decode(t, f.do(t, "GET", "/v1/admin/balance", "owner-key", "", ""))["data"].([]any)
+	if rows[0].(map[string]any)["balance"] != "100500" {
+		t.Fatalf("%v", rows)
+	}
+	for _, bad := range []string{`{}`, `{"asset":"credit:demo","amount":"0"}`, `{"asset":"credit:demo","amount":"5","extra":1}`, `{"asset":"credit:demo","amount":"5","kind":"x"}`} {
+		if res := f.do(t, "POST", "/v1/admin/credits/grants", "owner-key", "g-bad", bad); res.StatusCode != 400 {
+			t.Errorf("%s: status %d", bad, res.StatusCode)
+		}
+	}
+	if res := f.do(t, "POST", "/v1/admin/credits/grants", "reader-key", "g-r", grant); res.StatusCode != 403 {
+		t.Fatalf("scope status %d", res.StatusCode)
+	}
+}
