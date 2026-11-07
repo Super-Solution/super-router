@@ -1,0 +1,372 @@
+/*
+ * SuperRouter site system: calm neutrals, hairline structure, one accent.
+ * The accent (orange) marks only the primary action and the number or word
+ * the reader should notice. Everything else is ink, grey and rules.
+ */
+
+:root {
+  --bg: #ffffff;
+  --bg-subtle: #fafafa;
+  --surface: #ffffff;
+  --ink: #0a0a0a;
+  --body: #3f3f46;
+  --muted: #71717a;
+  --line: #e7e7ea;
+  --line-strong: #d4d4d8;
+  --accent: #ff5b14;
+  --accent-ink: #1a0a00;
+  --accent-text: #c2410c;
+  --accent-soft: #fff1e8;
+  --ok: #15803d;
+  --warn: #b45309;
+  --code-bg: #0a0a0a;
+  --code-ink: #e4e4e7;
+  --code-dim: #8b8b94;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
+  --radius: 12px;
+  --font: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --bg-subtle: #111113;
+    --surface: #111113;
+    --ink: #fafafa;
+    --body: #c4c4cc;
+    --muted: #8e8e98;
+    --line: #232327;
+    --line-strong: #34343a;
+    --accent: #ff6a2b;
+    --accent-ink: #1a0a00;
+    --accent-text: #ff8a57;
+    --accent-soft: #2a1408;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --code-bg: #111113;
+    --code-ink: #e4e4e7;
+    --code-dim: #7c7c86;
+    --shadow: 0 0 0 1px var(--line);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+code,
+pre,
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-inline: clamp(16px, 4vw, 32px);
+}
+
+/* Type */
+.h1 {
+  margin: 0;
+  font-size: clamp(40px, 5.4vw, 68px);
+  font-weight: 650;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+.h2 {
+  margin: 0;
+  font-size: clamp(28px, 3.2vw, 40px);
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.lede {
+  margin: 0;
+  font-size: clamp(17px, 1.4vw, 19px);
+  line-height: 1.6;
+  color: var(--body);
+  max-width: 36em;
+}
+.copy {
+  margin: 0;
+  color: var(--body);
+  max-width: 40em;
+}
+.muted {
+  color: var(--muted);
+}
+.accent-text {
+  color: var(--accent-text);
+}
+
+/* Sections */
+.section {
+  padding-block: clamp(72px, 9vw, 112px);
+  border-top: 1px solid var(--line);
+}
+.section__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 48px;
+  margin-bottom: 40px;
+}
+.section__head .copy {
+  max-width: 30em;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease;
+}
+.btn--accent {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn--accent:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--ink));
+}
+.btn--ink {
+  background: var(--ink);
+  color: var(--bg);
+}
+.btn--ink:hover {
+  background: color-mix(in srgb, var(--ink) 82%, var(--bg));
+}
+.btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.btn--ghost:hover {
+  background: var(--bg-subtle);
+}
+.btn[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Inputs */
+.input {
+  height: 44px;
+  width: 100%;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font-size: 15px;
+  caret-color: var(--accent);
+}
+.input::placeholder {
+  color: var(--muted);
+}
+.input:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* Panels and hairline grids */
+.panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow);
+}
+.cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.cells > * {
+  padding: 28px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.cells p {
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 15px;
+}
+
+/* Tables */
+.table-box {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--bg-subtle);
+  padding: 12px 16px;
+  white-space: nowrap;
+}
+.table td {
+  padding: 13px 16px;
+  border-top: 1px solid var(--line);
+  white-space: nowrap;
+}
+.table .r {
+  text-align: right;
+}
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: 1px;
+  background: var(--muted);
+}
+.dot--ok {
+  background: var(--ok);
+}
+.dot--warn {
+  background: var(--warn);
+}
+.dot--accent {
+  background: var(--accent);
+}
+
+/* Code */
+.code {
+  margin: 0;
+  padding: 20px 22px;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  font-size: 13.5px;
+  line-height: 1.75;
+  overflow-x: auto;
+  border-radius: var(--radius);
+}
+.code .c {
+  color: var(--code-dim);
+}
+.code .s {
+  color: #a7e3bf;
+}
+.code .k {
+  color: #c4b5fd;
+}
+.code .a {
+  color: var(--accent);
+}
+
+/*
+ * Glass, used only on the sticky navigation: it lets the page show through
+ * as it scrolls underneath, with a fine highlight on the top edge.
+ */
+.glass {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  backdrop-filter: blur(16px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent),
+    0 1px 0 var(--line);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--bg);
+  }
+}

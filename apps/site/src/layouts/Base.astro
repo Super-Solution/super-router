@@ -1,14 +1,17 @@
 ---
-import '../styles/glass.css';
+import '../styles/site.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
 
 interface Props {
   title: string;
   description: string;
-  fonts: string;
-  themeColor: string;
+  section: 'wallet' | 'developers';
 }
 
-const { title, description, fonts, themeColor } = Astro.props;
+const { title, description, section } = Astro.props;
+const fonts =
+  'https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap';
 ---
 
 <!doctype html>
@@ -18,7 +21,8 @@ const { title, description, fonts, themeColor } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content={themeColor} />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -27,6 +31,10 @@ const { title, description, fonts, themeColor } = Astro.props;
     <link rel="stylesheet" href={fonts} />
   </head>
   <body>
-    <slot />
+    <Header section={section} />
+    <main>
+      <slot />
+    </main>
+    <Footer section={section} />
   </body>
 </html>

@@ -1,0 +1,58 @@
+---
+interface Props {
+  section: 'wallet' | 'developers';
+}
+
+const { section } = Astro.props;
+---
+
+<footer class="foot">
+  <div class="wrap foot__inner">
+    <span class="foot__brand">SuperRouter</span>
+    <p>
+      {
+        section === 'wallet'
+          ? 'SuperRouter Cloud is not open yet. Prices, expiry and refund terms will be published before launch.'
+          : 'Development release. Packages are not yet on npm; live-provider and live-payment verification is pending.'
+      }
+    </p>
+    <nav aria-label="Footer">
+      <a href="/">Wallet</a>
+      <a href="/developers">Developers</a>
+    </nav>
+  </div>
+</footer>
+
+<style>
+  .foot {
+    border-top: 1px solid var(--line);
+    padding-block: 32px 40px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .foot__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px 32px;
+  }
+  .foot__brand {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .foot p {
+    margin: 0;
+    flex: 1 1 320px;
+  }
+  .foot nav {
+    display: flex;
+    gap: 20px;
+  }
+  .foot a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .foot a:hover {
+    color: var(--ink);
+  }
+</style>

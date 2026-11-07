@@ -1,710 +1,414 @@
 ---
 import Base from '../layouts/Base.astro';
 
-const fonts =
-  'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;600&display=swap';
+const upstreams = ['OpenAI', 'Anthropic', 'vLLM', 'Ollama', 'OpenRouter', 'DeepSeek', 'any OpenAI-compatible server'];
 
-const baseUrl = 'https://<your-superrouter>/v1';
+const requests = [
+  { time: '15:03:12', service: 'chat/low', provider: 'anthropic', tokens: '1,204 / 388', cost: '0.0021', charge: '0.0035', status: 'Settled', tone: 'ok' },
+  { time: '15:02:47', service: 'coding/high', provider: 'openai → anthropic', tokens: '3,880 / 1,120', cost: '0.0190', charge: '0.0240', status: 'Settled · fallback', tone: 'ok' },
+  { time: '15:01:30', service: 'chat/low', provider: 'openai', tokens: '—', cost: '0.0000', charge: '0.0000', status: 'Upstream failed · released', tone: 'idle' },
+  { time: '15:00:58', service: 'chat/low', provider: 'vllm-local', tokens: '640 / ?', cost: 'pending', charge: 'held', status: 'Reconciliation', tone: 'warn' },
+];
 
-const providers = ['OpenAI', 'Anthropic', 'vLLM', 'Ollama', 'OpenRouter', 'DeepSeek'];
+const features = [
+  {
+    title: 'Routing',
+    items: [
+      'Versioned Services: a specific model, a pool or a tier',
+      'Region, capability and price limits apply before scoring',
+      'Shared health and circuit breakers',
+      'Fails over only when the upstream definitely didn’t run',
+    ],
+  },
+  {
+    title: 'Billing',
+    items: [
+      'Reserve before the call, settle on actual usage',
+      'BigInt atoms and idempotent replays',
+      'Credits with expiry and Service scope, subscriptions, prorated upgrades',
+      'Stripe, Epay V1 and OEN hosted checkout (sandbox-verified)',
+    ],
+  },
+  {
+    title: 'Operations',
+    items: [
+      'Gapless invoices, voids and credit notes; tax table or your tax webhook',
+      'Workspaces, projects and roles; OIDC, passkeys, TOTP',
+      'Per-key spend, rate, concurrency and IP limits',
+      'Webhooks with SSRF protection, metrics, audit log',
+    ],
+  },
+];
 
-const candidates = [
-  { name: 'provider-a', note: 'Excluded: data region' },
-  { name: 'provider-b', note: 'Excluded: circuit open' },
-  { name: 'provider-c', score: '0.71' },
-  { name: 'provider-d', score: '0.86', chosen: true },
+const failures = [
+  { when: 'Rejected, no candidate, or insufficient balance', charge: 'Nothing', cost: 'None; nothing ran' },
+  { when: 'First attempt failed, fallback succeeded', charge: 'Once, for the result', cost: 'Every attempt recorded' },
+  { when: 'Every attempt failed', charge: 'Nothing; hold released', cost: 'Known and pending cost kept apart' },
+  { when: 'Stream cut after partial output', charge: 'Confirmed usage only', cost: 'Unknown usage goes to reconciliation' },
+  { when: 'Outcome unknown', charge: 'Hold kept, not retried', cost: 'Reconciliation queue' },
+];
+
+const compare = [
+  { row: 'Routing, billing, invoices', self: 'Included', cloud: 'Included' },
+  { row: 'Your own upstream API keys', self: 'Required', cloud: 'Not needed' },
+  { row: 'Payments and tax', self: 'Your integration', cloud: 'Handled by Cloud' },
+  { row: 'Shared user wallet (Sign in with SuperRouter)', self: '—', cloud: 'Included' },
+  { row: 'Per-key and per-app statistics', self: '—', cloud: 'Included' },
+  { row: 'Markup on token usage', self: 'Your own prices', cloud: '0, 10, 20, 30 or 50%' },
+  { row: 'Price', self: '—', cloud: 'Not announced' },
 ];
 ---
 
 <Base
   title="SuperRouter for developers — an AI gateway with billing built in"
   description="OpenAI-compatible AI gateway you can self-host. Reserve before the call, settle on actual usage, and keep provider cost and customer charges in separate ledgers."
-  fonts={fonts}
-  themeColor="#F7F8FA"
+  section="developers"
 >
-  <div class="page">
-    <header class="top">
-      <div class="top__bar glass">
-        <a class="brand" href="/developers">SuperRouter <span>for developers</span></a>
-        <nav aria-label="Main">
-          <a href="#how">How it works</a>
-          <a href="#deploy">Cloud &amp; self-host</a>
-          <a href="/">Wallet</a>
-          <a href="#run" class="pill">Run it locally</a>
-        </nav>
+  <section class="hero wrap">
+    <div class="hero__copy">
+      <h1 class="h1">The AI gateway with billing built in.</h1>
+      <p class="lede">
+        An OpenAI-compatible API you can host yourself. Every request is reserved up front, settled
+        on actual usage, and recorded with what it cost upstream and what your customer paid.
+      </p>
+      <div class="hero__actions">
+        <a class="btn btn--accent" href="#quickstart">Run it locally</a>
+        <a class="btn btn--ghost" href="#deploy">Compare Cloud and self-host</a>
       </div>
-    </header>
+    </div>
 
-    <main>
-      <section class="hero">
-        <div class="dots" aria-hidden="true"></div>
-        <div class="slab slab--blue" aria-hidden="true"></div>
-        <div class="slab slab--warm" aria-hidden="true"></div>
-        <div class="hero__inner wrap">
-          <h1>One API for routing,<br /><span class="grad">billing and reconciliation.</span></h1>
-          <p class="lede">
-            An OpenAI-compatible AI gateway you can host yourself. Every request is reserved up
-            front and settled on actual usage, with provider cost and customer charges kept in
-            separate ledgers.
-          </p>
-          <div class="urlbar glass">
-            <code><span class="dim">baseURL:</span> "{baseUrl}"</code>
-            <button type="button" class="copy" data-copy={baseUrl} aria-label="Copy base URL">Copy</button>
-            <a href="#run" class="pill">Get started</a>
-          </div>
-          <p class="hint">Keep the OpenAI SDK. Change the base URL.</p>
-        </div>
-      </section>
+    <div class="tabs panel" data-tabs>
+      <div class="tabs__bar" role="tablist" aria-label="Example code">
+        <button type="button" role="tab" id="t-openai" aria-controls="p-openai" aria-selected="true">OpenAI SDK</button>
+        <button type="button" role="tab" id="t-curl" aria-controls="p-curl" aria-selected="false" tabindex="-1">cURL</button>
+        <button type="button" role="tab" id="t-sdk" aria-controls="p-sdk" aria-selected="false" tabindex="-1">@superrouter/sdk</button>
+      </div>
+      <pre class="code" id="p-openai" role="tabpanel" aria-labelledby="t-openai"><span class="k">import</span> OpenAI <span class="k">from</span> <span class="s">"openai"</span>;
 
-      <section class="providers wrap" aria-label="Supported upstreams">
-        {providers.map((p) => <span class="chip">{p}</span>)}
-        <span class="chip chip--soft">Any OpenAI-compatible server</span>
-      </section>
+<span class="k">const</span> client = <span class="k">new</span> OpenAI(&#123;
+  apiKey: process.env.SUPERROUTER_KEY,
+  <span class="a">baseURL: "https://&lt;your-superrouter&gt;/v1",</span>
+&#125;);
 
-      <section id="how" class="rows wrap">
-        <div class="row">
-          <div class="row__copy">
-            <p class="step">01 · Routing</p>
-            <h2>Filter first.<br />Then pick the best.</h2>
-            <p>
-              Region, capability and price caps rule providers out before anything is scored. Cost,
-              latency and success rate decide among what’s left, and every exclusion comes with a
-              reason.
-            </p>
-          </div>
-          <div class="card card--list" aria-label="Example routing decision">
+<span class="k">const</span> stream = <span class="k">await</span> client.chat.completions.create(&#123;
+  model: <span class="s">"chat/low"</span>, <span class="c">// a Service you published</span>
+  messages,
+  stream: <span class="k">true</span>,
+&#125;);</pre>
+      <pre class="code" id="p-curl" role="tabpanel" aria-labelledby="t-curl" hidden>curl https://&lt;your-superrouter&gt;/v1/chat/completions \
+  -H <span class="s">"Authorization: Bearer $SUPERROUTER_KEY"</span> \
+  -H <span class="s">"Idempotency-Key: order-42"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'&#123;"model":"chat/low","messages":[&#123;"role":"user","content":"Hi"&#125;]&#125;'</span></pre>
+      <pre class="code" id="p-sdk" role="tabpanel" aria-labelledby="t-sdk" hidden><span class="k">import</span> &#123; SuperRouterClient &#125; <span class="k">from</span> <span class="s">"@superrouter/sdk"</span>;
+
+<span class="k">const</span> client = <span class="k">new</span> SuperRouterClient(&#123;
+  baseUrl: <span class="s">"https://&lt;your-superrouter&gt;"</span>,
+  apiKey: process.env.SUPERROUTER_KEY,
+&#125;);
+
+<span class="c">// Streaming, replay status, cancellation and usage queries.</span>
+<span class="c">// Not yet published to npm.</span></pre>
+    </div>
+  </section>
+
+  <div class="wrap upstreams">
+    <span class="muted">Routes to</span>
+    {upstreams.map((u) => <span>{u}</span>)}
+  </div>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section__head">
+        <h2 class="h2">Know what every request cost, and what you charged for it.</h2>
+        <p class="copy">
+          Provider cost and customer charge sit side by side for each request. Anything that can’t
+          be confirmed is held and queued for reconciliation, never treated as free.
+        </p>
+      </div>
+      <div class="table-box">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col">Service</th>
+              <th scope="col">Provider</th>
+              <th scope="col" class="r">Tokens in / out</th>
+              <th scope="col" class="r">Provider cost</th>
+              <th scope="col" class="r">Charged</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody class="mono">
             {
-              candidates.map((c) => (
-                <div class="cand">
-                  <span class="mono">{c.name}</span>
-                  {c.note && <span class="cand__note">{c.note}</span>}
-                  {c.score && !c.chosen && <span class="mono">{c.score}</span>}
-                  {c.chosen && <span class="badge mono">{c.score} selected</span>}
-                </div>
+              requests.map((r) => (
+                <tr>
+                  <td class="muted">{r.time}</td>
+                  <td>{r.service}</td>
+                  <td>{r.provider}</td>
+                  <td class="r">{r.tokens}</td>
+                  <td class="r">{r.cost}</td>
+                  <td class="r">{r.charge}</td>
+                  <td class="status">
+                    <span class={`dot dot--${r.tone}`} />
+                    {r.status}
+                  </td>
+                </tr>
               ))
             }
-          </div>
-        </div>
+          </tbody>
+        </table>
+      </div>
+      <p class="note muted">Example data, in credits. 1 credit = 1,000,000,000 atoms.</p>
+    </div>
+  </section>
 
-        <div class="row row--flip">
-          <div class="row__copy">
-            <p class="step">02 · Settlement</p>
-            <h2>Reserve first.<br />Charge what was used.</h2>
-            <p>
-              Concurrent requests can’t overspend a balance, and a retried idempotency key is only
-              charged once. Amounts are BigInt atoms, never floats.
-            </p>
-          </div>
-          <div class="card" aria-label="Example settlement: 4.000 reserved, 3.512 settled, 0.488 released">
-            <div class="settle__head"><span>Reserved 4.000</span><span>credits</span></div>
-            <div class="settle__bar" aria-hidden="true">
-              <span class="settle__used"></span><span class="settle__free"></span>
+  <section id="features" class="section">
+    <div class="wrap">
+      <div class="section__head">
+        <h2 class="h2">Routing, metering and invoicing in one service.</h2>
+      </div>
+      <div class="cells">
+        {
+          features.map((f) => (
+            <div>
+              <h3 class="h3">{f.title}</h3>
+              <ul class="list">
+                {f.items.map((i) => (
+                  <li>{i}</li>
+                ))}
+              </ul>
             </div>
-            <div class="settle__foot">
-              <span>Settled <b class="mono">3.512</b></span>
-              <span class="released">Released <b class="mono">0.488</b></span>
-            </div>
-            <p class="mono settle__note">1 credit = 1,000,000,000 atoms</p>
-          </div>
-        </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
 
-        <div class="row">
-          <div class="row__copy">
-            <p class="step">03 · Failures</p>
-            <h2>Unclear outcomes<br />aren’t guessed.</h2>
-            <p>
-              Failover only happens when the upstream definitely didn’t run. When the outcome is
-              unknown, the hold stays in place and the request goes to the reconciliation queue. It’s
-              never treated as free or retried blindly.
-            </p>
-          </div>
-          <pre class="card card--dark" aria-label="Example request traces"><span class="dim">req_01JD7Q · chat/low@v3</span>
-attempt 1  provider-a  <span class="amber">not executed (connect failed)</span>
-attempt 2  provider-b  <span class="green">200 stream</span>
-charge     <span class="white">once</span>
-cost       <span class="white">both attempts recorded</span>
-
-<span class="dim">req_01JD7T · chat/low@v3</span>
-attempt 1  provider-c  <span class="rose">stream cut, usage missing</span>
-status     <span class="rose">pending → reconciliation queue</span></pre>
-        </div>
-      </section>
-
-      <section id="deploy" class="deploy wrap" aria-labelledby="deploy-title">
-        <h2 id="deploy-title" class="center">One core. <span class="grad">Two ways to run it.</span></h2>
-        <div class="deploy__grid">
-          <article id="run" class="card deploy__self">
-            <h3>Self-host</h3>
-            <p>
-              Bring your own provider keys, payments (Stripe, Epay V1 and OEN, verified in sandbox)
-              and tax webhook. Needs Node.js 24 and Docker.
-            </p>
-            <pre class="term"><span class="dim">$</span> npm ci &amp;&amp; npm run build
-<span class="dim">$</span> npm run db:up
-<span class="dim">$</span> npm run demo</pre>
-            <p class="small">The demo uses a mock model, so it costs nothing. The database, HTTP, streaming and ledger all run for real.</p>
-          </article>
-          <article class="deploy__cloud">
-            <div class="dots dots--light" aria-hidden="true"></div>
-            <h3>Cloud <span class="soon glass glass--dark">Not open yet</span></h3>
-            <ul class="glass">
-              <li>Apply for a key. No server to run.</li>
-              <li>Users sign in with SuperRouter and pay from their own balance.</li>
-              <li>Usage and spend for every key and every app.</li>
-              <li>Add a 0–50% markup on token usage and keep the difference.</li>
-            </ul>
-          </article>
-        </div>
-        <p class="status">
-          Development release · 155 tests passing · not yet published to npm · live-provider and
-          live-payment verification pending
+  <section class="section">
+    <div class="wrap">
+      <div class="section__head">
+        <h2 class="h2">When things fail, the ledger stays honest.</h2>
+        <p class="copy">
+          Failover happens only when the upstream definitely didn’t run. The ledger is append-only:
+          refunds and corrections never rewrite the original entry.
         </p>
-      </section>
-    </main>
+      </div>
+      <div class="table-box">
+        <table class="table">
+          <thead>
+            <tr><th scope="col">Situation</th><th scope="col">Customer is charged</th><th scope="col">Provider cost</th></tr>
+          </thead>
+          <tbody>
+            {
+              failures.map((f) => (
+                <tr>
+                  <td>{f.when}</td>
+                  <td>{f.charge}</td>
+                  <td class="muted">{f.cost}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 
-    <footer class="foot wrap">
-      <span>SuperRouter</span>
-      <a href="/">SuperRouter Wallet</a>
-    </footer>
-  </div>
+  <section id="deploy" class="section">
+    <div class="wrap">
+      <div class="section__head">
+        <h2 class="h2">Host it yourself, or use Cloud.</h2>
+        <p class="copy">
+          The same core runs both. Cloud adds the shared user wallet and per-key statistics; it
+          isn’t open yet.
+        </p>
+      </div>
+      <div class="table-box">
+        <table class="table compare">
+          <thead>
+            <tr><th scope="col"></th><th scope="col">Self-host</th><th scope="col">Cloud <span class="soon">Not open yet</span></th></tr>
+          </thead>
+          <tbody>
+            {
+              compare.map((c) => (
+                <tr>
+                  <th scope="row">{c.row}</th>
+                  <td>{c.self}</td>
+                  <td>{c.cloud}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="quickstart" class="section">
+    <div class="wrap quick">
+      <div>
+        <h2 class="h2">Run it locally in four commands.</h2>
+        <p class="copy">
+          Needs Node.js 24 and Docker. The demo uses a mock model, so it costs nothing; the
+          database, HTTP, streaming and ledger all run for real.
+        </p>
+        <p class="copy muted small">
+          Development release · 155 tests passing · license not decided yet.
+        </p>
+      </div>
+      <pre class="code"><span class="c">$</span> npm ci
+<span class="c">$</span> npm run build
+<span class="c">$</span> npm run db:up
+<span class="c">$</span> npm run demo</pre>
+    </div>
+  </section>
 </Base>
 
 <script>
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
-    button.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(button.dataset.copy ?? '');
-        button.textContent = 'Copied';
-      } catch {
-        button.textContent = 'Press ⌘C';
+  for (const root of document.querySelectorAll<HTMLElement>('[data-tabs]')) {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const select = (tab: HTMLButtonElement) => {
+      for (const t of tabs) {
+        const on = t === tab;
+        t.setAttribute('aria-selected', String(on));
+        t.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById(t.getAttribute('aria-controls') ?? '');
+        if (panel) panel.hidden = !on;
       }
-      setTimeout(() => (button.textContent = 'Copy'), 1600);
+    };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => select(tab));
+      tab.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        select(next);
+        next.focus();
+      });
     });
   }
 </script>
 
 <style>
-  :global(body) {
-    background: #f7f8fa;
-    color: #0b0f1e;
-    font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
-  }
-  :global(::selection) {
-    background: #3b5bff;
-    color: #fff;
-  }
-  :global(:focus-visible) {
-    outline: 2px solid #3b5bff;
-    outline-offset: 3px;
-  }
-
-  .page {
-    --ink: #0b0f1e;
-    --body: #4b5168;
-    --muted: #6b7088;
-    --blue: #3b5bff;
-    --violet: #8b5cf6;
-    --coral: #ff6b6b;
-    --line: #e3e5ef;
-    --soft: #eef0fb;
-    overflow-x: clip;
-  }
-  .wrap {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding-inline: clamp(16px, 4vw, 40px);
-  }
-  .mono,
-  code,
-  pre {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-variant-numeric: tabular-nums;
-  }
-  .grad {
-    background: linear-gradient(90deg, var(--blue) 0%, var(--violet) 45%, var(--coral) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .dots {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: -80px;
-    height: 560px;
-    pointer-events: none;
-    background: linear-gradient(100deg, var(--blue) 0%, var(--violet) 50%, #ff8a5b 100%);
-    -webkit-mask-image:
-      radial-gradient(circle, #000 2px, transparent 2.4px),
-      linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.35) 55%, transparent 100%);
-    -webkit-mask-size: 16px 16px, 100% 100%;
-    -webkit-mask-composite: source-in;
-    mask-image:
-      radial-gradient(circle, #000 2px, transparent 2.4px),
-      linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.35) 55%, transparent 100%);
-    mask-size: 16px 16px, 100% 100%;
-    mask-composite: intersect;
-  }
-
-  /* Header */
-  .top {
-    position: sticky;
-    top: 12px;
-    z-index: 20;
-    padding-inline: clamp(12px, 3vw, 32px);
-  }
-  .top__bar {
-    max-width: 1100px;
-    margin: 12px auto 0;
-    border-radius: 999px;
-    padding: 8px 8px 8px 22px;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px 20px;
-  }
-  .brand {
-    font-weight: 800;
-    font-size: 18px;
-    color: inherit;
-    text-decoration: none;
-  }
-  .brand span {
-    font-weight: 500;
-    color: var(--muted);
-  }
-  .top nav {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 18px;
-    font-size: 15px;
-    font-weight: 500;
-  }
-  .top nav a {
-    color: var(--ink);
-    text-decoration: none;
-  }
-  .top nav a:not(.pill):hover {
-    color: var(--blue);
-  }
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    background: var(--ink);
-    color: #fff !important;
-    padding: 0 20px;
-    border-radius: 999px;
-    font-weight: 650;
-    text-decoration: none;
-    transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .pill:hover {
-    background: var(--blue);
-  }
-
-  /* Hero */
   .hero {
-    position: relative;
-    padding-bottom: 150px;
-    text-align: center;
-  }
-  .slab {
-    position: absolute;
-    height: 160px;
-    border-radius: 28px;
-    transform: rotate(6deg);
-    pointer-events: none;
-  }
-  .slab--blue {
-    left: -10%;
-    bottom: 26px;
-    width: 52%;
-    background: linear-gradient(100deg, #2b3fe0, #6d5bff);
-  }
-  .slab--warm {
-    right: -6%;
-    bottom: 64px;
-    width: 44%;
-    height: 132px;
-    background: linear-gradient(100deg, #a78bfa, #ff7a7a 60%, #ffb27a);
-  }
-  .hero__inner {
-    position: relative;
-    padding-top: clamp(80px, 11vw, 132px);
-  }
-  h1 {
-    margin: 0;
-    font-size: clamp(42px, 6vw, 80px);
-    font-weight: 800;
-    line-height: 1.04;
-    letter-spacing: -0.035em;
-    text-wrap: balance;
-  }
-  .lede {
-    margin: 24px auto 0;
-    font-size: clamp(17px, 1.5vw, 20px);
-    line-height: 1.6;
-    color: var(--body);
-    max-width: 36em;
-  }
-  .urlbar {
-    margin: 40px auto 0;
-    max-width: 720px;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     align-items: center;
-    gap: 8px;
-    border-radius: 999px;
-    padding: 8px 8px 8px 26px;
-    --glass-tint: rgb(255 255 255 / 0.72);
-    text-align: left;
+    gap: 56px;
+    padding-block: clamp(56px, 8vw, 104px) 48px;
   }
-  .urlbar code {
-    flex: 1;
-    min-width: 0;
-    font-size: 16px;
-    white-space: nowrap;
-    overflow-x: auto;
+  @media (max-width: 960px) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
-  .dim {
-    color: var(--muted);
+  .hero .lede {
+    margin-top: 22px;
   }
-  .copy {
-    flex: 0 0 auto;
-    min-height: 44px;
-    padding: 0 16px;
-    border: 0;
-    border-radius: 999px;
-    background: var(--soft);
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-  }
-  .copy:hover {
-    background: #e0e4fb;
-  }
-  .urlbar .pill {
-    flex: 0 0 auto;
-  }
-  .hint {
-    margin: 14px 0 0;
-    font-size: 14px;
-    color: var(--muted);
-  }
-
-  .providers {
+  .hero__actions {
+    margin-top: 32px;
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
     gap: 10px;
-    padding-bottom: 40px;
   }
-  .chip {
-    padding: 10px 18px;
-    border-radius: 999px;
-    background: #fff;
-    box-shadow: 0 0 0 1px var(--line);
-    font-size: 16px;
-    font-weight: 600;
+
+  .tabs {
+    overflow: hidden;
+    background: var(--code-bg);
   }
-  .chip--soft {
-    background: var(--soft);
-    box-shadow: none;
-    font-weight: 500;
+  .tabs__bar {
+    display: flex;
+    gap: 4px;
+    padding: 8px 10px 0;
+    border-bottom: 1px solid #26262b;
+  }
+  .tabs__bar button {
+    border: 0;
+    background: transparent;
+    color: var(--code-dim);
+    padding: 8px 10px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .tabs__bar button:hover {
+    color: var(--code-ink);
+  }
+  .tabs__bar button[aria-selected='true'] {
+    color: #fafafa;
+    border-bottom-color: var(--accent);
+  }
+  .tabs .code {
+    border-radius: 0;
+    min-height: 300px;
+  }
+
+  .upstreams {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    padding-bottom: 72px;
+    font-size: 15px;
     color: var(--body);
   }
 
-  /* Feature rows */
-  .rows {
-    padding-top: 96px;
-    padding-bottom: 120px;
-    display: flex;
-    flex-direction: column;
-    gap: 104px;
+  .status {
+    font-family: var(--font);
   }
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 40px 64px;
+  .dot--idle {
+    background: var(--muted);
   }
-  .row--flip {
-    flex-direction: row-reverse;
+  .note {
+    margin: 12px 0 0;
+    font-size: 13px;
   }
-  .row__copy {
-    flex: 1 1 300px;
-  }
-  .step {
-    margin: 0;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 14px;
-    color: var(--blue);
-  }
-  h2 {
-    margin: 10px 0 0;
-    font-size: clamp(32px, 3.6vw, 46px);
-    font-weight: 800;
-    line-height: 1.06;
-    letter-spacing: -0.03em;
-  }
-  .row__copy p:not(.step) {
-    margin: 16px 0 0;
-    font-size: 17px;
-    line-height: 1.65;
+
+  .list {
+    margin: 12px 0 0;
+    padding-left: 18px;
     color: var(--body);
-    max-width: 26em;
-  }
-  .card {
-    flex: 1.2 1 440px;
-    min-width: 0;
-    margin: 0;
-    background: #fff;
-    border-radius: 28px;
-    padding: 28px;
-    box-shadow: 0 30px 60px -30px rgb(11 15 30 / 0.35);
-  }
-  .card--list {
-    padding-block: 10px;
-  }
-  .cand {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 0;
     font-size: 15px;
   }
-  .cand + .cand {
-    border-top: 1px solid var(--soft);
-  }
-  .cand__note {
-    font-size: 14px;
-    color: var(--muted);
-  }
-  .badge {
-    padding: 6px 12px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--blue), var(--violet));
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .settle__head,
-  .settle__foot {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .settle__head {
-    font-size: 14px;
-    color: var(--muted);
-  }
-  .settle__bar {
-    margin-top: 10px;
-    display: flex;
-    height: 18px;
-    border-radius: 999px;
-    overflow: hidden;
-    background: var(--soft);
-  }
-  .settle__used {
-    flex: 3512;
-    background: linear-gradient(90deg, var(--blue), var(--violet));
-  }
-  .settle__free {
-    flex: 488;
-    background: repeating-linear-gradient(45deg, #ffd3c2 0 6px, #ffe7dd 6px 12px);
-  }
-  .settle__foot {
-    margin-top: 16px;
-    font-size: 16px;
-  }
-  .released {
-    color: #c23a52;
-  }
-  .settle__note {
-    margin: 18px 0 0;
-    padding-top: 16px;
-    border-top: 1px solid var(--soft);
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .card--dark {
-    background: var(--ink);
-    color: #d6d9e6;
-    font-size: 14px;
-    line-height: 2;
-    overflow-x: auto;
-    box-shadow: 0 30px 60px -30px rgb(11 15 30 / 0.6);
-  }
-  .card--dark .dim {
-    color: #8a8fa6;
-  }
-  .amber {
-    color: #ffb27a;
-  }
-  .green {
-    color: #9fe3b8;
-  }
-  .rose {
-    color: #ff8fa3;
-  }
-  .white {
-    color: #fff;
+  .list li + li {
+    margin-top: 6px;
   }
 
-  /* Deploy */
-  .deploy {
-    padding-bottom: 104px;
-  }
-  .center {
-    text-align: center;
-    margin-inline: auto;
-  }
-  .deploy__grid {
-    margin-top: 48px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 16px;
-  }
-  .deploy h3 {
-    margin: 0;
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-  }
-  .deploy__self {
-    box-shadow: 0 0 0 1px var(--line);
-    padding: 36px;
-    border-radius: 32px;
-  }
-  .deploy__self p {
-    margin: 10px 0 0;
-    font-size: 16px;
-    line-height: 1.65;
+  .compare th[scope='row'] {
+    font-weight: 400;
     color: var(--body);
+    background: transparent;
+    border-top: 1px solid var(--line);
+    white-space: normal;
   }
-  .deploy__self .small {
-    font-size: 14px;
-    color: var(--muted);
-  }
-  .term {
-    margin: 22px 0 0;
-    padding: 18px 20px;
-    border-radius: 18px;
-    background: var(--ink);
-    color: #d6d9e6;
-    font-size: 14px;
-    line-height: 1.9;
-    overflow-x: auto;
-  }
-  .term .dim {
-    color: #8a8fa6;
-  }
-  .deploy__cloud {
-    position: relative;
-    overflow: hidden;
-    border-radius: 32px;
-    padding: 36px;
-    background: linear-gradient(120deg, #2b3fe0, #7c5cff 55%, #ff7a7a);
-    color: #fff;
-  }
-  .dots--light {
-    inset: 0;
-    top: 0;
-    height: auto;
-    background: #fff;
-    opacity: 0.18;
-  }
-  .deploy__cloud h3 {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  .compare td {
+    white-space: normal;
   }
   .soon {
-    font-size: 14px;
-    font-weight: 650;
-    letter-spacing: 0;
-    padding: 6px 12px;
+    margin-left: 8px;
+    padding: 2px 8px;
     border-radius: 999px;
-  }
-  .deploy__cloud ul {
-    --glass-tint: rgb(255 255 255 / 0.16);
-    --glass-blur: 16px;
-    margin: 22px 0 0;
-    padding: 20px 22px 20px 40px;
-    border-radius: 22px;
-    font-size: 16px;
-    line-height: 1.85;
-  }
-  .status {
-    margin: 28px 0 0;
-    text-align: center;
-    font-size: 14px;
-    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent-text);
+    background: var(--accent-soft);
   }
 
-  .foot {
-    padding-bottom: 40px;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 12px;
+  .quick {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 48px;
+    align-items: center;
+  }
+  @media (max-width: 860px) {
+    .quick {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .quick .copy {
+    margin-top: 16px;
+  }
+  .small {
     font-size: 14px;
-    color: var(--muted);
-  }
-  .foot a {
-    color: var(--muted);
-  }
-
-  @media (max-width: 640px) {
-    .urlbar {
-      flex-wrap: wrap;
-      border-radius: 24px;
-      padding: 14px;
-    }
-    .urlbar code {
-      flex-basis: 100%;
-      padding: 4px 6px 8px;
-    }
-    .urlbar .pill {
-      flex: 1;
-      justify-content: center;
-    }
-    .top__bar {
-      border-radius: 28px;
-      padding: 10px 10px 10px 16px;
-    }
-    .brand span {
-      display: none;
-    }
-    .top nav {
-      gap: 4px 14px;
-    }
-    .top nav a:not(.pill) {
-      font-size: 14px;
-    }
-    .top nav .pill {
-      min-height: 40px;
-      padding: 0 14px;
-      font-size: 14px;
-    }
-    .hero {
-      padding-bottom: 170px;
-    }
-    .slab {
-      height: 96px;
-    }
-    .slab--blue {
-      bottom: 0;
-    }
-    .slab--warm {
-      bottom: 30px;
-      height: 80px;
-    }
   }
 </style>

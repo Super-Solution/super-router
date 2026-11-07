@@ -1,0 +1,121 @@
+---
+interface Props {
+  section: 'wallet' | 'developers';
+}
+
+const { section } = Astro.props;
+
+const links =
+  section === 'wallet'
+    ? [
+        { href: '#how', label: 'How it works' },
+        { href: '#charges', label: 'Charges' },
+        { href: '#faq', label: 'FAQ' },
+      ]
+    : [
+        { href: '#quickstart', label: 'Quickstart' },
+        { href: '#features', label: 'Features' },
+        { href: '#deploy', label: 'Cloud & self-host' },
+      ];
+---
+
+<header class="nav glass">
+  <div class="wrap nav__inner">
+    <a class="brand" href={section === 'wallet' ? '/' : '/developers'}>
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <rect width="20" height="20" rx="5" fill="currentColor"></rect>
+        <path d="M5.5 13.5L10 6.5l4.5 7" stroke="var(--accent)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      <span>SuperRouter</span>
+    </a>
+    <div class="switcher" role="navigation" aria-label="Audience">
+      <a href="/" aria-current={section === 'wallet' ? 'page' : undefined}>Wallet</a>
+      <a href="/developers" aria-current={section === 'developers' ? 'page' : undefined}>Developers</a>
+    </div>
+    <nav class="links" aria-label="On this page">
+      {links.map((l) => <a href={l.href}>{l.label}</a>)}
+    </nav>
+    {
+      section === 'wallet' ? (
+        <a class="btn btn--ink nav__cta" href="#join">Join the waitlist</a>
+      ) : (
+        <a class="btn btn--ink nav__cta" href="#quickstart">Run it locally</a>
+      )
+    }
+  </div>
+</header>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .nav__inner {
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px 24px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 650;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+  }
+  .switcher {
+    display: flex;
+    padding: 3px;
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px var(--line);
+    font-size: 14px;
+  }
+  .switcher a {
+    padding: 4px 10px;
+    border-radius: 6px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .switcher a:hover {
+    color: var(--ink);
+  }
+  .switcher a[aria-current='page'] {
+    background: var(--bg-subtle);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .links {
+    display: flex;
+    gap: 22px;
+    margin-left: auto;
+    font-size: 14px;
+  }
+  .links a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .links a:hover {
+    color: var(--ink);
+  }
+  .nav__cta {
+    min-height: 36px;
+    padding: 0 14px;
+    font-size: 14px;
+  }
+  @media (max-width: 760px) {
+    .links {
+      display: none;
+    }
+    .nav__cta {
+      margin-left: auto;
+    }
+  }
+  @media (max-width: 440px) {
+    .brand span {
+      display: none;
+    }
+  }
+</style>
