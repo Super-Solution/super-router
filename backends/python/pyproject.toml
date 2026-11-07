@@ -3,15 +3,15 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "super-router-core"
+name = "super-router"
 version = "0.1.0"
-description = "Exact pricing and offering routing for Super Router (Python port of the TypeScript reference)."
+description = "Super Router data plane for Python: exact pricing, routing, reserve and settle, providers, an ASGI server and swappable storage."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "SUPER SOLUTION LABS INC", email = "contact@supersolution.io" }]
-keywords = ["ai", "routing", "billing", "metering"]
+keywords = ["ai", "routing", "billing", "metering", "asgi", "llm"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
@@ -21,17 +21,31 @@ classifiers = [
 ]
 dependencies = []
 
+[project.scripts]
+super-router-server = "super_router.__main__:main"
+
 [project.urls]
 Repository = "https://github.com/Super-Solution/super-router"
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10"]
+postgres = ["psycopg[binary]>=3.2", "psycopg-pool>=3.2"]
+http = ["httpx>=0.27"]
+server = ["super-router[postgres,http]", "uvicorn>=0.30"]
+dev = [
+  "super-router[server]",
+  "pytest>=8",
+  "anyio>=4",
+  "starlette>=0.37",
+  "fastapi>=0.110",
+  "ruff>=0.6",
+  "mypy>=1.10",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-super_router = ["py.typed"]
+super_router = ["py.typed", "stores/migrations/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -46,6 +60,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
 strict = true
+ignore_missing_imports = true
 python_version = "3.10"
 mypy_path = "src"
 files = ["src"]

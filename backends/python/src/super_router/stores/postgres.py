@@ -64,7 +64,7 @@ class PostgresStore:
             await tx.execute("SELECT pg_advisory_xact_lock(hashtextextended('superrouter:migrate',0))")
             await tx.execute("CREATE TABLE IF NOT EXISTS sr_migrations(version integer PRIMARY KEY)")
             files = sorted(
-                (f for f in resources.files(__package__ + ".migrations").iterdir() if f.name.endswith(".sql")),
+                (f for f in (resources.files(__package__) / "migrations").iterdir() if f.name.endswith(".sql")),
                 key=lambda f: f.name,
             )
             for file in files:

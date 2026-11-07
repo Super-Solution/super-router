@@ -19,7 +19,7 @@ npx tsx scripts/export-contracts-conformance.ts # regenerate parsing
 npx tsx --test tests/conformance.test.ts       # TypeScript still matches the generated files
 npx tsx --test tests/dataplane.test.ts         # data plane scenarios on memory and PostgreSQL
 (cd backends/go && go test ./...)              # Go port (PostgreSQL tests need a database, see its README)
-(cd backends/python && pytest)              # Python port (ruff check . && mypy for lint and types)
+(cd backends/python && pytest)                 # Python port (ruff check . && mypy for lint and types)
 ```
 
 `dataplane.v1.json` is edited by hand: change a scenario only when behaviour changes on purpose, and run it on every store.

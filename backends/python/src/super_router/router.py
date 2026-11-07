@@ -34,7 +34,7 @@ from .contracts import (
     parse_invocation,
     valid_meters,
 )
-from .pricing import MEDIA_KEYS, RouterError, bound, charge
+from .pricing import MEDIA_KEYS, RouterError, bound, charge, compile_credit_price
 from .routing import Candidate, route
 
 Clock = Callable[[], int]
@@ -184,6 +184,38 @@ class DataStore(Store, Protocol):
     async def recover(self) -> int:
         """Settle or release requests whose deadline passed, never redispatching an uncertain attempt."""
         ...
+
+
+async def publish_credit_rate_version(
+    store: DataStore, p: Principal, id: str, expected_version: int, config: Any, mode: str = "self-host"
+) -> Json:
+    """Advance only the customer-sale price of a service to a new version compiled from exact units-per-credit rates.
+    Supply and platform prices stay as the server's snapshot. ``expected_version`` must be the current version."""
+    if not p.has_scope("service:write"):
+        raise RouterError("scope_denied", 403)
+    if not 1 <= expected_version < 2**53 - 1:
+        raise RouterError("invalid_service_version", 400)
+    current = await store.get_service(p, id)
+    if current["version"] != expected_version:
+        raise RouterError("service_version_conflict", 409)
+    price = compile_credit_price(config)
+    cfg = config if isinstance(config, dict) else {}
+    media: dict[str, Any] = cfg.get("media") or {}
+    if not isinstance(media, dict):
+        media = {}
+    task_kind = current.get("task_kind")
+    if task_kind:
+        meter = KIND_METER[task_kind]
+        mismatch = meter not in media or "tokens" in cfg or any(k != meter for k in media)
+    else:
+        mismatch = "tokens" not in cfg or bool(media) or "media" in cfg
+    if mismatch:
+        raise RouterError("credit_rate_kind_mismatch", 422)
+    if price["asset"] != current["price"]["asset"]:
+        raise RouterError("credit_asset_mismatch", 422)
+    nxt = {**current, "version": current["version"] + 1, "price": price}
+    await store.publish(p, nxt, mode, expected_version)
+    return nxt
 
 
 def invocation_bound(invocation: Mapping[str, Any], max_input: int, price: Mapping[str, Any]) -> int:
