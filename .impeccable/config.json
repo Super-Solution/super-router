@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-11-07T15:54:57.503Z",
         "reason": "user chose developer option 1 (gradient-word halftone direction) on the design canvas, 2026-11-07"
+      },
+      {
+        "rule": "overused-font",
+        "value": "roboto",
+        "files": [
+          "apps/site/src/pages/index.astro"
+        ],
+        "createdAt": "2026-11-07T15:57:33.564Z",
+        "reason": "user chose wallet option 2 (Material 3 Expressive direction, Roboto Flex) on the design canvas, 2026-11-07"
       }
     ]
   }
