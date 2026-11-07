@@ -1,6 +1,6 @@
 # SuperRouter
 
-[English](README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · **日本語**
+[English](../../README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · **日本語**
 
 パッケージとして組み込める AI ルーティング、課金、サービング基盤です。**Service**（販売する AI 機能）を定義し、背後のモデル、価格、サブスクリプション、クレジットを設定すれば、SuperRouter がリクエストのルーティング、使用量の計測、精算を行います。
 
@@ -47,7 +47,7 @@ npm run demo:subscription
 npm run demo:payments
 ```
 
-デモは mock モデルを使うため、モデル利用料はかかりません。データベース、HTTP、ストリーミング、会計は実際に動作します。モデル呼び出しが 1 回行われてテスト用の 35 atoms が課金され、同じ key での再送では追加課金されません。詳細は [minimal-chat](examples/minimal-chat/README.md) を参照してください。
+デモは mock モデルを使うため、モデル利用料はかかりません。データベース、HTTP、ストリーミング、会計は実際に動作します。モデル呼び出しが 1 回行われてテスト用の 35 atoms が課金され、同じ key での再送では追加課金されません。詳細は [minimal-chat](../../examples/minimal-chat/README.md) を参照してください。
 
 ```sh
 npm run typecheck
@@ -61,10 +61,10 @@ npm run contracts
 
 設計ドキュメントは現在、繁体字中国語で書かれています。
 
-- [PRD](docs/PRD.md)、[アーキテクチャ](docs/ARCHITECTURE.md)、[データモデル](docs/DATA_MODEL.md)、[目標 API](docs/API_SPEC.md)、[実装済み OpenAPI](docs/generated/openapi.json)
-- [決済](docs/PAYMENTS.md)、[P2 課金](docs/P2_BILLING.md)、[有料コンポーネントと preset](docs/PAID_COMPONENTS_PRESETS.md)
-- [P0 の決定](docs/adr/0001-p0-baseline.md)、[Provider spike](docs/PROVIDER_SPIKE.md)、[検証記録と制限](docs/P1_VALIDATION.md)
-- [サンプル](examples/README.md)、[Agent skill の計画](skills/README.md)
+- [PRD](../../docs/PRD.md)、[アーキテクチャ](../../docs/ARCHITECTURE.md)、[データモデル](../../docs/DATA_MODEL.md)、[目標 API](../../docs/API_SPEC.md)、[実装済み OpenAPI](../../docs/generated/openapi.json)
+- [決済](../../docs/PAYMENTS.md)、[P2 課金](../../docs/P2_BILLING.md)、[有料コンポーネントと preset](../../docs/PAID_COMPONENTS_PRESETS.md)
+- [P0 の決定](../../docs/adr/0001-p0-baseline.md)、[Provider spike](../../docs/PROVIDER_SPIKE.md)、[検証記録と制限](../../docs/P1_VALIDATION.md)
+- [サンプル](../../examples/README.md)、[Agent skill の計画](../../skills/README.md)
 
 ## 既知の制限
 
@@ -72,7 +72,7 @@ npm run contracts
 
 ## ライセンス
 
-Apache License 2.0。[LICENSE](LICENSE) と [NOTICE](NOTICE) を参照してください。
+Apache License 2.0。[LICENSE](../../LICENSE) と [NOTICE](../../NOTICE) を参照してください。
 
 Copyright 2026 SUPER SOLUTION LABS INC.
 

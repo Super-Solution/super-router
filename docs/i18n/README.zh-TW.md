@@ -1,6 +1,6 @@
 # SuperRouter
 
-[English](README.md) · **繁體中文** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
+[English](../../README.md) · **繁體中文** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
 以套件形式整合的 AI routing、計價與 serving 基礎設施。你定義 **Service**（要販售的 AI 能力）、選擇背後的模型、設定售價、訂閱與額度，由 SuperRouter 負責選路、計量與結算。
 
@@ -47,7 +47,7 @@ npm run demo:subscription
 npm run demo:payments
 ```
 
-Demo 使用 mock 模型，不花模型費用；資料庫、HTTP、串流與帳務是真實執行。預期一次模型呼叫、扣 35 個測試 atoms，以相同 key 重送不再扣款。詳見 [minimal-chat](examples/minimal-chat/README.md)。
+Demo 使用 mock 模型，不花模型費用；資料庫、HTTP、串流與帳務是真實執行。預期一次模型呼叫、扣 35 個測試 atoms，以相同 key 重送不再扣款。詳見 [minimal-chat](../../examples/minimal-chat/README.md)。
 
 ```sh
 npm run typecheck
@@ -59,10 +59,10 @@ npm run contracts
 
 ## 文件
 
-- [PRD](docs/PRD.md)、[技術架構](docs/ARCHITECTURE.md)、[資料模型](docs/DATA_MODEL.md)、[完整目標 API](docs/API_SPEC.md)、[目前實作的 OpenAPI](docs/generated/openapi.json)
-- [金流整合](docs/PAYMENTS.md)、[P2 多租戶／訂閱／credits](docs/P2_BILLING.md)、[付費 components／presets](docs/PAID_COMPONENTS_PRESETS.md)
-- [P0 決策](docs/adr/0001-p0-baseline.md)、[Provider spike](docs/PROVIDER_SPIKE.md)、[驗證紀錄與限制](docs/P1_VALIDATION.md)
-- [範例 App](examples/README.md)、[Agent skill 規劃](skills/README.md)
+- [PRD](../../docs/PRD.md)、[技術架構](../../docs/ARCHITECTURE.md)、[資料模型](../../docs/DATA_MODEL.md)、[完整目標 API](../../docs/API_SPEC.md)、[目前實作的 OpenAPI](../../docs/generated/openapi.json)
+- [金流整合](../../docs/PAYMENTS.md)、[P2 多租戶／訂閱／credits](../../docs/P2_BILLING.md)、[付費 components／presets](../../docs/PAID_COMPONENTS_PRESETS.md)
+- [P0 決策](../../docs/adr/0001-p0-baseline.md)、[Provider spike](../../docs/PROVIDER_SPIKE.md)、[驗證紀錄與限制](../../docs/P1_VALIDATION.md)
+- [範例 App](../../examples/README.md)、[Agent skill 規劃](../../skills/README.md)
 
 ## 已知限制
 
@@ -70,7 +70,7 @@ npm run contracts
 
 ## 授權
 
-Apache License 2.0。見 [LICENSE](LICENSE) 與 [NOTICE](NOTICE)。
+Apache License 2.0。見 [LICENSE](../../LICENSE) 與 [NOTICE](../../NOTICE)。
 
 Copyright 2026 SUPER SOLUTION LABS INC.
 

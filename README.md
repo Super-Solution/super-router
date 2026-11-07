@@ -1,6 +1,6 @@
 # SuperRouter
 
-**English** · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
+**English** · [繁體中文](docs/i18n/README.zh-TW.md) · [简体中文](docs/i18n/README.zh-CN.md) · [日本語](docs/i18n/README.ja.md)
 
 AI routing, billing and serving infrastructure that you embed as a set of packages. Define a **Service** (an AI capability you sell), pick the models behind it, set prices, subscriptions and credits, and let SuperRouter route each request, meter the usage and settle the books.
 
