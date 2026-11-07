@@ -14,14 +14,14 @@ import {
 import {
   route,
   charge,
-  type Store,
+  type DataStore,
   type Leg,
   type RequestRecord,
 } from "@supersolutions/super-router-core";
 export const LOCAL_DATABASE_URL =
   "postgresql://superrouter:local-development-only@127.0.0.1:25432/superrouter";
 const scope = (p: Principal) => [p.workspace, p.environment];
-export class PostgresStore implements Store {
+export class PostgresStore implements DataStore {
   readonly pool: pg.Pool;
   constructor(url: string) {
     this.pool = new pg.Pool({ connectionString: url, max: 10 });
@@ -714,7 +714,7 @@ export class PostgresStore implements Store {
         );
       });
     }
-    return rows.rowCount;
+    return rows.rowCount ?? 0;
   }
   async resolveWaiver(p: Principal, id: string, evidence: string) {
     if (!p.scopes.includes("billing:write") || evidence.length < 10)

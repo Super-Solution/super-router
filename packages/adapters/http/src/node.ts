@@ -1,7 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { once } from "node:events";
-import { defaultOnError, type AdapterOptions, type FetchHandler } from "./index.js";
+import {
+  defaultOnError,
+  type AdapterOptions,
+  type FetchHandler,
+} from "./index.js";
 
 export type { FetchHandler, AdapterOptions } from "./index.js";
 
@@ -28,7 +32,8 @@ function toHeaders(req: IncomingMessage): Headers {
 function toBody(req: IncomingMessage, parsed: unknown): BodyInit | null {
   if (METHODS_WITHOUT_BODY.has(req.method ?? "GET")) return null;
   if (parsed !== undefined) {
-    if (typeof parsed === "string" || parsed instanceof Uint8Array) return parsed as BodyInit;
+    if (typeof parsed === "string" || parsed instanceof Uint8Array)
+      return parsed as BodyInit;
     // The framework already consumed the stream: hand over what it parsed.
     return JSON.stringify(parsed);
   }
@@ -36,7 +41,11 @@ function toBody(req: IncomingMessage, parsed: unknown): BodyInit | null {
 }
 
 /** Build a web `Request` from a Node request. Aborts when the client disconnects before the response ends. */
-export function toRequest(req: IncomingMessage, res: ServerResponse, options: NodeBridgeOptions = {}): Request {
+export function toRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  options: NodeBridgeOptions = {},
+): Request {
   const controller = new AbortController();
   res.once("close", () => {
     if (!res.writableEnded) controller.abort();
@@ -51,11 +60,20 @@ export function toRequest(req: IncomingMessage, res: ServerResponse, options: No
     init.body = body;
     init.duplex = "half";
   }
-  return new Request(new URL(options.url ?? req.url ?? "/", options.origin ?? "http://localhost"), init);
+  return new Request(
+    new URL(
+      options.url ?? req.url ?? "/",
+      options.origin ?? "http://localhost",
+    ),
+    init,
+  );
 }
 
 /** Write a web `Response` to a Node response: headers are flushed immediately, the body streams with backpressure. */
-export async function writeResponse(res: ServerResponse, response: Response): Promise<void> {
+export async function writeResponse(
+  res: ServerResponse,
+  response: Response,
+): Promise<void> {
   const headers: Record<string, string | string[]> = {};
   response.headers.forEach((value, name) => {
     if (name !== "set-cookie") headers[name] = value;
@@ -84,12 +102,16 @@ export async function writeResponse(res: ServerResponse, response: Response): Pr
   } catch (error) {
     await reader.cancel().catch(() => undefined);
     if (!res.destroyed) res.destroy();
-    if (!(error instanceof Error) || error.message !== "client_closed") throw error;
+    if (!(error instanceof Error) || error.message !== "client_closed")
+      throw error;
   }
 }
 
 /** Serve a fetch handler on the plain `(req, res)` signature of `node:http`. */
-export function nodeListener(handler: FetchHandler, options: AdapterOptions = {}) {
+export function nodeListener(
+  handler: FetchHandler,
+  options: AdapterOptions = {},
+) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     await serve(handler, req, res, options);
   };

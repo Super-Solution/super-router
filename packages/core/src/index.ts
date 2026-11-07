@@ -76,6 +76,41 @@ export interface Store {
   ): Promise<void>;
   cancel(p: Principal, id: string): Promise<void>;
 }
+export interface BalanceRow {
+  id: string;
+  kind: string;
+  asset: string;
+  balance: string;
+  held: string;
+  available: string;
+}
+/** A source of epoch milliseconds. Stores and the router accept one so tests and conformance runs control time. */
+export type Clock = () => number;
+/**
+ * Everything the data-plane server and worker need from storage, beyond the router's own {@link Store} port.
+ * Implement this to plug in another database; run the store contract suite against it.
+ */
+export interface DataStore extends Store {
+  publish(
+    p: Principal,
+    service: unknown,
+    mode?: "cloud" | "self-host",
+    expectedVersion?: number,
+  ): Promise<Service | undefined>;
+  list(p: Principal): Promise<Service[]>;
+  balance(p: Principal): Promise<BalanceRow[]>;
+  grant(
+    p: Principal,
+    kind: "customer_sale" | "platform_sale",
+    asset: string,
+    amount: string,
+    source: string,
+    expires?: Date,
+  ): Promise<string>;
+  disable(p: Principal, offering: string): Promise<void>;
+  /** Settle or release expired reservations. Returns how many requests were processed. */
+  recover(): Promise<number>;
+}
 export const mediaKeys = ["images", "video_ms", "audio_ms", "tasks"] as const;
 export const kindMeter = {
   image: "images",
@@ -201,6 +236,7 @@ export class Router {
     public store: Store,
     private providers: Record<string, Provider>,
     private digestKey: string,
+    private clock: Clock = Date.now,
   ) {
     if (digestKey.length < 32)
       throw new Error("digest key must be >=32 characters");
@@ -283,7 +319,7 @@ export class Router {
       digest,
       service,
       legs,
-      new Date(Date.now() + input.limits.timeout_ms).toISOString(),
+      new Date(this.clock() + input.limits.timeout_ms).toISOString(),
       {
         excluded: decision.excluded,
         candidates: decision.candidates.map((c) => ({

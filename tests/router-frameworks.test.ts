@@ -1,0 +1,149 @@
+// The router API is one fetch handler; prove it mounts unchanged on node:http, Express and Fastify,
+// over the in-memory store (no database needed).
+import test from "node:test";
+import assert from "node:assert/strict";
+import { once } from "node:events";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import express from "express";
+import Fastify from "fastify";
+import { MockProvider, Router } from "@supersolutions/super-router-core";
+import { MemoryStore } from "@supersolutions/super-router-storage-memory";
+import { createRouterHandler } from "@supersolutions/super-router-server";
+import { expressHandler } from "@supersolutions/node-fetch-adapters/express";
+import { fastifyPlugin } from "@supersolutions/node-fetch-adapters/fastify";
+import { nodeListener } from "@supersolutions/node-fetch-adapters/node";
+import { parseSSE } from "@supersolutions/super-router-contracts";
+import {
+  principal,
+  digestKey,
+  seed,
+  demoInput,
+  demoService,
+} from "../scripts/demo-config.js";
+
+async function fixture() {
+  const store = new MemoryStore();
+  await seed(store as never, principal, demoService);
+  const provider = new MockProvider();
+  const key = "k-" + Math.random();
+  const handler = createRouterHandler({
+    router: new Router(store, { mock: provider }, digestKey),
+    store,
+    keys: [{ key, principal }],
+  });
+  return { handler, key, provider };
+}
+const mounts = {
+  "node:http": async (h: (r: Request) => Promise<Response>) => {
+    const server = createServer(nodeListener(h));
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    return {
+      base: "http://127.0.0.1:" + (server.address() as AddressInfo).port,
+      close: async () => void server.close(),
+    };
+  },
+  express: async (h: (r: Request) => Promise<Response>) => {
+    const app = express();
+    app.use("/router", express.json(), expressHandler(h));
+    const server = createServer(app);
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    return {
+      base:
+        "http://127.0.0.1:" +
+        (server.address() as AddressInfo).port +
+        "/router",
+      close: async () => void server.close(),
+    };
+  },
+  fastify: async (h: (r: Request) => Promise<Response>) => {
+    const app = Fastify();
+    await app.register(fastifyPlugin(h), { prefix: "/router" });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    return {
+      base:
+        "http://127.0.0.1:" +
+        (app.server.address() as AddressInfo).port +
+        "/router",
+      close: () => app.close(),
+    };
+  },
+};
+
+for (const [name, mount] of Object.entries(mounts))
+  test(`router API on ${name} over the memory store`, async () => {
+    const { handler, key, provider } = await fixture();
+    // The handler is mounted under a prefix in some frameworks: strip it so the API paths stay /v1/...
+    const prefix = name === "node:http" ? "" : "/router";
+    const strip = async (r: Request) =>
+      handler(prefix ? new Request(r.url.replace(prefix, ""), r) : r);
+    const { base, close } = await mount(strip);
+    const auth = { Authorization: "Bearer " + key };
+    try {
+      assert.equal((await fetch(base + "/v1/services")).status, 401);
+      const services = (await (
+        await fetch(base + "/v1/services", { headers: auth })
+      ).json()) as { data: { id: string }[] };
+      assert.deepEqual(
+        services.data.map((s) => s.id),
+        ["chat"],
+      );
+
+      const done = await fetch(base + "/v1/inferences", {
+        method: "POST",
+        headers: {
+          ...auth,
+          "Idempotency-Key": "one",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(demoInput),
+      });
+      assert.equal(done.status, 200);
+      const output = (await done.json()) as {
+        billing_status: string;
+        execution_status: string;
+      };
+      assert.deepEqual(
+        [output.execution_status, output.billing_status],
+        ["succeeded", "settled"],
+      );
+
+      const streamed = await fetch(base + "/v1/inferences", {
+        method: "POST",
+        headers: {
+          ...auth,
+          "Idempotency-Key": "two",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ ...demoInput, stream: true }),
+      });
+      assert.equal(streamed.headers.get("content-type"), "text/event-stream");
+      const events = [];
+      for await (const e of parseSSE(streamed.body!)) events.push(e.event);
+      assert.deepEqual(events, [
+        "request.started",
+        "output.delta",
+        "request.completed",
+      ]);
+
+      const bad = await fetch(base + "/v1/inferences", {
+        method: "POST",
+        headers: {
+          ...auth,
+          "Idempotency-Key": "three",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ ...demoInput, customer_id: "victim" }),
+      });
+      assert.equal(bad.status, 403);
+      assert.equal(
+        ((await bad.json()) as { error: { code: string } }).error.code,
+        "scope_denied",
+      );
+      assert.equal(provider.calls, 2);
+    } finally {
+      await close();
+    }
+  });
