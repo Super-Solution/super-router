@@ -886,3 +886,16 @@ func (s *Store) Inspect(p contracts.Principal) Inspection {
 	}
 	return out
 }
+
+// RequestIDs lists the ids of a tenant's requests, oldest first by id order. For tests and diagnostics.
+func (s *Store) RequestIDs(p contracts.Principal) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t := s.tenant(p)
+	ids := make([]string, 0, len(t.requests))
+	for id := range t.requests {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}

@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/Super-Solution/super-router/backends/go/pricing"
 )
@@ -35,15 +35,16 @@ var errInvalid = errors.New("invalid")
 // InvalidRequest is the error every Parse* function returns for input the reference would reject.
 func InvalidRequest() *RouterError { return NewError("invalid_request", 400) }
 
-func utf16Len(s string) int { return len(utf16.Encode([]rune(s))) }
+// length counts code points, as the reference's string limits do.
+func length(s string) int { return utf8.RuneCountInString(s) }
 
-func validID(s string) bool { return len(s) >= 1 && utf16Len(s) <= 120 && idRe.MatchString(s) }
+func validID(s string) bool { return len(s) >= 1 && length(s) <= 120 && idRe.MatchString(s) }
 
 func safeNonNeg(n int64) bool { return n >= 0 && n <= maxSafe }
 
 // decodeStrict decodes JSON that must contain no null, no duplicate-free surprises and no unknown fields.
 // defaults runs on the generic tree first so absent keys get the reference's defaults.
-func decodeStrict(data []byte, defaults func(map[string]any), into any) error {
+func decodeStrict(data []byte, defaults func(map[string]any) bool, into any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	var tree any
@@ -60,7 +61,9 @@ func decodeStrict(data []byte, defaults func(map[string]any), into any) error {
 	if !ok {
 		return errInvalid
 	}
-	defaults(root)
+	if !defaults(root) {
+		return errInvalid
+	}
 	normalized, err := json.Marshal(root)
 	if err != nil {
 		return errInvalid
@@ -104,10 +107,37 @@ func object(v any) map[string]any {
 	return m
 }
 
-func priceDefaults(v any) {
-	if m := object(v); m != nil {
-		setDefault(m, "per", json.Number("1"))
+// need reports whether every required key is present. A value that is not an object passes: the typed
+// decode rejects it with the right error.
+func need(v any, keys ...string) bool {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return true
 	}
+	for _, k := range keys {
+		if _, ok := m[k]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func priceDefaults(v any) bool {
+	m := object(v)
+	if m == nil {
+		return true
+	}
+	setDefault(m, "per", json.Number("1"))
+	if !need(m, "asset", "input", "cached", "cache_write", "output") {
+		return false
+	}
+	media := object(m["media"])
+	for _, rate := range media {
+		if !need(rate, "atoms", "per") {
+			return false
+		}
+	}
+	return true
 }
 
 func validPrice(p pricing.Price) bool {
@@ -147,18 +177,22 @@ func validMedia(m map[string]int64) bool {
 
 func isTaskKind(k string) bool { _, ok := KindMeter[k]; return ok }
 
-func serviceDefaults(root map[string]any) {
+func serviceDefaults(root map[string]any) bool {
 	setDefault(root, "required_labels", []any{})
 	setDefault(root, "unknown_score", json.Number("0"))
-	priceDefaults(root["price"])
-	priceDefaults(root["platform_price"])
+	ok := need(root, "id", "version", "mode", "offerings", "regions", "price", "max_attempts", "max_provider_cost",
+		"max_output_tokens", "weights", "cost_scale", "latency_scale_ms")
+	ok = ok && need(root["weights"], "cost", "latency", "reliability", "quality")
+	ok = ok && priceDefaults(root["price"]) && priceDefaults(root["platform_price"])
 	offerings, _ := root["offerings"].([]any)
 	for _, o := range offerings {
 		if m := object(o); m != nil {
 			setDefault(m, "labels", []any{})
-			priceDefaults(m["price"])
+			ok = ok && need(m, "id", "provider", "model", "upstream_model", "region", "enabled", "source",
+				"max_input_tokens", "max_output_tokens", "price") && priceDefaults(m["price"])
 		}
 	}
+	return ok
 }
 
 func validOffering(o *Offering) bool {
@@ -280,16 +314,24 @@ func validService(s *Service) bool {
 	return s.LatencyScaleMs > 0 && !math.IsInf(s.LatencyScaleMs, 0) && s.UnknownScore >= 0 && s.UnknownScore <= 1
 }
 
-func invocationDefaults(root map[string]any) {
+func invocationDefaults(root map[string]any) bool {
 	setDefault(root, "payer_mode", "developer")
 	setDefault(root, "stream", false)
+	ok := need(root, "service", "customer_id", "input", "limits")
 	if in := object(root["input"]); in != nil {
 		setDefault(in, "messages", []any{})
+		messages, _ := in["messages"].([]any)
+		for _, m := range messages {
+			ok = ok && need(m, "role", "content")
+		}
+		ok = ok && need(in["task"], "kind", "prompt")
 	}
 	if l := object(root["limits"]); l != nil {
 		setDefault(l, "max_output_tokens", json.Number("1"))
 		setDefault(l, "timeout_ms", json.Number("30000"))
+		ok = ok && need(l["max_charge"], "asset", "atoms", "scale")
 	}
+	return ok
 }
 
 // ParseInvocation validates an invocation exactly as the TypeScript reference does and fills its defaults
@@ -336,7 +378,7 @@ func validInvocation(in *Invocation) bool {
 	return true
 }
 
-func validContent(s string) bool { n := utf16Len(s); return n >= 1 && n <= 32000 }
+func validContent(s string) bool { n := length(s); return n >= 1 && n <= 32000 }
 
 // Valid reports whether every meter is a non-negative safe integer, as the reference requires of provider usage.
 func (m Meters) Valid() bool {

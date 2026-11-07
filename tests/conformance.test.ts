@@ -1,4 +1,4 @@
-// The TypeScript reference must still produce every expectation in conformance/pricing.v1.json,
+// The TypeScript reference must still produce every expectation in conformance/*.v1.json,
 // the data the Go and Python ports are tested against. Regenerate with
 // `npx tsx scripts/export-conformance.ts` (and `scripts/export-routing-conformance.ts` for
 // routing) when behaviour changes on purpose.
@@ -7,11 +7,16 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   bound,
+  canonical,
   charge,
   compileCreditPrice,
   route,
 } from "@supersolutions/super-router-core";
-import { RouterError } from "@supersolutions/super-router-contracts";
+import {
+  Invocation,
+  RouterError,
+  Service,
+} from "@supersolutions/super-router-contracts";
 
 const cases = JSON.parse(
   readFileSync(
@@ -74,4 +79,32 @@ test("route matches the conformance data", () => {
       }),
       c.expect,
     );
+});
+
+const parsing = JSON.parse(
+  readFileSync(
+    new URL("../conformance/contracts.v1.json", import.meta.url),
+    "utf8",
+  ),
+);
+test("Service and Invocation parsing match the conformance data", () => {
+  assert.ok(parsing.service.length >= 50 && parsing.invocation.length >= 30);
+  for (const [schema, list, withCanonical] of [
+    [Service, parsing.service, false],
+    [Invocation, parsing.invocation, true],
+  ] as const)
+    for (const c of list) {
+      const r = schema.safeParse(c.input);
+      if (c.expect.error) assert.equal(r.success, false, c.name);
+      else {
+        assert.ok(r.success, c.name);
+        assert.deepEqual(
+          JSON.parse(JSON.stringify(r.data)),
+          c.expect.ok,
+          c.name,
+        );
+        if (withCanonical)
+          assert.equal(canonical(r.data), c.expect.canonical, c.name);
+      }
+    }
 });

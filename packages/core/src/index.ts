@@ -164,7 +164,8 @@ export function bound(input: number, output: number, price: Price): bigint {
     BigInt(price.per)
   );
 }
-function canonical(value: unknown): string {
+/** The canonical JSON of a value: object keys sorted, no whitespace. It is the input of the idempotency digest. */
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
   if (value && typeof value === "object")
     return (
