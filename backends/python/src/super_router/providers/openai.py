@@ -12,7 +12,7 @@ from typing import Any
 import httpx
 
 from ..contracts import Delta, Done, ProviderError, ProviderEvent, Usage, valid_meters
-from ._http import KeySource, as_dict, count, make_client, open_stream, resolve_key
+from ._http import KeySource, as_dict, counter, make_client, open_stream, resolve_key
 
 
 class OpenAIProvider:
@@ -65,7 +65,7 @@ class OpenAIProvider:
                     usage = response.get("usage")
                     if not isinstance(usage, dict):
                         raise ProviderError(False, False, "usage_unknown")
-                    meters = _normalize(usage)
+                    meters = _normalize(usage)  # raises invalid_usage for a missing or malformed counter
                     if meters is None:
                         raise ProviderError(False, False, "invalid_usage")
                     yield Usage(meters, response.get("id") if isinstance(response.get("id"), str) else None)
@@ -78,14 +78,13 @@ class OpenAIProvider:
 
 def _normalize(usage: Mapping[str, Any]) -> dict[str, Any] | None:
     """OpenAI counts cached and cache-write tokens inside input."""
-    details = usage.get("input_tokens_details")
-    details = as_dict(details)
-    cached, written = count(details.get("cached_tokens")), count(details.get("cache_write_tokens"))
+    details = as_dict(usage.get("input_tokens_details"))
+    cached, written = counter(details, "cached_tokens") or 0, counter(details, "cache_write_tokens") or 0
     return valid_meters(
         {
-            "input": count(usage.get("input_tokens")) - cached - written,
+            "input": (counter(usage, "input_tokens", True) or 0) - cached - written,
             "cached": cached,
             "cache_write": written,
-            "output": count(usage.get("output_tokens")),
+            "output": counter(usage, "output_tokens", True),
         }
     )

@@ -52,11 +52,13 @@ func New(key func() string, opts ...Option) *Provider {
 	return p
 }
 
+// usage keeps the two required counters as pointers: a response that omits them must be refused, not billed as
+// zero tokens (the TypeScript adapter does the same).
 type usage struct {
-	InputTokens              int64 `json:"input_tokens"`
-	OutputTokens             int64 `json:"output_tokens"`
-	CacheReadInputTokens     int64 `json:"cache_read_input_tokens"`
-	CacheCreationInputTokens int64 `json:"cache_creation_input_tokens"`
+	InputTokens              *int64 `json:"input_tokens"`
+	OutputTokens             *int64 `json:"output_tokens"`
+	CacheReadInputTokens     int64  `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int64  `json:"cache_creation_input_tokens"`
 }
 
 func perr(definitive, retryable bool, code string) error {
@@ -145,16 +147,24 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 			if current != nil {
 				// message_delta carries the final counters; they overwrite what message_start reported.
 				fields := map[string]*int64{
-					"input_tokens": &current.InputTokens, "output_tokens": &current.OutputTokens,
 					"cache_read_input_tokens": &current.CacheReadInputTokens, "cache_creation_input_tokens": &current.CacheCreationInputTokens,
 				}
 				for k, raw := range e.Usage {
-					if target := fields[k]; target != nil {
-						var n int64
+					var n int64
+					if k == "input_tokens" || k == "output_tokens" || fields[k] != nil {
 						if json.Unmarshal(raw, &n) != nil {
 							return perr(false, false, "invalid_usage")
 						}
-						*target = n
+					}
+					switch k {
+					case "input_tokens":
+						current.InputTokens = &n
+					case "output_tokens":
+						current.OutputTokens = &n
+					default:
+						if target := fields[k]; target != nil {
+							*target = n
+						}
 					}
 				}
 				if e.Delta.StopReason == "max_tokens" {
@@ -165,7 +175,10 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 			if current == nil {
 				return perr(false, false, "usage_unknown")
 			}
-			meters := contracts.Meters{Input: current.InputTokens, Cached: current.CacheReadInputTokens, CacheWrite: current.CacheCreationInputTokens, Output: current.OutputTokens}
+			if current.InputTokens == nil || current.OutputTokens == nil {
+				return perr(false, false, "invalid_usage")
+			}
+			meters := contracts.Meters{Input: *current.InputTokens, Cached: current.CacheReadInputTokens, CacheWrite: current.CacheCreationInputTokens, Output: *current.OutputTokens}
 			if !meters.Valid() {
 				return perr(false, false, "invalid_usage")
 			}

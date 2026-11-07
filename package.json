@@ -41,7 +41,8 @@
     "demo:payments": "npm run build && tsx examples/payments/index.ts",
     "demo:paid-chat": "npm run build && tsx examples/paid-chat/server.ts",
     "build:paid-chat": "npm run build",
-    "test:paid-chat:browser": "npm run build && tsx scripts/paid-chat-browser.ts"
+    "test:paid-chat:browser": "npm run build && tsx scripts/paid-chat-browser.ts",
+    "check": "scripts/check-all.sh"
   },
   "devDependencies": {
     "@types/express": "4.17.25",

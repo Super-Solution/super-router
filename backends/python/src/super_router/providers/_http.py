@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -19,8 +19,18 @@ def as_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def count(value: Any) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+def counter(source: Mapping[str, Any], key: str, required: bool = False) -> int | None:
+    """A token counter from provider usage. A missing optional counter is None; a missing required one, or any present
+    value that is not a non-negative integer, is an invalid usage record. Never default a required counter to zero:
+    that would bill a response with unreadable usage as free."""
+    value = source.get(key)
+    if value is None:
+        if required:
+            raise ProviderError(False, False, "invalid_usage")
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ProviderError(False, False, "invalid_usage")
+    return value
 
 
 def resolve_key(key: KeySource | None) -> str:

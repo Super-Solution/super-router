@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from ..contracts import Delta, Done, ProviderError, ProviderEvent, Usage, valid_meters
-from ._http import KeySource, as_dict, count, make_client, open_stream, resolve_key
+from ._http import KeySource, as_dict, counter, make_client, open_stream, resolve_key
 
 _USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
 
@@ -53,7 +53,7 @@ class AnthropicProvider:
             "stream": True,
         }
         headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
-        current: dict[str, Any] | None = None
+        current: dict[str, int | None] | None = None
         upstream_id: str | None = None
         completion = "succeeded"
         async with open_stream(self._client, f"{self._base}/v1/messages", headers, body) as frames:
@@ -68,7 +68,7 @@ class AnthropicProvider:
                 if kind == "message_start":
                     message = as_dict(e.get("message"))
                     usage = message.get("usage")
-                    current = {k: count(usage.get(k)) for k in _USAGE_FIELDS} if isinstance(usage, dict) else None
+                    current = {k: counter(usage, k) for k in _USAGE_FIELDS} if isinstance(usage, dict) else None
                     upstream_id = message.get("id") if isinstance(message.get("id"), str) else None
                 elif kind == "content_block_delta":
                     delta = as_dict(e.get("delta"))
@@ -79,10 +79,7 @@ class AnthropicProvider:
                         # message_delta carries the final counters; they overwrite what message_start reported.
                         usage = as_dict(e.get("usage"))
                         for k in _USAGE_FIELDS:
-                            if k in usage:
-                                v = usage[k]
-                                if not isinstance(v, int) or isinstance(v, bool):
-                                    raise ProviderError(False, False, "invalid_usage")
+                            if (v := counter(usage, k)) is not None:
                                 current[k] = v
                         delta = as_dict(e.get("delta"))
                         if delta.get("stop_reason") == "max_tokens":
@@ -90,11 +87,13 @@ class AnthropicProvider:
                 elif kind == "message_stop":
                     if current is None:
                         raise ProviderError(False, False, "usage_unknown")
+                    if current["input_tokens"] is None or current["output_tokens"] is None:
+                        raise ProviderError(False, False, "invalid_usage")
                     meters = valid_meters(
                         {
                             "input": current["input_tokens"],
-                            "cached": current["cache_read_input_tokens"],
-                            "cache_write": current["cache_creation_input_tokens"],
+                            "cached": current["cache_read_input_tokens"] or 0,
+                            "cache_write": current["cache_creation_input_tokens"] or 0,
                             "output": current["output_tokens"],
                         }
                     )

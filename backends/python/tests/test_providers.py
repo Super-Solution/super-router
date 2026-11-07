@@ -288,6 +288,21 @@ async def test_anthropic_max_tokens_is_partial():
         ("error event", stream(START, frame('{"type":"error"}')), "k", (False, False, "upstream_stream_error")),
         ("bad event json", stream(frame("{")), "k", (False, False, "invalid_upstream_event")),
         (
+            "start without counters is not free",
+            stream(frame('{"type":"message_start","message":{"id":"m","usage":{}}}'), frame('{"type":"message_stop"}')),
+            "k",
+            (False, False, "invalid_usage"),
+        ),
+        (
+            "start without output",
+            stream(
+                frame('{"type":"message_start","message":{"id":"m","usage":{"input_tokens":3}}}'),
+                frame('{"type":"message_stop"}'),
+            ),
+            "k",
+            (False, False, "invalid_usage"),
+        ),
+        (
             "non-integer counter",
             stream(START, frame('{"type":"message_delta","delta":{},"usage":{"output_tokens":"9"}}')),
             "k",
@@ -307,3 +322,17 @@ async def test_anthropic_tasks_and_system_only_are_definitive_failures():
     )
     only_system = {"input": {"messages": [{"role": "system", "content": "x"}]}, "limits": {"max_output_tokens": 16}}
     assert await failure(anthropic(status(200)), only_system) == (True, False, "messages_required")
+
+
+async def test_anthropic_delta_may_complete_the_counters():
+    events = await collect(
+        anthropic(
+            stream(
+                frame('{"type":"message_start","message":{"id":"m","usage":{"input_tokens":7}}}'),
+                frame('{"type":"message_delta","delta":{},"usage":{"output_tokens":4}}'),
+                frame('{"type":"message_stop"}'),
+            )
+        ),
+        invocation(),
+    )
+    assert events[0] == Usage({"input": 7, "cached": 0, "cache_write": 0, "output": 4}, "m")

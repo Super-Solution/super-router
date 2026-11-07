@@ -121,6 +121,9 @@ func TestFailures(t *testing.T) {
 		{"only system messages", status(200), "k", onlySystem, true, false, "messages_required"},
 		{"truncated stream", stream(start), "k", invocation(), false, false, "stream_interrupted"},
 		{"stop without start", stream(frame(`{"type":"message_stop"}`)), "k", invocation(), false, false, "usage_unknown"},
+		{"start without counters is not free", stream(frame(`{"type":"message_start","message":{"id":"m","usage":{}}}`), frame(`{"type":"message_stop"}`)), "k", invocation(), false, false, "invalid_usage"},
+		{"start without output", stream(frame(`{"type":"message_start","message":{"id":"m","usage":{"input_tokens":3}}}`), frame(`{"type":"message_stop"}`)), "k", invocation(), false, false, "invalid_usage"},
+		{"non-integer counter", stream(start, frame(`{"type":"message_delta","delta":{},"usage":{"output_tokens":"9"}}`)), "k", invocation(), false, false, "invalid_usage"},
 		{"error event", stream(start, frame(`{"type":"error"}`)), "k", invocation(), false, false, "upstream_stream_error"},
 		{"bad event json", stream(frame(`{`)), "k", invocation(), false, false, "invalid_upstream_event"},
 	}
@@ -132,5 +135,16 @@ func TestFailures(t *testing.T) {
 				t.Fatalf("definitive=%v retryable=%v code=%s, want %v %v %s", d, r, got, c.definitive, c.retry, c.code)
 			}
 		})
+	}
+}
+
+func TestDeltaMayCompleteTheCounters(t *testing.T) {
+	events, err := run(t, stream(
+		frame(`{"type":"message_start","message":{"id":"m","usage":{"input_tokens":7}}}`),
+		frame(`{"type":"message_delta","delta":{},"usage":{"output_tokens":4}}`),
+		frame(`{"type":"message_stop"}`),
+	), "k", invocation())
+	if err != nil || events[0].Usage != (contracts.Meters{Input: 7, Output: 4}) {
+		t.Fatalf("%v %+v", err, events)
 	}
 }

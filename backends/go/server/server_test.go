@@ -328,3 +328,36 @@ func TestGrantEndpoint(t *testing.T) {
 		t.Fatalf("scope status %d", res.StatusCode)
 	}
 }
+
+func TestCreditRatesEndpoint(t *testing.T) {
+	f := setup(t, "success", 0)
+	units := func(n string) string { return `{"units":"` + n + `"}` }
+	config := `{"asset":"credit:demo","tokens":{"input":` + units("1000") + `,"cached":` + units("1000") + `,"cache_write":` + units("1000") + `,"output":` + units("1000") + `}}`
+	post := func(idem, body string) *http.Response {
+		return f.do(t, "POST", "/v1/admin/services/chat/credit-rates", "owner-key", idem, body)
+	}
+	res := post("cr1", `{"expected_version":1,"config":`+config+`}`)
+	if res.StatusCode != 201 {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	if v := decode(t, res)["version"]; v != float64(2) {
+		t.Fatalf("version %v", v)
+	}
+	if res := post("cr2", `{"expected_version":1,"config":`+config+`}`); res.StatusCode != 409 || errorCode(t, res) != "service_version_conflict" {
+		t.Fatalf("stale version: %d", res.StatusCode)
+	}
+	for body, code := range map[string]string{
+		`{"expected_version":"2"}`:                         "invalid_service_version",
+		`{"expected_version":2.5,"config":` + config + `}`: "invalid_service_version",
+		`{"x":1}`: "invalid_credit_rates",
+		`{"expected_version":2,"config":{"asset":"credit:demo"}}`:            "invalid_credit_rates",
+		`{"expected_version":2,"config":{"asset":"other","tokens":` + `{}}}`: "invalid_credit_rates",
+	} {
+		if res := post("cr-bad", body); errorCode(t, res) != code {
+			t.Errorf("%s: %d, want %s", body, res.StatusCode, code)
+		}
+	}
+	if res := f.do(t, "POST", "/v1/admin/services/chat/credit-rates", "reader-key", "cr3", `{"expected_version":2,"config":`+config+`}`); res.StatusCode != 403 {
+		t.Fatalf("scope status %d", res.StatusCode)
+	}
+}

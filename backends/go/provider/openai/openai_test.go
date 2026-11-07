@@ -115,6 +115,9 @@ func TestFailures(t *testing.T) {
 		{"unterminated frame is dropped", stream(`data: {"type":"response.completed"}`), "k", invocation(), false, false, "stream_interrupted"},
 		{"bad event json", stream(frame(`not json`)), "k", invocation(), false, false, "invalid_upstream_event"},
 		{"completed without usage", stream(frame(`{"type":"response.completed","response":{"id":"r"}}`)), "k", invocation(), false, false, "usage_unknown"},
+		{"usage without counters is not free", stream(frame(`{"type":"response.completed","response":{"id":"r","usage":{}}}`)), "k", invocation(), false, false, "invalid_usage"},
+		{"usage without output", stream(frame(`{"type":"response.completed","response":{"id":"r","usage":{"input_tokens":3}}}`)), "k", invocation(), false, false, "invalid_usage"},
+		{"fractional counter", stream(frame(`{"type":"response.completed","response":{"id":"r","usage":{"input_tokens":3.5,"output_tokens":1}}}`)), "k", invocation(), false, false, "invalid_upstream_event"},
 		{"negative input after cache", stream(frame(`{"type":"response.completed","response":{"id":"r","usage":{"input_tokens":1,"output_tokens":1,"input_tokens_details":{"cached_tokens":5}}}}`)), "k", invocation(), false, false, "invalid_usage"},
 		{"upstream error event", stream(frame(`{"type":"error"}`)), "k", invocation(), false, false, "upstream_incomplete"},
 	}

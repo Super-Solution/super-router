@@ -52,9 +52,11 @@ func New(key func() string, opts ...Option) *Provider {
 	return p
 }
 
+// usage keeps the two required counters as pointers: a response that omits them must be refused, not billed as
+// zero tokens (the TypeScript adapter does the same).
 type usage struct {
-	InputTokens        int64 `json:"input_tokens"`
-	OutputTokens       int64 `json:"output_tokens"`
+	InputTokens        *int64 `json:"input_tokens"`
+	OutputTokens       *int64 `json:"output_tokens"`
 	InputTokensDetails struct {
 		CachedTokens     int64 `json:"cached_tokens"`
 		CacheWriteTokens int64 `json:"cache_write_tokens"`
@@ -63,11 +65,14 @@ type usage struct {
 
 // Normalize converts OpenAI usage to router meters. OpenAI counts cached and cache-write tokens inside input.
 func (u usage) normalize() (contracts.Meters, bool) {
+	if u.InputTokens == nil || u.OutputTokens == nil {
+		return contracts.Meters{}, false
+	}
 	m := contracts.Meters{
-		Input:      u.InputTokens - u.InputTokensDetails.CachedTokens - u.InputTokensDetails.CacheWriteTokens,
+		Input:      *u.InputTokens - u.InputTokensDetails.CachedTokens - u.InputTokensDetails.CacheWriteTokens,
 		Cached:     u.InputTokensDetails.CachedTokens,
 		CacheWrite: u.InputTokensDetails.CacheWriteTokens,
-		Output:     u.OutputTokens,
+		Output:     *u.OutputTokens,
 	}
 	return m, m.Valid()
 }
