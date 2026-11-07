@@ -6,8 +6,8 @@ One folder per language. Each implements the same contract and is tested against
 | Folder | Status |
 | --- | --- |
 | `typescript/` | Reference implementation: server, worker, billing presets |
-| `go/` | Proof of concept: the pricing core (`charge`, `bound`, `CompileCreditPrice`) |
-| `python/` | Proof of concept: the same pricing core |
+| `go/` | Proof of concept: the pricing core (`charge`, `bound`, `CompileCreditPrice`) and offering routing (`routing.Route`) |
+| `python/` | Proof of concept: the same pricing core and routing (`route`) |
 
-The proofs of concept cover exact money arithmetic and rate validation only. They have no HTTP server,
+The proofs of concept cover exact money arithmetic, rate validation and offering selection only. They have no HTTP server,
 storage or provider adapters yet.
