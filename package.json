@@ -10,6 +10,7 @@
   "workspaces": [
     "packages/contracts",
     "packages/core",
+    "packages/adapters/http",
     "packages/adapters/payments",
     "packages/adapters/storage-postgres",
     "packages/adapters/provider-openai",
@@ -42,8 +43,11 @@
     "test:paid-chat:browser": "npm run build && tsx scripts/paid-chat-browser.ts"
   },
   "devDependencies": {
+    "@types/express": "4.17.25",
     "@types/node": "24.10.1",
     "@types/pg": "8.23.1",
+    "express": "4.22.3",
+    "fastify": "5.12.8",
     "playwright": "1.56.1",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
