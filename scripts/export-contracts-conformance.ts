@@ -74,7 +74,7 @@ service("optional scores", (s) => {
   Object.assign(o(s), { latency_ms: 120.5, reliability: 0.99, quality: 0 });
 });
 service("max safe integer version", (s) => (s.version = 9007199254740991));
-for (const [name, edit] of Object.entries({
+const serviceMutations: Record<string, (s: Json) => unknown> = {
   "unknown top-level key": (s: Json) => (s.extra = 1),
   "missing id": (s: Json) => delete s.id,
   "id with space": (s: Json) => (s.id = "a b"),
@@ -143,7 +143,8 @@ for (const [name, edit] of Object.entries({
   "offering max usage unknown meter": (s: Json) =>
     (o(s).max_usage = { pixels: 1 }),
   "offering max usage negative": (s: Json) => (o(s).max_usage = { images: -1 }),
-}))
+};
+for (const [name, edit] of Object.entries(serviceMutations))
   service(name, edit);
 
 invocation("base");
@@ -178,7 +179,7 @@ invocation("content 32000 UTF-16 units", (i) => {
 invocation("content 16000 emoji (32000 units)", (i) => {
   i.input.messages = [{ role: "user", content: "😀".repeat(16000) }];
 });
-for (const [name, edit] of Object.entries({
+const invocationMutations: Record<string, (s: Json) => unknown> = {
   "unknown key": (i: Json) => (i.extra = 1),
   "payer mode platform": (i: Json) => (i.payer_mode = "platform"),
   "missing service": (i: Json) => delete i.service,
@@ -217,7 +218,8 @@ for (const [name, edit] of Object.entries({
   "max usage negative": (i: Json) => (i.limits.max_usage = { images: -1 }),
   "stream as string": (i: Json) => (i.stream = "yes"),
   "stream null": (i: Json) => (i.stream = null),
-}))
+};
+for (const [name, edit] of Object.entries(invocationMutations))
   invocation(name, edit);
 
 writeFileSync(
