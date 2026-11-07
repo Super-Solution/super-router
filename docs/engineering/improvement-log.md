@@ -40,7 +40,5 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
   in cloud mode against the TypeScript-managed tables (`SUPERROUTER_AUTH=database`), which is the cheaper path.
 - Providers are tested against fake upstreams only, not the live OpenAI and Anthropic APIs.
 - No benchmarks for the Go and Python stores yet; the memory stores scan per tenant.
-- `docs/` links to `P1_VALIDATION.md` and `P2_BILLING.md` are in the translated READMEs only; keep them in step if
-  those files change.
 - Python JSON number text differs from Go and TypeScript for integral floats (`1.0` vs `1`) in the dry-run `score`;
   values are equal.
