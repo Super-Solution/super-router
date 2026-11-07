@@ -10,66 +10,22 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/Super-Solution/super-router/backends/go/contracts"
 	"github.com/Super-Solution/super-router/backends/go/pricing"
 )
 
 // MediaKeys are the media meters, in the order the TypeScript reference iterates them.
-var MediaKeys = []string{"images", "video_ms", "audio_ms", "tasks"}
+var MediaKeys = contracts.MediaKeys
 
-var kindMeter = map[string]string{"image": "images", "video": "video_ms", "audio": "audio_ms", "task": "tasks"}
+var kindMeter = contracts.KindMeter
 
-// Offering is one concrete model route a service can use.
-type Offering struct {
-	ID              string           `json:"id"`
-	TaskKind        *string          `json:"task_kind"`
-	MaxUsage        map[string]int64 `json:"max_usage"`
-	Model           string           `json:"model"`
-	Region          string           `json:"region"`
-	Labels          []string         `json:"labels"`
-	Enabled         bool             `json:"enabled"`
-	MaxInputTokens  int64            `json:"max_input_tokens"`
-	MaxOutputTokens int64            `json:"max_output_tokens"`
-	Price           pricing.Price    `json:"price"`
-	LatencyMs       *float64         `json:"latency_ms"`
-	Reliability     *float64         `json:"reliability"`
-	Quality         *float64         `json:"quality"`
-}
-
-// Weights are the scoring weights; they sum to one.
-type Weights struct {
-	Cost        float64 `json:"cost"`
-	Latency     float64 `json:"latency"`
-	Reliability float64 `json:"reliability"`
-	Quality     float64 `json:"quality"`
-}
-
-// Service is the part of a service definition that routing reads.
-type Service struct {
-	TaskKind        *string    `json:"task_kind"`
-	Mode            string     `json:"mode"`
-	Model           string     `json:"model"`
-	Offerings       []Offering `json:"offerings"`
-	Regions         []string   `json:"regions"`
-	RequiredLabels  []string   `json:"required_labels"`
-	MaxProviderCost string     `json:"max_provider_cost"`
-	Weights         Weights    `json:"weights"`
-	CostScale       string     `json:"cost_scale"`
-	LatencyScaleMs  float64    `json:"latency_scale_ms"`
-	UnknownScore    float64    `json:"unknown_score"`
-}
-
-// Invocation is the part of a request that routing reads.
-type Invocation struct {
-	Input struct {
-		Task *struct {
-			Kind string `json:"kind"`
-		} `json:"task"`
-	} `json:"input"`
-	Limits struct {
-		MaxOutputTokens int64            `json:"max_output_tokens"`
-		MaxUsage        map[string]int64 `json:"max_usage"`
-	} `json:"limits"`
-}
+// Offering, Weights, Service and Invocation are the shared wire types of package contracts.
+type (
+	Offering   = contracts.Offering
+	Weights    = contracts.Weights
+	Service    = contracts.Service
+	Invocation = contracts.Invocation
+)
 
 // Candidate is an offering that passed every hard limit.
 type Candidate struct {
@@ -117,6 +73,13 @@ func invocationBound(in Invocation, maxInput int64, price pricing.Price) (*big.I
 		usage.Media[k] = in.Limits.MaxUsage[k]
 	}
 	return pricing.Charge(usage, price)
+}
+
+// InvocationBound is the most a single attempt can cost on one price: the token bound for chat, or the
+// priced media limits for a task. Routing and the router both use it, so the reserved amount and the
+// candidate cost can never disagree.
+func InvocationBound(in Invocation, maxInput int64, price pricing.Price) (*big.Int, error) {
+	return invocationBound(in, maxInput, price)
 }
 
 func minOne(x float64) float64 {
