@@ -15,7 +15,7 @@ npx tsx scripts/export-conformance.ts          # regenerate pricing from the Typ
 npx tsx scripts/export-routing-conformance.ts  # regenerate routing
 npx tsx --test tests/conformance.test.ts       # TypeScript still matches the file
 (cd backends/go && go test ./...)              # Go port
-(cd backends/python && python -m unittest discover -s tests)   # Python port
+(cd backends/python && pytest)              # Python port (ruff check . && mypy for lint and types)
 ```
 
 If pricing behaviour changes on purpose, regenerate, review the diff, and update every port.

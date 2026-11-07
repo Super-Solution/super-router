@@ -87,3 +87,20 @@ func TestRouteConformance(t *testing.T) {
 		t.Fatalf("weak coverage: %d with candidates, %d errors", withCandidates, errorCases)
 	}
 }
+
+func BenchmarkRoute(b *testing.B) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "conformance", "routing.v1.json"))
+	if err != nil {
+		b.Fatal(err)
+	}
+	var f fixtures
+	if err := json.Unmarshal(data, &f); err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c := f.Route[i%len(f.Route)]
+		_, _, _ = Route(c.Service, c.Invocation)
+	}
+}

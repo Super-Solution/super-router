@@ -5,10 +5,12 @@ Hard limits first, then weighted scoring, ordered by score and then by id. It re
 case in conformance/routing.v1.json, including the exact IEEE-754 scores. Offering ids must sort
 the same byte-wise as in TypeScript (use [a-z0-9]).
 """
+
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from .pricing import bound, charge
 

@@ -5,11 +5,13 @@ Mirrors packages/core (charge, bound) and packages/core/src/credit-rates.ts (com
 All money is integer atoms held as Python ints (arbitrary precision), so results match the
 TypeScript BigInt reference exactly. conformance/pricing.v1.json is the shared test data.
 """
+
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from math import gcd
-from typing import Any, Mapping
+from typing import Any
 
 CREDIT_ATOMS = 1_000_000_000
 MEDIA_KEYS = ("images", "video_ms", "audio_ms", "tasks")
@@ -94,16 +96,14 @@ def compile_credit_price(raw: Any) -> dict[str, Any]:
     if parsed_tokens is None and not parsed_media:
         raise _invalid()
 
-    rates = [
-        _rate(*parsed_tokens[k]) if parsed_tokens is not None else (0, 1) for k in TOKEN_KEYS
-    ]
+    rates = [_rate(*parsed_tokens[k]) if parsed_tokens is not None else (0, 1) for k in TOKEN_KEYS]
     per = 1
     for _, denominator in rates:
         per = per // gcd(per, denominator) * denominator
         if per > 1_000_000_000:
             raise RouterError("unsupported_rate_precision", 422)
     price: dict[str, Any] = {"asset": asset, "per": per}
-    for key, (numerator, denominator) in zip(TOKEN_KEYS, rates):
+    for key, (numerator, denominator) in zip(TOKEN_KEYS, rates, strict=True):
         price[key] = str(numerator * (per // denominator))
     media_out: dict[str, dict[str, Any]] = {}
     for key in MEDIA_KEYS:
