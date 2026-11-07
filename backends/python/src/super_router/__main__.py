@@ -3,8 +3,12 @@
 
 Configured through environment variables, as the Go binary is:
 
-    SUPERROUTER_API_KEY      required, "sr_" plus 64 hexadecimal characters; the bearer token of the single owner key
+    SUPERROUTER_API_KEY      "sr_" plus 64 hexadecimal characters; the bearer token of the single owner key.
+                             Required unless SUPERROUTER_AUTH=database
     SUPERROUTER_DIGEST_KEY   required, at least 32 characters; keys the idempotency digest
+    SUPERROUTER_AUTH         "database" authenticates bearer tokens against the control plane's keys in PostgreSQL
+                             (members, scoped keys, revocation) instead of the single owner key; needs DATABASE_URL.
+                             Keys are created by the TypeScript control plane
     DATABASE_URL             PostgreSQL URL. Unset means the in-memory store: state is lost on restart
     ADDR                     listen address, default 127.0.0.1:3410
     SUPERROUTER_WORKSPACE, SUPERROUTER_ENVIRONMENT, SUPERROUTER_CUSTOMER
@@ -29,7 +33,7 @@ from typing import Any
 
 from .contracts import Principal, Provider
 from .router import DataStore, MockProvider, Router
-from .server import Key, StaticKeys, create_app
+from .server import Authenticator, Key, StaticKeys, create_app
 from .stores.memory import MemoryStore
 
 _API_KEY = re.compile(r"^sr_[a-f0-9]{64}$")
@@ -64,10 +68,16 @@ async def serve(
         return getenv(name) or fallback
 
     api_key, digest_key = env("SUPERROUTER_API_KEY"), env("SUPERROUTER_DIGEST_KEY")
-    if not _API_KEY.match(api_key) or len(digest_key) < 32:
+    auth_mode = env("SUPERROUTER_AUTH")
+    if auth_mode not in ("", "database"):
+        raise ConfigError('SUPERROUTER_AUTH must be empty or "database"')
+    database_auth = auth_mode == "database"
+    if database_auth and not env("DATABASE_URL"):
+        raise ConfigError("SUPERROUTER_AUTH=database needs DATABASE_URL")
+    if (not database_auth and not _API_KEY.match(api_key)) or len(digest_key) < 32:
         raise ConfigError(
-            "set SUPERROUTER_API_KEY (sr_ plus 64 random hexadecimal characters) and SUPERROUTER_DIGEST_KEY "
-            "(at least 32 characters); values are not logged"
+            "set SUPERROUTER_API_KEY (sr_ plus 64 random hexadecimal characters; not needed with "
+            "SUPERROUTER_AUTH=database) and SUPERROUTER_DIGEST_KEY (at least 32 characters); values are not logged"
         )
     host, _, port = env("ADDR", "127.0.0.1:3410").rpartition(":")
     if not host or not port.isdigit():
@@ -75,15 +85,19 @@ async def serve(
 
     closers: list[Callable[[], Any]] = []
     store: DataStore
+    auth: Authenticator | None = None
     if url := env("DATABASE_URL"):
+        from .stores.keys import PostgresKeys, revalidate
         from .stores.postgres import PostgresStore
         from .stores.sql import PsycopgDatabase
 
         db = await PsycopgDatabase.connect(url, max_size=20)
         closers.append(db.close)
-        pg = PostgresStore(db)
+        pg = PostgresStore(db, revalidate=revalidate if database_auth else None)
         await pg.migrate()
         store = pg
+        if database_auth:
+            auth = PostgresKeys(db)
     else:
         _log.warning("DATABASE_URL is not set: using the in-memory store, state is lost on restart")
         store = MemoryStore()
@@ -113,7 +127,7 @@ async def serve(
         ("invoke", "service:write", "billing:write", "billing:read", "operations:read", "routing:write"),
     )
     router = Router(store, providers, digest_key)
-    app = create_app(router, store, StaticKeys([Key(api_key, owner)]), logger=_log)
+    app = create_app(router, store, auth or StaticKeys([Key(api_key, owner)]), logger=_log)
 
     class Server(uvicorn.Server):
         """We own signal handling, so shutdown ends in our cleanup and a normal exit, not a re-raised signal."""

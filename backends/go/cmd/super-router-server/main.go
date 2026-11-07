@@ -3,8 +3,12 @@
 // Command super-router-server runs the Super Router data plane: the HTTP API, a storage backend and the
 // configured providers. It is configured through environment variables:
 //
-//	SUPERROUTER_API_KEY      required, "sr_" plus 64 hexadecimal characters; the bearer token of the single owner key
+//	SUPERROUTER_API_KEY      "sr_" plus 64 hexadecimal characters; the bearer token of the single owner key.
+//	                         Required unless SUPERROUTER_AUTH=database
 //	SUPERROUTER_DIGEST_KEY   required, at least 32 characters; keys the idempotency digest
+//	SUPERROUTER_AUTH         "database" authenticates bearer tokens against the control plane's keys in
+//	                         PostgreSQL (members, scoped keys, revocation) instead of the single owner key;
+//	                         needs DATABASE_URL. Keys are created by the TypeScript control plane
 //	DATABASE_URL             PostgreSQL URL. Unset means the in-memory store: state is lost on restart
 //	ADDR                     listen address, default 127.0.0.1:3410
 //	SUPERROUTER_WORKSPACE, SUPERROUTER_ENVIRONMENT, SUPERROUTER_CUSTOMER
@@ -54,8 +58,15 @@ func main() {
 // run starts the server and blocks until ctx is cancelled. ready, when set, receives the bound address.
 func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, ready chan<- string) error {
 	apiKey, digestKey := getenv("SUPERROUTER_API_KEY"), getenv("SUPERROUTER_DIGEST_KEY")
-	if !apiKeyRe.MatchString(apiKey) || len(digestKey) < 32 {
-		return errors.New("set SUPERROUTER_API_KEY (sr_ plus 64 random hexadecimal characters) and SUPERROUTER_DIGEST_KEY (at least 32 characters); values are not logged")
+	databaseAuth := getenv("SUPERROUTER_AUTH") == "database"
+	if getenv("SUPERROUTER_AUTH") != "" && !databaseAuth {
+		return errors.New("SUPERROUTER_AUTH must be empty or \"database\"")
+	}
+	if databaseAuth && getenv("DATABASE_URL") == "" {
+		return errors.New("SUPERROUTER_AUTH=database needs DATABASE_URL")
+	}
+	if (!databaseAuth && !apiKeyRe.MatchString(apiKey)) || len(digestKey) < 32 {
+		return errors.New("set SUPERROUTER_API_KEY (sr_ plus 64 random hexadecimal characters; not needed with SUPERROUTER_AUTH=database) and SUPERROUTER_DIGEST_KEY (at least 32 characters); values are not logged")
 	}
 	or := func(name, fallback string) string {
 		if v := getenv(name); v != "" {
@@ -64,6 +75,7 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, r
 		return fallback
 	}
 	var store router.DataStore
+	var auth server.Authenticator
 	if url := getenv("DATABASE_URL"); url != "" {
 		db, err := sql.Open("pgx", url)
 		if err != nil {
@@ -71,11 +83,18 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, r
 		}
 		defer db.Close()
 		db.SetMaxOpenConns(20)
-		pg := postgres.New(db, postgres.Options{})
+		opts := postgres.Options{}
+		if databaseAuth {
+			opts.Revalidate = postgres.Revalidate
+		}
+		pg := postgres.New(db, opts)
 		if err := pg.Migrate(ctx); err != nil {
 			return fmt.Errorf("migrate: %w", err)
 		}
 		store = pg
+		if databaseAuth {
+			auth = postgres.NewKeys(db)
+		}
 	} else {
 		logger.Warn("DATABASE_URL is not set: using the in-memory store, state is lost on restart")
 		store = memory.New(nil)
@@ -101,10 +120,10 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, r
 		Workspace: or("SUPERROUTER_WORKSPACE", "default"), Environment: or("SUPERROUTER_ENVIRONMENT", "prod"), Customer: or("SUPERROUTER_CUSTOMER", "default"),
 		Scopes: []string{"invoke", "service:write", "billing:write", "billing:read", "operations:read", "routing:write"},
 	}
-	api, err := server.Handler(server.Options{
-		Router: rt, Store: store, Logger: logger,
-		Auth: server.StaticKeys([]server.Key{{Secret: apiKey, Principal: owner}}),
-	})
+	if auth == nil {
+		auth = server.StaticKeys([]server.Key{{Secret: apiKey, Principal: owner}})
+	}
+	api, err := server.Handler(server.Options{Router: rt, Store: store, Logger: logger, Auth: auth})
 	if err != nil {
 		return err
 	}

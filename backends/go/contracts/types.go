@@ -239,3 +239,12 @@ type StreamEvent struct {
 	Sequence  int
 	Data      map[string]any
 }
+
+// RoleScopes maps each member role to the scopes its keys may hold.
+var RoleScopes = map[string][]string{
+	"owner":         {"invoke", "identity:write", "service:write", "routing:write", "billing:write", "billing:read", "operations:read"},
+	"service_admin": {"invoke", "service:write", "routing:write", "operations:read"},
+	"billing_admin": {"billing:write", "billing:read", "operations:read"},
+	"viewer":        {"billing:read", "operations:read"},
+	"app":           {"invoke", "credits:read"},
+}
