@@ -1,0 +1,36 @@
+{
+  "name": "@supersolutions/super-router-provider-openai",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@supersolutions/super-router-contracts": "0.1.0"
+  },
+  "author": "SUPER SOLUTION LABS INC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Super-Solution/super-router.git",
+    "directory": "packages/adapters/provider-openai"
+  },
+  "homepage": "https://github.com/Super-Solution/super-router#readme",
+  "bugs": {
+    "url": "https://github.com/Super-Solution/super-router/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

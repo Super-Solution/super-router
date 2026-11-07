@@ -1,0 +1,38 @@
+{
+  "name": "@supersolutions/super-router-billing-presets",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@supersolutions/super-router-contracts": "0.1.0",
+    "@supersolutions/super-router-storage-postgres": "0.1.0",
+    "@supersolutions/super-router-core": "0.1.0"
+  },
+  "license": "Apache-2.0",
+  "author": "SUPER SOLUTION LABS INC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Super-Solution/super-router.git",
+    "directory": "backends/typescript/billing-presets"
+  },
+  "homepage": "https://github.com/Super-Solution/super-router#readme",
+  "bugs": {
+    "url": "https://github.com/Super-Solution/super-router/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

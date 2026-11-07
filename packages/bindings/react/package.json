@@ -1,0 +1,40 @@
+{
+  "name": "@supersolutions/super-router-ui",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "react": "19.2.0",
+    "@types/react": "19.2.2"
+  },
+  "license": "Apache-2.0",
+  "author": "SUPER SOLUTION LABS INC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Super-Solution/super-router.git",
+    "directory": "packages/bindings/react"
+  },
+  "homepage": "https://github.com/Super-Solution/super-router#readme",
+  "bugs": {
+    "url": "https://github.com/Super-Solution/super-router/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ]
+}

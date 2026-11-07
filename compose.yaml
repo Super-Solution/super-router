@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: superrouter
+      POSTGRES_PASSWORD: local-development-only
+      POSTGRES_DB: superrouter
+    ports:
+      - "127.0.0.1:25432:5432"
+    volumes:
+      - superrouter_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superrouter -d superrouter"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  superrouter_pg:

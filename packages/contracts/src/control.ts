@@ -1,0 +1,98 @@
+import { z } from "zod";
+const id = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(/^[a-zA-Z0-9_.:/-]+$/);
+const positive = z.string().regex(/^[1-9][0-9]{0,29}$/);
+export const Role = z.enum([
+  "owner",
+  "service_admin",
+  "billing_admin",
+  "viewer",
+  "app",
+]);
+export type Role = z.infer<typeof Role>;
+export const roleScopes: Record<Role, readonly string[]> = {
+  owner: [
+    "invoke",
+    "identity:write",
+    "service:write",
+    "routing:write",
+    "billing:write",
+    "billing:read",
+    "operations:read",
+  ],
+  service_admin: [
+    "invoke",
+    "service:write",
+    "routing:write",
+    "operations:read",
+  ],
+  billing_admin: ["billing:write", "billing:read", "operations:read"],
+  viewer: ["billing:read", "operations:read"],
+  app: ["invoke", "credits:read"],
+};
+export const MemberInput = z
+  .object({ id, role: Role, active: z.boolean().default(true) })
+  .strict();
+export const CustomerInput = z.object({ id, external_id: id }).strict();
+export const KeyInput = z
+  .object({
+    member_id: id,
+    customer_id: id,
+    scopes: z.array(z.string()).min(1).max(16),
+    service_ids: z.array(id).min(1).optional(),
+    expires_at: z.string().datetime(),
+  })
+  .strict();
+export const PlanInput = z
+  .object({
+    id,
+    version: z.number().int().positive(),
+    period_days: z.number().int().min(1).max(366),
+    asset: id,
+    credits: positive,
+    service_ids: z.array(id).min(1).max(100),
+    amount_minor: positive,
+    currency: z.string().regex(/^[A-Z]{3}$/),
+  })
+  .strict();
+export type PlanInput = z.infer<typeof PlanInput>;
+export const SubscriptionInput = z
+  .object({
+    customer_id: id,
+    plan_id: id,
+    plan_version: z.number().int().positive(),
+  })
+  .strict();
+export const PlanChangeInput = z
+  .object({ plan_id: id, plan_version: z.number().int().positive() })
+  .strict();
+export const PaymentInput = z
+  .object({
+    id,
+    order_id: id,
+    revision: z.number().int().positive(),
+    status: z.enum(["succeeded", "failed"]),
+    amount_minor: positive,
+    currency: z.string().regex(/^[A-Z]{3}$/),
+  })
+  .strict();
+export const CreditGrantInput = z
+  .object({
+    customer_id: id,
+    asset: id,
+    amount: positive,
+    reason: z.string().min(5).max(300),
+    source_kind: z.enum(["promotion", "purchased"]).default("promotion"),
+    service_ids: z.array(id).min(1).optional(),
+    expires_at: z.string().datetime().optional(),
+  })
+  .strict();
+
+export type MemberInput = z.infer<typeof MemberInput>;
+export type CustomerInput = z.infer<typeof CustomerInput>;
+export type KeyInput = z.infer<typeof KeyInput>;
+export type SubscriptionInput = z.infer<typeof SubscriptionInput>;
+export type CreditGrantInput = z.infer<typeof CreditGrantInput>;

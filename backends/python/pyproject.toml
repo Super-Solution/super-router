@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "super-router-core"
+version = "0.1.0"
+description = "Python port of the Super Router pricing core (charge, bound, compile_credit_price). Proof of concept."
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "SUPER SOLUTION LABS INC" }]
+dependencies = []
+
+[tool.setuptools]
+packages = ["super_router"]
