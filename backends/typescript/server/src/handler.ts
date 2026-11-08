@@ -13,13 +13,29 @@ import {
 import type { ControlPlane } from "@supersolutions/super-router-storage-postgres";
 
 const MAX_BODY_BYTES = 256_000;
+/**
+ * Read a request body of at most MAX_BODY_BYTES. The declared length is checked first, and the stream is read
+ * chunk by chunk and cancelled the moment it passes the limit, so a chunked body with no Content-Length cannot make
+ * the process buffer more than the limit (this runs before authentication on payment notifications).
+ */
 async function rawBody(request: Request): Promise<Buffer> {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > MAX_BODY_BYTES) throw new RouterError("body_too_large", 413);
-  const bytes = Buffer.from(await request.arrayBuffer());
-  if (bytes.length > MAX_BODY_BYTES)
-    throw new RouterError("body_too_large", 413);
-  return bytes;
+  if (!request.body) return Buffer.alloc(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      throw new RouterError("body_too_large", 413);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
 }
 async function body(request: Request): Promise<any> {
   try {

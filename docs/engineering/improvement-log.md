@@ -42,3 +42,15 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
 - No benchmarks for the Go and Python stores yet; the memory stores scan per tenant.
 - Python JSON number text differs from Go and TypeScript for integral floats (`1.0` vs `1`) in the dry-run `score`;
   values are equal.
+
+## Rounds of 15 (audit, fix, local gate, push)
+
+### Round 2 (2026-11-08): request bodies in the TypeScript handler
+
+- **Chunked bodies were buffered before the size check.** `rawBody` compared `Content-Length` with the 256 kB limit and
+  then called `arrayBuffer()`, so a request with no `Content-Length` (chunked) was read in full first. The payment
+  notification route reads its body before any authentication, so an anonymous client could make the process buffer an
+  unbounded body. The body is now read chunk by chunk and the stream is cancelled the moment it passes the limit
+  (413 `body_too_large`). A test feeds an endless stream: before the fix it never ended, now it answers 413 after reading 256 kB.
+- The Go (`http.MaxBytesReader`) and Python (running total in the ASGI receive loop) servers already bounded the read.
+- Gate: `npm run typecheck`, `format:check`, all 141 tests against a real PostgreSQL (none skipped).

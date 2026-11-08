@@ -147,3 +147,28 @@ for (const [name, mount] of Object.entries(mounts))
       await close();
     }
   });
+
+test("a chunked body without Content-Length is cut off at the limit instead of buffered", async () => {
+  const { handler, key } = await fixture();
+  let pulled = 0;
+  const chunk = new Uint8Array(64 * 1024).fill(0x20);
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulled += chunk.length;
+      controller.enqueue(chunk); // endless: a client that never stops sending
+    },
+  });
+  const request = new Request("http://localhost/v1/inferences", {
+    method: "POST",
+    headers: { authorization: "Bearer " + key, "idempotency-key": "big" },
+    body,
+    duplex: "half",
+  } as RequestInit);
+  const response = await handler(request);
+  assert.equal(response.status, 413);
+  assert.equal(((await response.json()) as any).error.code, "body_too_large");
+  assert.ok(
+    pulled <= 256_000 + 3 * 64 * 1024,
+    `read ${pulled} bytes before refusing`,
+  );
+});
