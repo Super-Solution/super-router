@@ -68,3 +68,25 @@ func TestReadError(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+// endless yields bytes with no newline for ever and counts how many were taken.
+type endless struct{ taken int }
+
+func (e *endless) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 'a'
+	}
+	e.taken += len(p)
+	return len(p), nil
+}
+
+func TestALineThatNeverEndsIsCutOffNotBuffered(t *testing.T) {
+	src := &endless{}
+	err := Read(src, func(Frame) error { return nil })
+	if !errors.Is(err, ErrFrameTooLarge) {
+		t.Fatalf("%v", err)
+	}
+	if src.taken > MaxFrameBytes+128*1024 {
+		t.Fatalf("read %d bytes before giving up", src.taken)
+	}
+}

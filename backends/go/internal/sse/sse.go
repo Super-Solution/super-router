@@ -32,11 +32,11 @@ func Read(r io.Reader, yield func(Frame) error) error {
 	event, size := "message", 0
 	var data []string
 	for {
-		line, err := reader.ReadString('\n')
-		size += len(line)
-		if size > MaxFrameBytes {
-			return ErrFrameTooLarge
+		line, err := readLine(reader, MaxFrameBytes-size)
+		if err == ErrFrameTooLarge {
+			return err
 		}
+		size += len(line)
 		if line != "" || err == nil {
 			trimmed := strings.TrimRight(line, "\r\n")
 			switch {
@@ -59,5 +59,22 @@ func Read(r io.Reader, yield func(Frame) error) error {
 			}
 			return err
 		}
+	}
+}
+
+// readLine reads through the next '\n' (or to the end of the stream) but gives up as soon as the line passes
+// budget bytes. ReadString would buffer a line that never ends, which is exactly what a hostile upstream sends.
+func readLine(r *bufio.Reader, budget int) (string, error) {
+	var line []byte
+	for {
+		chunk, err := r.ReadSlice('\n')
+		if len(line)+len(chunk) > budget {
+			return "", ErrFrameTooLarge
+		}
+		line = append(line, chunk...)
+		if err == bufio.ErrBufferFull {
+			continue
+		}
+		return string(line), err
 	}
 }

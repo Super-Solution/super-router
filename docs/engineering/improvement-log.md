@@ -69,3 +69,15 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
 * Gate: TypeScript typecheck, format and 142 tests with PostgreSQL; Go gofmt, vet and race tests; Python
   ruff and 249 tests. `mypy` reports one error at `__main__.py:132` ("Server has type Any") that is the same
   without this change; this host has no project virtualenv, so it is environmental and was not chased.
+
+### Round 10 (2026-11-08) — Go SSE reader bounded per line
+
+* Audit: the SSE readers behind the provider adapters in all three languages. TypeScript and Python check
+  the buffer after every chunk. Go's `Read` used `ReadString('\n')` and checked the frame size only after the
+  line was complete, so an upstream that sent bytes without ever sending a newline was buffered until the
+  stream ended: the 2 MB cap did not hold for the one case it exists for.
+* Fix: lines are read with `ReadSlice` in buffer-sized pieces and abandoned the moment they pass the frame
+  budget (`ErrFrameTooLarge`, mapped to `stream_frame_too_large` by the adapters).
+* Test: `TestALineThatNeverEndsIsCutOffNotBuffered` (an endless reader; asserts the error and that at most
+  2 MB plus one buffer was read). It was not run against the old code: that code would not stop.
+* Gate: `scripts/check-all.sh go` (gofmt, vet, race tests) passes.
