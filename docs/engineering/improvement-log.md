@@ -81,3 +81,16 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
 * Test: `TestALineThatNeverEndsIsCutOffNotBuffered` (an endless reader; asserts the error and that at most
   2 MB plus one buffer was read). It was not run against the old code: that code would not stop.
 * Gate: `scripts/check-all.sh go` (gofmt, vet, race tests) passes.
+
+### Round 13 (2026-11-08) — provider names that collide with Object.prototype
+
+* Audit: user- or operator-controlled strings used as keys into plain objects (a grep across the four repos,
+  after round 12 found that class in the editor). Editor renderers and chat jobs already guard or tolerate
+  it. The router core did not: `this.providers[offering.provider]` finds `Object.prototype` members, and the
+  offering id pattern allows `constructor`, `toString` and similar. Such an offering passed the
+  `provider_unavailable` (503) check and then failed with a `TypeError` after the funds had been reserved.
+  It needs an admin to publish the offering, so the exposure is small, but the guard exists to catch it.
+* Fix: one `providerFor()` that uses own keys only, used by both checks. Go and Python use real maps and are
+  unaffected.
+* Test: `router-frameworks.test.ts` (fails without the fix, `provider_unavailable` with it).
+* Gate: `scripts/check-all.sh ts` (typecheck, format check, tests with PostgreSQL) passes.

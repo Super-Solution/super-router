@@ -184,3 +184,15 @@ test("an empty configured key does not authenticate a request without credential
   const res = await handler(new Request("http://x/v1/services"));
   assert.equal(res.status, 401);
 });
+
+test("an offering whose provider is named like an Object.prototype member is an unavailable provider", async () => {
+  const store = new MemoryStore();
+  const service = JSON.parse(JSON.stringify(demoService));
+  for (const offering of service.offerings) offering.provider = "constructor";
+  await seed(store as never, principal, service);
+  const router = new Router(store, { mock: new MockProvider() }, digestKey);
+  await assert.rejects(
+    () => router.infer(principal, demoInput, "proto-key"),
+    (e: unknown) => (e as { code?: string }).code === "provider_unavailable",
+  );
+});

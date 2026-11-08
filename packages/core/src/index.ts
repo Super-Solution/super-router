@@ -242,6 +242,12 @@ export class Router {
     if (digestKey.length < 32)
       throw new Error("digest key must be >=32 characters");
   }
+  /** Own providers only: an offering may name its provider `constructor` or `toString`, which `providers[name]` finds on Object.prototype. */
+  private providerFor(name: string): Provider | undefined {
+    return Object.hasOwn(this.providers, name)
+      ? this.providers[name]
+      : undefined;
+  }
   async infer(
     principal: Principal,
     raw: unknown,
@@ -298,7 +304,7 @@ export class Router {
     const decision = route(service, input);
     if (!decision.candidates.length)
       throw new RouterError("no_eligible_offering", 422);
-    if (decision.candidates.some((c) => !this.providers[c.offering.provider]))
+    if (decision.candidates.some((c) => !this.providerFor(c.offering.provider)))
       throw new RouterError("provider_unavailable", 503);
     const maxInput = Math.max(
       ...decision.candidates.map((c) => c.offering.max_input_tokens),
@@ -378,7 +384,7 @@ export class Router {
           execution = "cancelled";
           break;
         }
-        const provider = this.providers[candidate.offering.provider];
+        const provider = this.providerFor(candidate.offering.provider);
         if (!provider) throw new RouterError("provider_unavailable", 503);
         let attempt: string;
         try {
