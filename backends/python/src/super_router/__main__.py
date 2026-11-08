@@ -80,7 +80,7 @@ async def serve(
             "SUPERROUTER_AUTH=database) and SUPERROUTER_DIGEST_KEY (at least 32 characters); values are not logged"
         )
     host, _, port = env("ADDR", "127.0.0.1:3410").rpartition(":")
-    if not host or not port.isdigit():
+    if not host or not (port.isascii() and port.isdigit()):
         raise ConfigError("ADDR must be host:port")
 
     closers: list[Callable[[], Any]] = []

@@ -361,3 +361,10 @@ func TestCreditRatesEndpoint(t *testing.T) {
 		t.Fatalf("scope status %d", res.StatusCode)
 	}
 }
+
+func TestStaticKeysRefuseAnEmptyToken(t *testing.T) {
+	auth := server.StaticKeys([]server.Key{{Secret: "", Principal: owner}})
+	if _, err := auth.Authenticate(context.Background(), ""); err == nil {
+		t.Fatal("an empty secret must not authenticate a request that sent no credentials")
+	}
+}

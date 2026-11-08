@@ -172,3 +172,15 @@ test("a chunked body without Content-Length is cut off at the limit instead of b
     `read ${pulled} bytes before refusing`,
   );
 });
+
+test("an empty configured key does not authenticate a request without credentials", async () => {
+  const store = new MemoryStore();
+  await seed(store as never, principal, demoService);
+  const handler = createRouterHandler({
+    router: new Router(store, { mock: new MockProvider() }, digestKey),
+    store,
+    keys: [{ key: "", principal }],
+  });
+  const res = await handler(new Request("http://x/v1/services"));
+  assert.equal(res.status, 401);
+});

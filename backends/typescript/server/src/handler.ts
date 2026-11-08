@@ -249,8 +249,10 @@ export function createRouterHandler(
       );
       const principal = control
         ? await control.authenticate(token)
-        : credentials.find((k) => timingSafeEqual(k.digest, hash(token)))
-            ?.principal;
+        : token === ""
+          ? undefined // an empty configured key (an unset variable) must not match "no credentials"
+          : credentials.find((k) => timingSafeEqual(k.digest, hash(token)))
+              ?.principal;
       if (!principal) throw new RouterError("invalid_key", 401);
       const key = req.headers.get("idempotency-key") ?? "";
       if (req.method === "POST" && !key)

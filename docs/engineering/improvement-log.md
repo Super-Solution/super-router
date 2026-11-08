@@ -54,3 +54,18 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
   (413 `body_too_large`). A test feeds an endless stream: before the fix it never ended, now it answers 413 after reading 256 kB.
 - The Go (`http.MaxBytesReader`) and Python (running total in the ASGI receive loop) servers already bounded the read.
 - Gate: `npm run typecheck`, `format:check`, all 141 tests against a real PostgreSQL (none skipped).
+
+### Round 6 (2026-11-08) — empty keys and Unicode digits
+
+* Audit: the authentication path and body-length parsing of the Go, Python and TypeScript servers.
+  The shipped binaries validate the key shape, but the libraries did not: `StaticKeys` / `keys` with an
+  empty secret (what an unset variable produces) authenticated a request that sent no credentials at all,
+  in all three languages. Separately, the Python server called `int()` after `str.isdigit()` on
+  `Content-Length` (and the CLI on the port), and `"²".isdigit()` is true, so a hostile header became a 500.
+* Fix: an empty token is refused before any key is compared (Go, Python, TypeScript); length and port
+  parsing is ASCII-only.
+* Tests: one per language (`TestStaticKeysRefuseAnEmptyToken`, `test_static_keys_refuse_an_empty_token`,
+  and the TypeScript case in `router-frameworks.test.ts`).
+* Gate: TypeScript typecheck, format and 142 tests with PostgreSQL; Go gofmt, vet and race tests; Python
+  ruff and 249 tests. `mypy` reports one error at `__main__.py:132` ("Server has type Any") that is the same
+  without this change; this host has no project virtualenv, so it is environmental and was not chased.

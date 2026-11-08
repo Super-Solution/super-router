@@ -12,6 +12,7 @@ import uvicorn
 from dataplane_runner import DATA, DIGEST_KEY
 
 from super_router.contracts import Principal, parse_service
+from super_router.pricing import RouterError
 from super_router.router import MockProvider, Router
 from super_router.server import Key, StaticKeys, create_app
 from super_router.stores.memory import MemoryStore
@@ -310,3 +311,9 @@ async def test_credit_rates_endpoint(make):
     assert bad.status_code == 400 and code(bad) == "invalid_service_version"
     junk = await f.do("POST", "/v1/admin/services/chat/credit-rates", "owner-key", "cr4", '{"x":1}')
     assert junk.status_code == 400 and code(junk) == "invalid_credit_rates"
+
+
+async def test_static_keys_refuse_an_empty_token():
+    auth = StaticKeys([Key("", OWNER)])
+    with pytest.raises(RouterError):
+        await auth.authenticate("")

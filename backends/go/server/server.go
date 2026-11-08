@@ -60,6 +60,11 @@ func StaticKeys(keys []Key) Authenticator {
 }
 
 func (s staticKeys) Authenticate(_ context.Context, token string) (contracts.Principal, error) {
+	// A key list built from an unset variable holds an empty secret, which would otherwise
+	// authenticate a request that sent no credentials at all.
+	if token == "" {
+		return contracts.Principal{}, contracts.NewError("invalid_key", 401)
+	}
 	digest := sha256.Sum256([]byte(token))
 	var found *contracts.Principal
 	for i := range s {

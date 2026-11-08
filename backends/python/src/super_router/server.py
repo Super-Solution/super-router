@@ -55,6 +55,8 @@ class StaticKeys:
         self._keys = [(hashlib.sha256(k.secret.encode()).digest(), k.principal) for k in keys]
 
     async def authenticate(self, token: str) -> Principal:
+        if not token:  # an empty secret (an unset variable) must not match a request with no credentials
+            raise RouterError("invalid_key", 401)
         digest = hashlib.sha256(token.encode()).digest()
         found: Principal | None = None
         for stored, principal in self._keys:
@@ -210,7 +212,7 @@ def create_app(
             if method == "POST" and not key:
                 raise RouterError("missing_idempotency_key", 400)
             declared = headers.get("content-length")
-            body_length = int(declared) if declared and declared.isdigit() else None
+            body_length = int(declared) if declared and declared.isascii() and declared.isdigit() else None
             request_id = await _route(x, method, path, principal, key, body_length)
         except _ClientGone:
             pass
