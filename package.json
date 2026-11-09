@@ -19,10 +19,14 @@
     "backends/typescript/server",
     "backends/typescript/billing-presets",
     "packages/bindings/react",
-    "examples/paid-chat"
+    "examples/paid-chat",
+    "examples/superchat-billing/packages/shared",
+    "examples/superchat-billing/apps/router",
+    "examples/superchat-billing/apps/console",
+    "examples/superchat-billing/apps/chat"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run build && tsc --noEmit -p tsconfig.json",
     "test": "npm run build && tsx --test --test-concurrency=1 tests/*.test.ts",
     "db:up": "docker compose up -d --wait",
@@ -39,7 +43,10 @@
     "demo:payments": "npm run build && tsx examples/payments/index.ts",
     "demo:paid-chat": "npm run build && tsx examples/paid-chat/server.ts",
     "build:paid-chat": "npm run build",
-    "test:paid-chat:browser": "npm run build && tsx scripts/paid-chat-browser.ts"
+    "test:paid-chat:browser": "npm run build && tsx scripts/paid-chat-browser.ts",
+    "demo:superchat": "npm run build && tsx examples/superchat-billing/dev.ts",
+    "build:superchat": "npm run build -w @supersolutions/example-superchat-console -w @supersolutions/example-superchat-chat",
+    "scenarios:superchat": "tsx examples/superchat-billing/scenarios.ts"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

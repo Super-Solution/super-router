@@ -682,6 +682,44 @@ export class PostgresStore implements Store {
     );
     return { request, attempts: attempts.rows, settlements: settlements.rows };
   }
+  /**
+   * Recent requests across all customers of the workspace/environment, newest first,
+   * with each attempt's offering, status and provider cost and the settled amount per ledger.
+   * Read-only operator view; amounts are atom strings.
+   */
+  async recent(p: Principal, limit = 50, customer?: string) {
+    if (!p.scopes.includes("operations:read"))
+      throw new RouterError("scope_denied", 403);
+    const n = Math.min(Math.max(Math.trunc(limit) || 50, 1), 200);
+    const r = await this.pool.query(
+      `SELECT r.id, r.customer, r.service->>'id' AS service, (r.service->>'version')::int AS service_version,
+        r.execution, r.billing, r.provider_spent::text AS provider_cost, r.created_at,
+        COALESCE((SELECT json_agg(json_build_object('offering',a.offering,'status',a.status,'cost',a.cost::text,'usage',a.usage) ORDER BY a.created_at)
+          FROM sr_attempts a WHERE a.workspace=r.workspace AND a.environment=r.environment AND a.request=r.id),'[]') AS attempts,
+        COALESCE((SELECT json_object_agg(s.kind,s.amount::text)
+          FROM sr_settlements s WHERE s.workspace=r.workspace AND s.environment=r.environment AND s.request=r.id),'{}') AS settled
+       FROM sr_requests r WHERE r.workspace=$1 AND r.environment=$2 AND ($4::text IS NULL OR r.customer=$4)
+       ORDER BY r.created_at DESC, r.id DESC LIMIT $3`,
+      [...scope(p), n, customer ?? null],
+    );
+    return r.rows as {
+      id: string;
+      customer: string;
+      service: string;
+      service_version: number;
+      execution: string;
+      billing: string;
+      provider_cost: string;
+      created_at: Date;
+      attempts: {
+        offering: string;
+        status: string;
+        cost: string | null;
+        usage: unknown;
+      }[];
+      settled: Record<string, string>;
+    }[];
+  }
   /** Never redispatch an expired uncertain attempt. Operator resolution requires evidence. */
   async recover() {
     const rows = await this.pool.query(

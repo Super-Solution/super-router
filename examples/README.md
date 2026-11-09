@@ -5,6 +5,7 @@ minimal-chat 與 subscription-credits 已可執行，使用 mock 模型、sandbo
 | 範例 | 階段 | 學習目標 |
 | --- | --- | --- |
 | [minimal-chat](minimal-chat/README.md) | P1 | 最小 Service、串流、狀態、用量與結算 |
+| [superchat-billing](superchat-billing/README.md) | P2 | super-chat 聊天 App＋開發者主控台：API keys、credits、預留／結算、fallback、待對帳與重送，本機 monorepo |
 | [subscription-credits](subscription-credits/README.md) | P2 | 週期訂閱、credits、付款去重與額度不足 |
 | [payments](payments/README.md) | P2 金流延伸 | Stripe／易支付 V1／應援 checkout 與回查協定 fixtures |
 | [self-host-byok](self-host-byok/README.md) | P2（P1 先驗證核心） | 自有 Provider keys、政策、fallback 與成本 |

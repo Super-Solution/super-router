@@ -1,0 +1,163 @@
+.wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 20px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.span-all {
+  grid-column: 1 / -1;
+}
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.stack {
+  display: grid;
+  gap: 14px;
+}
+.small {
+  font-size: 13px;
+  margin: 0;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.inline .input {
+  width: 180px;
+}
+.inline .input--num {
+  width: 80px;
+  height: 30px;
+}
+
+.issued {
+  display: grid;
+  gap: 10px;
+}
+.issued__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.issued__token {
+  flex: 1 1 360px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #ffd2bd;
+  overflow-wrap: anywhere;
+}
+
+.keys {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rates {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.rates div {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-subtle);
+}
+.rates dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+.rates dd {
+  margin: 2px 0 0;
+}
+.rates strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.rate-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+@media (max-width: 520px) {
+  .rate-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scenarios {
+  display: grid;
+  gap: 6px;
+}
+.scenario {
+  position: relative;
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 2px 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.scenario:hover {
+  background: var(--bg-subtle);
+}
+.scenario.is-on {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  background: var(--accent-soft);
+}
+.scenario input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+}
+.scenario:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.scenario__label {
+  font-weight: 600;
+}
+.scenario__note {
+  font-size: 13px;
+  color: var(--body);
+}
+@media (max-width: 520px) {
+  .scenario {
+    grid-template-columns: 1fr;
+  }
+}
+.attempts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
