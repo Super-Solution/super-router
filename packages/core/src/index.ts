@@ -76,6 +76,64 @@ export interface Store {
   ): Promise<void>;
   cancel(p: Principal, id: string): Promise<void>;
 }
+export interface BalanceRow {
+  id: string;
+  kind: string;
+  asset: string;
+  balance: string;
+  held: string;
+  available: string;
+}
+/** A source of epoch milliseconds. Stores and the router accept one so tests and conformance runs control time. */
+export type Clock = () => number;
+/**
+ * Everything the data-plane server and worker need from storage, beyond the router's own {@link Store} port.
+ * Implement this to plug in another database; run the store contract suite against it.
+ */
+export interface DataStore extends Store {
+  publish(
+    p: Principal,
+    service: unknown,
+    mode?: "cloud" | "self-host",
+    expectedVersion?: number,
+  ): Promise<Service | undefined>;
+  list(p: Principal): Promise<Service[]>;
+  balance(p: Principal): Promise<BalanceRow[]>;
+  grant(
+    p: Principal,
+    kind: "customer_sale" | "platform_sale",
+    asset: string,
+    amount: string,
+    source: string,
+    expires?: Date,
+  ): Promise<string>;
+  disable(p: Principal, offering: string): Promise<void>;
+  /** Settle or release expired reservations. Returns how many requests were processed. */
+  recover(): Promise<number>;
+  /** Optional operator view: recent requests with attempts and settled amounts. */
+  recent?(
+    p: Principal,
+    limit?: number,
+    customer?: string,
+  ): Promise<RecentRequest[]>;
+}
+export interface RecentRequest {
+  id: string;
+  customer: string;
+  service: string;
+  service_version: number;
+  execution: string;
+  billing: string;
+  provider_cost: string;
+  created_at: Date;
+  attempts: {
+    offering: string;
+    status: string;
+    cost: string | null;
+    usage: unknown;
+  }[];
+  settled: Record<string, string>;
+}
 export const mediaKeys = ["images", "video_ms", "audio_ms", "tasks"] as const;
 export const kindMeter = {
   image: "images",
@@ -129,7 +187,8 @@ export function bound(input: number, output: number, price: Price): bigint {
     BigInt(price.per)
   );
 }
-function canonical(value: unknown): string {
+/** The canonical JSON of a value: object keys sorted, no whitespace. It is the input of the idempotency digest. */
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
   if (value && typeof value === "object")
     return (
@@ -201,9 +260,16 @@ export class Router {
     public store: Store,
     private providers: Record<string, Provider>,
     private digestKey: string,
+    private clock: Clock = Date.now,
   ) {
     if (digestKey.length < 32)
       throw new Error("digest key must be >=32 characters");
+  }
+  /** Own providers only: an offering may name its provider `constructor` or `toString`, which `providers[name]` finds on Object.prototype. */
+  private providerFor(name: string): Provider | undefined {
+    return Object.hasOwn(this.providers, name)
+      ? this.providers[name]
+      : undefined;
   }
   async infer(
     principal: Principal,
@@ -261,7 +327,7 @@ export class Router {
     const decision = route(service, input);
     if (!decision.candidates.length)
       throw new RouterError("no_eligible_offering", 422);
-    if (decision.candidates.some((c) => !this.providers[c.offering.provider]))
+    if (decision.candidates.some((c) => !this.providerFor(c.offering.provider)))
       throw new RouterError("provider_unavailable", 503);
     const maxInput = Math.max(
       ...decision.candidates.map((c) => c.offering.max_input_tokens),
@@ -283,7 +349,7 @@ export class Router {
       digest,
       service,
       legs,
-      new Date(Date.now() + input.limits.timeout_ms).toISOString(),
+      new Date(this.clock() + input.limits.timeout_ms).toISOString(),
       {
         excluded: decision.excluded,
         candidates: decision.candidates.map((c) => ({
@@ -341,7 +407,7 @@ export class Router {
           execution = "cancelled";
           break;
         }
-        const provider = this.providers[candidate.offering.provider];
+        const provider = this.providerFor(candidate.offering.provider);
         if (!provider) throw new RouterError("provider_unavailable", 503);
         let attempt: string;
         try {

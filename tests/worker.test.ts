@@ -8,7 +8,9 @@ import {
 import { runRecoveryWorker } from "@supersolutions/super-router-worker";
 
 test("recovery worker loops until its signal aborts", async () => {
-  const store = new PostgresStore(process.env.DATABASE_URL ?? LOCAL_DATABASE_URL);
+  const store = new PostgresStore(
+    process.env.DATABASE_URL ?? LOCAL_DATABASE_URL,
+  );
   try {
     await store.migrate();
     const control = new ControlPlane(store);

@@ -1,6 +1,6 @@
 # SuperRouter
 
-**English** · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
+**English** · [繁體中文](docs/i18n/README.zh-TW.md) · [简体中文](docs/i18n/README.zh-CN.md) · [日本語](docs/i18n/README.ja.md)
 
 AI routing, billing and serving infrastructure that you embed as a set of packages. Define a **Service** (an AI capability you sell), pick the models behind it, set prices, subscriptions and credits, and let SuperRouter route each request, meter the usage and settle the books.
 
@@ -32,7 +32,7 @@ Folders group packages by role: `packages/` holds libraries (`adapters/` plug th
 | `packages/bindings/react` | React components: pricing table, checkout status, credit balance, paywall, usage summary |
 | `backends/typescript/server` | HTTP + SSE server: `createRouterServer`, payment integration wiring |
 | `backends/typescript/worker` | Recovery worker library and `super-router-worker` binary |
-| `backends/go`, `backends/python` | Proofs of concept of the pricing core, tested against `conformance/` (see [backends/README.md](backends/README.md)) |
+| `backends/go`, `backends/python` | Data-plane servers (`net/http` handler, ASGI app) with providers and swappable storage, tested against `conformance/` (see [backends/README.md](backends/README.md)) |
 | `apps/server`, `apps/worker` | Local demo entry points (mock model, demo workspace) |
 
 Packages are published under the `@supersolutions` scope, for example `@supersolutions/super-router-core` and `@supersolutions/super-router-sdk`.

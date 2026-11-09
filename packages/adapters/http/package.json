@@ -1,0 +1,24 @@
+{
+  "name": "@supersolutions/node-fetch-adapters",
+  "version": "0.1.0",
+  "description": "Mount a fetch-style handler ((Request) => Response) on Node http, Express and Fastify. No framework dependency.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./node": { "types": "./dist/node.d.ts", "import": "./dist/node.js" },
+    "./express": { "types": "./dist/express.d.ts", "import": "./dist/express.js" },
+    "./fastify": { "types": "./dist/fastify.d.ts", "import": "./dist/fastify.js" }
+  },
+  "files": ["dist", "LICENSE", "NOTICE"],
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "author": "SUPER SOLUTION LABS INC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Super-Solution/super-router.git",
+    "directory": "packages/adapters/http"
+  },
+  "homepage": "https://github.com/Super-Solution/super-router#readme",
+  "bugs": { "url": "https://github.com/Super-Solution/super-router/issues" },
+  "publishConfig": { "access": "public" }
+}

@@ -8,3 +8,6 @@ coverage/
 
 __pycache__/
 *.egg-info/
+
+# local Claude Code state
+.claude/

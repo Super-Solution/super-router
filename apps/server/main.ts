@@ -1,4 +1,7 @@
-import { paymentIntegrations, createRouterServer } from "@supersolutions/super-router-server";
+import {
+  paymentIntegrations,
+  createRouterServer,
+} from "@supersolutions/super-router-server";
 import { Router, MockProvider } from "@supersolutions/super-router-core";
 import {
   PostgresStore,

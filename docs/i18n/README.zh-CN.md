@@ -1,6 +1,6 @@
 # SuperRouter
 
-[English](README.md) · [繁體中文](README.zh-TW.md) · **简体中文** · [日本語](README.ja.md)
+[English](../../README.md) · [繁體中文](README.zh-TW.md) · **简体中文** · [日本語](README.ja.md)
 
 以软件包形式集成的 AI routing、计价与 serving 基础设施。你定义 **Service**（要销售的 AI 能力）、选择背后的模型、设置售价、订阅与额度，由 SuperRouter 负责选路、计量与结算。
 
@@ -47,7 +47,7 @@ npm run demo:subscription
 npm run demo:payments
 ```
 
-Demo 使用 mock 模型，不花模型费用；数据库、HTTP、流式与账务是真实运行。预期一次模型调用、扣 35 个测试 atoms，以相同 key 重发不再扣款。详见 [minimal-chat](examples/minimal-chat/README.md)。
+Demo 使用 mock 模型，不花模型费用；数据库、HTTP、流式与账务是真实运行。预期一次模型调用、扣 35 个测试 atoms，以相同 key 重发不再扣款。详见 [minimal-chat](../../examples/minimal-chat/README.md)。
 
 ```sh
 npm run typecheck
@@ -61,10 +61,10 @@ npm run contracts
 
 设计文档目前以繁体中文撰写。
 
-- [PRD](docs/PRD.md)、[技术架构](docs/ARCHITECTURE.md)、[数据模型](docs/DATA_MODEL.md)、[完整目标 API](docs/API_SPEC.md)、[当前实现的 OpenAPI](docs/generated/openapi.json)
-- [支付集成](docs/PAYMENTS.md)、[P2 多租户／订阅／credits](docs/P2_BILLING.md)、[付费 components／presets](docs/PAID_COMPONENTS_PRESETS.md)
-- [P0 决策](docs/adr/0001-p0-baseline.md)、[Provider spike](docs/PROVIDER_SPIKE.md)、[验证记录与限制](docs/P1_VALIDATION.md)
-- [示例应用](examples/README.md)、[Agent skill 规划](skills/README.md)
+- [PRD](../../docs/PRD.md)、[技术架构](../../docs/ARCHITECTURE.md)、[数据模型](../../docs/DATA_MODEL.md)、[完整目标 API](../../docs/API_SPEC.md)、[当前实现的 OpenAPI](../../docs/generated/openapi.json)
+- [支付集成](../../docs/PAYMENTS.md)、[P2 多租户／订阅／credits](../../docs/P2_BILLING.md)、[付费 components／presets](../../docs/PAID_COMPONENTS_PRESETS.md)
+- [P0 决策](../../docs/adr/0001-p0-baseline.md)、[Provider spike](../../docs/PROVIDER_SPIKE.md)、[验证记录与限制](../../docs/P1_VALIDATION.md)
+- [示例应用](../../examples/README.md)、[Agent skill 规划](../../skills/README.md)
 
 ## 已知限制
 
@@ -72,7 +72,7 @@ npm run contracts
 
 ## 许可证
 
-Apache License 2.0。见 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。
+Apache License 2.0。见 [LICENSE](../../LICENSE) 与 [NOTICE](../../NOTICE)。
 
 Copyright 2026 SUPER SOLUTION LABS INC.
 
