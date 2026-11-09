@@ -62,6 +62,24 @@ test("HTTP + SDK: real SSE, replay, unauthorized and customer spoofing rejected"
     });
     assert.equal(bad.status, 400);
     assert.equal(provider.calls, 1);
+    const log = (await (
+      await fetch(url + "/v1/admin/requests?limit=5", {
+        headers: { Authorization: "Bearer " + key },
+      })
+    ).json()) as { data: any[] };
+    assert.equal(log.data.length, 1);
+    assert.equal(log.data[0].id, id);
+    assert.equal(log.data[0].billing, "settled");
+    assert.equal(log.data[0].attempts.length, 1);
+    assert.equal(log.data[0].attempts[0].offering, "mock-a");
+    assert.ok(BigInt(log.data[0].settled.customer_sale) > 0n);
+    const me = (await (
+      await fetch(url + "/v1/me", {
+        headers: { Authorization: "Bearer " + key },
+      })
+    ).json()) as { customer_id: string; scopes: string[] };
+    assert.equal(me.customer_id, p.customer);
+    assert.deepEqual(me.scopes, p.scopes);
   } finally {
     await new Promise<void>((r) => server.close(() => r()));
     await store.close();

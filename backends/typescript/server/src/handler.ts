@@ -254,6 +254,14 @@ export function createRouterHandler(
           : credentials.find((k) => timingSafeEqual(k.digest, hash(token)))
               ?.principal;
       if (!principal) throw new RouterError("invalid_key", 401);
+      if (req.method === "GET" && path === "/v1/me")
+        // What the presented key may do. Lets an app learn which customer a key is bound to.
+        return json(200, {
+          key_id: principal.auth_key_id ?? null,
+          customer_id: principal.customer,
+          scopes: principal.scopes,
+          service_ids: principal.service_ids ?? null,
+        });
       const key = req.headers.get("idempotency-key") ?? "";
       if (req.method === "POST" && !key)
         throw new RouterError("missing_idempotency_key");
@@ -402,6 +410,17 @@ export function createRouterHandler(
             service_version: r.service.version,
           });
         }
+      }
+      if (req.method === "GET" && path === "/v1/admin/requests") {
+        if (!store.recent) throw new RouterError("not_supported", 501);
+        const params = new URL(req.url).searchParams;
+        return json(200, {
+          data: await store.recent(
+            principal,
+            Number(params.get("limit") ?? 50),
+            params.get("customer_id") ?? undefined,
+          ),
+        });
       }
       if (req.method === "GET" && path === "/v1/admin/balance") {
         if (!principal.scopes.includes("billing:read"))

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "superchat",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "examples/superchat-billing/dev.ts"],
+      "port": 4420,
+      "autoPort": false
+    }
+  ]
+}

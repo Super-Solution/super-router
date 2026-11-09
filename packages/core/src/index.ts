@@ -110,6 +110,29 @@ export interface DataStore extends Store {
   disable(p: Principal, offering: string): Promise<void>;
   /** Settle or release expired reservations. Returns how many requests were processed. */
   recover(): Promise<number>;
+  /** Optional operator view: recent requests with attempts and settled amounts. */
+  recent?(
+    p: Principal,
+    limit?: number,
+    customer?: string,
+  ): Promise<RecentRequest[]>;
+}
+export interface RecentRequest {
+  id: string;
+  customer: string;
+  service: string;
+  service_version: number;
+  execution: string;
+  billing: string;
+  provider_cost: string;
+  created_at: Date;
+  attempts: {
+    offering: string;
+    status: string;
+    cost: string | null;
+    usage: unknown;
+  }[];
+  settled: Record<string, string>;
 }
 export const mediaKeys = ["images", "video_ms", "audio_ms", "tasks"] as const;
 export const kindMeter = {
