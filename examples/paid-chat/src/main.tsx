@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { AgentClient, AgentProvider } from "@super-solution/super-chat-react";
+import { AgentClient } from "@supersolutions/super-chat-client";
+import { AgentProvider } from "@supersolutions/super-chat-react";
 import {
   ContextBuilder,
   ToolRegistry,
   createOpenAIProvider,
   type Provider,
-} from "@super-solution/super-chat-core";
-import { Composer, Thread } from "@super-solution/super-chat-ui";
+} from "@supersolutions/super-chat-core";
+import { Composer, Thread } from "@supersolutions/super-chat-ui";
 import {
   createBillingClient,
   PricingTable,
@@ -20,7 +21,7 @@ import {
   type BillingSnapshot,
   type PlanOffer,
 } from "@supersolutions/super-router-ui";
-import "@super-solution/super-chat-ui/styles.css";
+import "@supersolutions/super-chat-ui/styles.css";
 import "./style.css";
 const api = createBillingClient();
 type Mode = "chat" | "image" | "video" | "audio" | "task";

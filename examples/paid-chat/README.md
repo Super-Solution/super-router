@@ -34,7 +34,7 @@ Starter TWD 99／固定 30 天含 10 credits；Creator TWD 249／30 天含 30 cr
 
 ## 可重用的部分
 
-`@supersolutions/super-router-billing-presets` 是 server-only 套件，提供 preset 驗證、idempotent 發布、固定商戶 customer BFF；`@supersolutions/super-router-ui` 提供 browser client、PricingTable、CheckoutStatus、CreditBalance、SubscriptionCard、Paywall、UsageSummary。`@super-solution/super-chat-core`、`-react`、`-ui` 固定使用 npm 0.5.0，實際使用 AgentClient／AgentProvider／Thread／Composer。
+`@supersolutions/super-router-billing-presets` 是 server-only 套件，提供 preset 驗證、idempotent 發布、固定商戶 customer BFF；`@supersolutions/super-router-ui` 提供 browser client、PricingTable、CheckoutStatus、CreditBalance、SubscriptionCard、Paywall、UsageSummary。`@supersolutions/super-chat-core`、`-client`、`-react`、`-ui` 固定使用 npm 0.1.0，實際使用 AgentClient／AgentProvider／Thread／Composer。
 
 公開 catalog 只從目前啟用 Service 版本讀取 retail rate／asset／version；開發者發布新費率後重新整理即可看到新比率，不會暴露上游成本。可整除時顯示「1 credit＝N tokens」，其他情況保留精確單位費率。客戶送出時只能帶目前顯示的 `expected_service_version`，不能指定售價；費率已換版時，新請求回傳 409 且不預留／扣款，畫面重載費率並要求檢視後再次送出。已接受請求的原 key 重播保留原先帳務結果。
 
