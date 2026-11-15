@@ -14,8 +14,8 @@ npm 11.15 or newer): organization `Super-Solution`, repository `super-router`, w
 package that has never been published first needs a placeholder version. Configure the trust close to
 the release: a new configuration expires if it has not completed a publish within two days.
 
-The repository is private, so npm cannot attach provenance; the workflow sets
-`NPM_CONFIG_PROVENANCE=false`. Delete that line when the repository becomes public.
+The repository is public, so every release is published with provenance (`--provenance`); each
+package's `repository.url` must keep pointing at this repository or npm rejects the publish.
 
 ## Releasing
 

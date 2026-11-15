@@ -27,9 +27,6 @@ jobs:
       id-token: write
     env:
       RELEASE_VERSION: ${{ inputs.version }}
-      # npm provenance is unavailable for a private source repository. Delete this line when
-      # the repository becomes public, so the next release is published with provenance.
-      NPM_CONFIG_PROVENANCE: 'false'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -57,5 +54,5 @@ jobs:
         run: |
           while read -r dir; do
             name="$(node -p "require('./$dir/package.json').name.replace('@','').replace('/','-')")"
-            npm publish "$RUNNER_TEMP/npm-release/$name-$RELEASE_VERSION.tgz" --registry=https://registry.npmjs.org/ --access=public --tag="$( [[ "$RELEASE_VERSION" == *-* ]] && echo next || echo latest )" --ignore-scripts
+            npm publish "$RUNNER_TEMP/npm-release/$name-$RELEASE_VERSION.tgz" --registry=https://registry.npmjs.org/ --access=public --provenance --tag="$( [[ "$RELEASE_VERSION" == *-* ]] && echo next || echo latest )" --ignore-scripts
           done < "$RUNNER_TEMP/publish-order.txt"
