@@ -1,5 +1,5 @@
 {
-  "name": "@supersolutions/node-fetch-adapters",
+  "name": "@supersolutions/super-router-fetch-adapters",
   "version": "0.1.0",
   "description": "Mount a fetch-style handler ((Request) => Response) on Node http, Express and Fastify. No framework dependency.",
   "license": "Apache-2.0",

@@ -1,6 +1,6 @@
 # Publishing to npm
 
-Thirteen packages are public (`@supersolutions/super-router-*` and `@supersolutions/node-fetch-adapters`).
+Thirteen packages are public (`@supersolutions/super-router-*`).
 They are released together, at one version, by the manual workflow **Publish npm packages**
 (`.github/workflows/npm-publish.yml`). It uses npm Trusted Publishing (OIDC): there is no npm token
 and no repository secret.

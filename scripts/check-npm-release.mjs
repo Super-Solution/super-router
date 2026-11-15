@@ -13,7 +13,7 @@ import path from "node:path";
 export const PUBLISH_ORDER = [
   "@supersolutions/super-router-contracts",
   "@supersolutions/super-router-core",
-  "@supersolutions/node-fetch-adapters",
+  "@supersolutions/super-router-fetch-adapters",
   "@supersolutions/super-router-payments",
   "@supersolutions/super-router-provider-anthropic",
   "@supersolutions/super-router-provider-openai",

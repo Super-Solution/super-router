@@ -189,7 +189,7 @@ export interface RouterHandlerOptions {
 }
 /**
  * The whole HTTP API as a fetch-style handler. Mount it on anything that can pass a web `Request`:
- * `node:http`, Express and Fastify via `@supersolutions/node-fetch-adapters`, or Hono, Next.js, Workers,
+ * `node:http`, Express and Fastify via `@supersolutions/super-router-fetch-adapters`, or Hono, Next.js, Workers,
  * Deno and Bun directly.
  */
 export function createRouterHandler(
