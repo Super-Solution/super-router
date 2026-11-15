@@ -7,9 +7,10 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@super-solution/super-chat-core": "0.5.0",
-    "@super-solution/super-chat-react": "0.5.0",
-    "@super-solution/super-chat-ui": "0.5.0",
+    "@supersolutions/super-chat-client": "0.1.0",
+    "@supersolutions/super-chat-core": "0.1.0",
+    "@supersolutions/super-chat-react": "0.1.0",
+    "@supersolutions/super-chat-ui": "0.1.0",
     "@supersolutions/super-router-billing-presets": "0.1.0",
     "@supersolutions/super-router-ui": "0.1.0",
     "react": "19.2.0",

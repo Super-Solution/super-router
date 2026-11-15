@@ -84,7 +84,7 @@ Revoked key         401   invalid_key
 - **Request log**: `GET /v1/admin/requests` lists recent requests with their attempts, provider cost and settled amounts.
 - **Provider behaviour**: `POST /__dev/scenario` exists only in this example's router wrapper, guarded by the owner key. It is not part of the SuperRouter API.
 
-The chat app uses the published `@super-solution/super-chat-core`, `-react` and `-ui` 0.5.0 packages. super-chat's own Super Router binding (`@supersolutions/super-chat-router`) isn't on npm yet, so the chat server calls the HTTP API directly in the same shape.
+The chat app uses the published `@supersolutions/super-chat-core`, `-client`, `-react` and `-ui` 0.1.0 packages. super-chat's own Super Router binding (`@supersolutions/super-chat-router`) is on npm too, but the chat server still calls the HTTP API directly in the same shape, which keeps the example's request flow visible.
 
 ## Settings and cleanup
 

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { AgentClient, AgentProvider } from "@super-solution/super-chat-react";
+import { AgentClient } from "@supersolutions/super-chat-client";
+import { AgentProvider } from "@supersolutions/super-chat-react";
 import {
   ContextBuilder,
   ToolRegistry,
   createOpenAIProvider,
   type Provider,
-} from "@super-solution/super-chat-core";
-import { Composer, Thread } from "@super-solution/super-chat-ui";
+} from "@supersolutions/super-chat-core";
+import { Composer, Thread } from "@supersolutions/super-chat-ui";
 import { PORTS, formatCredits } from "@supersolutions/example-superchat-shared";
-import "@super-solution/super-chat-ui/styles.css";
+import "@supersolutions/super-chat-ui/styles.css";
 import "@supersolutions/example-superchat-shared/ui.css";
 import "./style.css";
 
