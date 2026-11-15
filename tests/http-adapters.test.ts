@@ -5,9 +5,9 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import express from "express";
 import Fastify from "fastify";
-import { nodeListener } from "@supersolutions/node-fetch-adapters/node";
-import { expressHandler } from "@supersolutions/node-fetch-adapters/express";
-import { fastifyPlugin } from "@supersolutions/node-fetch-adapters/fastify";
+import { nodeListener } from "@supersolutions/super-router-fetch-adapters/node";
+import { expressHandler } from "@supersolutions/super-router-fetch-adapters/express";
+import { fastifyPlugin } from "@supersolutions/super-router-fetch-adapters/fastify";
 
 let aborted = 0;
 /** One handler, mounted everywhere: that is the contract under test. */

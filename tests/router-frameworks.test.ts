@@ -10,9 +10,9 @@ import Fastify from "fastify";
 import { MockProvider, Router } from "@supersolutions/super-router-core";
 import { MemoryStore } from "@supersolutions/super-router-storage-memory";
 import { createRouterHandler } from "@supersolutions/super-router-server";
-import { expressHandler } from "@supersolutions/node-fetch-adapters/express";
-import { fastifyPlugin } from "@supersolutions/node-fetch-adapters/fastify";
-import { nodeListener } from "@supersolutions/node-fetch-adapters/node";
+import { expressHandler } from "@supersolutions/super-router-fetch-adapters/express";
+import { fastifyPlugin } from "@supersolutions/super-router-fetch-adapters/fastify";
+import { nodeListener } from "@supersolutions/super-router-fetch-adapters/node";
 import { parseSSE } from "@supersolutions/super-router-contracts";
 import {
   principal,

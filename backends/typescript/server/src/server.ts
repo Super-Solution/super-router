@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { nodeListener } from "@supersolutions/node-fetch-adapters/node";
+import { nodeListener } from "@supersolutions/super-router-fetch-adapters/node";
 import { type Router, type DataStore } from "@supersolutions/super-router-core";
 import type { Principal } from "@supersolutions/super-router-contracts";
 import type { ControlPlane } from "@supersolutions/super-router-storage-postgres";

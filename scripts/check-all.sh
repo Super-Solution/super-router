@@ -16,6 +16,7 @@ ts() {
   step "TypeScript: build, typecheck, format, tests"
   npm run typecheck
   npm run format:check
+  node scripts/check-npm-release.mjs "$(node -p "require('./package.json').version")" >/dev/null
   npx tsx --test --test-concurrency=1 tests/*.test.ts
 }
 go_() {

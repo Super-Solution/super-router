@@ -1,0 +1,58 @@
+name: Publish npm packages
+
+# Manual release. Publishes with npm Trusted Publishing (OIDC): no npm token, no secret.
+# Each package's trusted publisher must name this repository and this file (npm-publish.yml).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact version already committed in every public package (X.Y.Z or X.Y.Z-next.N)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'Super-Solution/super-router' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+      - name: Require npm 11.5.1 or newer (Trusted Publishing)
+        run: |
+          node -e "const [a,b,c]=process.argv[1].split('.').map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error('npm '+process.argv[1]+' is too old for Trusted Publishing'); process.exit(1) }" "$(npm --version)"
+      - name: Verify the release (public packages, version, publish order)
+        run: node scripts/check-npm-release.mjs "$RELEASE_VERSION" > "$RUNNER_TEMP/publish-order.txt"
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck and build
+        run: npm run typecheck
+      - name: Pack in dependency order
+        run: |
+          mkdir -p "$RUNNER_TEMP/npm-release"
+          while read -r dir; do
+            npm pack "./$dir" --pack-destination "$RUNNER_TEMP/npm-release" --ignore-scripts
+          done < "$RUNNER_TEMP/publish-order.txt"
+      - name: Publish in dependency order using OIDC
+        run: |
+          while read -r dir; do
+            name="$(node -p "require('./$dir/package.json').name.replace('@','').replace('/','-')")"
+            npm publish "$RUNNER_TEMP/npm-release/$name-$RELEASE_VERSION.tgz" --registry=https://registry.npmjs.org/ --access=public --provenance --tag="$( [[ "$RELEASE_VERSION" == *-* ]] && echo next || echo latest )" --ignore-scripts
+          done < "$RUNNER_TEMP/publish-order.txt"
