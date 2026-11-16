@@ -124,6 +124,12 @@ func TestFailures(t *testing.T) {
 		{"start without counters is not free", stream(frame(`{"type":"message_start","message":{"id":"m","usage":{}}}`), frame(`{"type":"message_stop"}`)), "k", invocation(), false, false, "invalid_usage"},
 		{"start without output", stream(frame(`{"type":"message_start","message":{"id":"m","usage":{"input_tokens":3}}}`), frame(`{"type":"message_stop"}`)), "k", invocation(), false, false, "invalid_usage"},
 		{"non-integer counter", stream(start, frame(`{"type":"message_delta","delta":{},"usage":{"output_tokens":"9"}}`)), "k", invocation(), false, false, "invalid_usage"},
+		// json.Unmarshal accepts null and leaves the zero value, which would overwrite the real count from message_start
+		// and bill the call as free.
+		{"null input counter in message_delta", stream(start, frame(`{"type":"message_delta","delta":{},"usage":{"input_tokens":null}}`)), "k", invocation(), false, false, "invalid_usage"},
+		{"null output counter in message_delta", stream(start, frame(`{"type":"message_delta","delta":{},"usage":{"output_tokens":null}}`)), "k", invocation(), false, false, "invalid_usage"},
+		{"null cache read counter in message_delta", stream(start, frame(`{"type":"message_delta","delta":{},"usage":{"cache_read_input_tokens":null}}`)), "k", invocation(), false, false, "invalid_usage"},
+		{"null cache write counter in message_delta", stream(start, frame(`{"type":"message_delta","delta":{},"usage":{"cache_creation_input_tokens":null}}`)), "k", invocation(), false, false, "invalid_usage"},
 		{"error event", stream(start, frame(`{"type":"error"}`)), "k", invocation(), false, false, "upstream_stream_error"},
 		{"bad event json", stream(frame(`{`)), "k", invocation(), false, false, "invalid_upstream_event"},
 	}
@@ -146,5 +152,21 @@ func TestDeltaMayCompleteTheCounters(t *testing.T) {
 	), "k", invocation())
 	if err != nil || events[0].Usage != (contracts.Meters{Input: 7, Output: 4}) {
 		t.Fatalf("%v %+v", err, events)
+	}
+}
+
+// A null counter in message_delta must never replace a real count from message_start: that would settle the call
+// as if no tokens were used.
+func TestNullCounterCannotZeroARealCount(t *testing.T) {
+	start := frame(`{"type":"message_start","message":{"id":"m","usage":{"input_tokens":7,"output_tokens":3}}}`)
+	null := frame(`{"type":"message_delta","delta":{},"usage":{"output_tokens":null}}`)
+	events, err := run(t, stream(start, null, frame(`{"type":"message_stop"}`)), "k", invocation())
+	if definitive, retryable, got := code(err); definitive || retryable || got != "invalid_usage" {
+		t.Fatalf("definitive=%v retryable=%v code=%s, want an uncertain invalid_usage", definitive, retryable, got)
+	}
+	for _, e := range events {
+		if e.Type == "usage" || e.Type == "done" {
+			t.Fatalf("the response was accepted and billed with %+v", e)
+		}
 	}
 }

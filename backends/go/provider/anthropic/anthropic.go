@@ -61,6 +61,13 @@ type usage struct {
 	CacheCreationInputTokens int64  `json:"cache_creation_input_tokens"`
 }
 
+// counter decodes one usage counter. json.Unmarshal accepts null and leaves the zero value without an error, so a
+// null counter would silently replace a real count with 0 and bill the call as free. It is refused, like any value
+// that is not a JSON integer.
+func counter(raw json.RawMessage, n *int64) bool {
+	return !bytes.Equal(bytes.TrimSpace(raw), []byte("null")) && json.Unmarshal(raw, n) == nil
+}
+
 func perr(definitive, retryable bool, code string) error {
 	return &contracts.ProviderError{Definitive: definitive, Retryable: retryable, Code: code}
 }
@@ -152,7 +159,7 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 				for k, raw := range e.Usage {
 					var n int64
 					if k == "input_tokens" || k == "output_tokens" || fields[k] != nil {
-						if json.Unmarshal(raw, &n) != nil {
+						if !counter(raw, &n) {
 							return perr(false, false, "invalid_usage")
 						}
 					}

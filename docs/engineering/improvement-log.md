@@ -94,3 +94,17 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
   unaffected.
 * Test: `router-frameworks.test.ts` (fails without the fix, `provider_unavailable` with it).
 * Gate: `scripts/check-all.sh ts` (typecheck, format check, tests with PostgreSQL) passes.
+
+### Round 14 (2026-11-16) — null usage counters in the Go Anthropic adapter
+
+* Audit: found while porting the adapter to Rust. `message_delta` carries the final counters and overwrites what
+  `message_start` reported. Go decoded each counter with `json.Unmarshal(raw, &n)`, which accepts `null` and leaves
+  `n` at 0 without an error, so `"output_tokens": null` replaced the real count with 0 and the call settled as if no
+  tokens were used (billed as free). The same held for `input_tokens` and both cache counters. This is the same class
+  as the missing-counters fix of 2026-11-07. The TypeScript adapter already refused it.
+* Fix: counters go through `counter`, which refuses `null` as well as anything that is not a JSON integer
+  (`invalid_usage`, outcome unknown, funds stay held). The OpenAI adapter needs no change: its required counters are
+  pointers, so `null` already reads as missing.
+* Tests: four table cases (one per counter) and `TestNullCounterCannotZeroARealCount`, which streams a full response
+  and asserts nothing is billed. Both fail on the old code: the stream settled with `output = 0`.
+* Gate: `gofmt`, `go vet` and `go test -race ./...` pass with PostgreSQL required.
