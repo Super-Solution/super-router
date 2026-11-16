@@ -65,7 +65,7 @@ Tests need the development database. Set `DATABASE_URL` to override the default 
 Detailed design documents are currently written in Traditional Chinese.
 
 - [PRD](docs/PRD.md), [Architecture](docs/ARCHITECTURE.md), [Data model](docs/DATA_MODEL.md), [Target API](docs/API_SPEC.md), [Implemented OpenAPI](docs/generated/openapi.json)
-- [Payments](docs/PAYMENTS.md), [P2 billing](docs/P2_BILLING.md), [Paid components and presets](docs/PAID_COMPONENTS_PRESETS.md)
+- [Payments](docs/PAYMENTS.md), [P2 billing](docs/P2_BILLING.md), [Session + weekly window limits](docs/WINDOW_LIMITS.md) (optional, off by default), [Paid components and presets](docs/PAID_COMPONENTS_PRESETS.md)
 - [P0 decisions](docs/adr/0001-p0-baseline.md), [Provider spike](docs/PROVIDER_SPIKE.md), [Validation record and limits](docs/P1_VALIDATION.md)
 - [Examples](examples/README.md), [Agent skill plan](skills/README.md)
 

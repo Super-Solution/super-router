@@ -1233,6 +1233,50 @@
           "currency": {
             "type": "string",
             "pattern": "^[A-Z]{3}$"
+          },
+          "window_limits": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "session": {
+                "type": "object",
+                "properties": {
+                  "hours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 72
+                  },
+                  "credits": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "hours",
+                  "credits"
+                ],
+                "additionalProperties": false
+              },
+              "weekly": {
+                "type": "object",
+                "properties": {
+                  "credits": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,29}$"
+                  }
+                },
+                "required": [
+                  "credits"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "enabled"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1244,6 +1288,51 @@
           "service_ids",
           "amount_minor",
           "currency"
+        ],
+        "additionalProperties": false
+      },
+      "WindowLimits": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "session": {
+            "type": "object",
+            "properties": {
+              "hours": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 72
+              },
+              "credits": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,29}$"
+              }
+            },
+            "required": [
+              "hours",
+              "credits"
+            ],
+            "additionalProperties": false
+          },
+          "weekly": {
+            "type": "object",
+            "properties": {
+              "credits": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,29}$"
+              }
+            },
+            "required": [
+              "credits"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "enabled"
         ],
         "additionalProperties": false
       },
@@ -2957,6 +3046,95 @@
         "responses": {
           "200": {
             "description": "Only the authenticated customer credit buckets."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/windows": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Session and weekly usage windows of the authenticated customer's subscriptions whose plan enables window limits."
+          },
+          "400": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "401": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "402": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "403": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "404": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "409": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "422": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "429": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "500": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          },
+          "503": {
+            "description": "See error.code; no automatic payer switch or new idempotency key."
+          }
+        }
+      }
+    },
+    "/v1/admin/customers/{id}/windows": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The same window usage for one customer (billing:read)."
           },
           "400": {
             "description": "See error.code; no automatic payer switch or new idempotency key."

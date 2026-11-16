@@ -230,6 +230,8 @@ def create_app(
         body: Json = {"code": error.code, "retryable": error.retryable}
         if request_id:
             body["request_id"] = request_id
+        if error.details:
+            body["details"] = dict(error.details)
         if x.started:
             return  # the response is already under way; nothing honest can be added
         with contextlib.suppress(_ClientGone):
@@ -282,6 +284,13 @@ def create_app(
                 )
             else:
                 raise RouterError("resource_not_found", 404)
+        elif method == "GET" and path == "/v1/windows":
+            if not (p.has_scope("credits:read") or p.has_scope("billing:read")):
+                raise RouterError("scope_denied", 403)
+            usage = getattr(store, "windows", None)
+            if usage is None:
+                raise RouterError("resource_not_found", 404)
+            await x.json(200, {"windows": await usage(p)})
         elif method == "GET" and path == "/v1/admin/balance":
             need("billing:read")
             await x.json(200, {"data": [row.to_json() for row in await store.balance(p)]})

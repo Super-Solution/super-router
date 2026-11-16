@@ -187,6 +187,22 @@ func (h *handler) route(w http.ResponseWriter, r *http.Request, requestID *strin
 			writeJSON(w, http.StatusOK, map[string]any{"id": rec.ID, "execution_status": rec.Execution, "billing_status": rec.Billing, "service_version": rec.Service.Version})
 			return nil
 		}
+	case r.Method == http.MethodGet && path == "/v1/windows":
+		if !p.HasScope("credits:read") && !p.HasScope("billing:read") {
+			return contracts.NewError("scope_denied", 403)
+		}
+		windows, ok := h.Store.(interface {
+			WindowsJSON(context.Context, contracts.Principal) (any, error)
+		})
+		if !ok {
+			return contracts.NewError("resource_not_found", 404)
+		}
+		rows, err := windows.WindowsJSON(ctx, p)
+		if err != nil {
+			return err
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"windows": rows})
+		return nil
 	case r.Method == http.MethodGet && path == "/v1/admin/balance":
 		if !p.HasScope("billing:read") {
 			return contracts.NewError("scope_denied", 403)
@@ -424,10 +440,10 @@ func errorOf(err error) *contracts.RouterError {
 
 func (h *handler) fail(w http.ResponseWriter, err error, requestID string) {
 	re := errorOf(err)
-	retryable := false
+	retryable := re.Retryable
 	var withRequest *contracts.RouterErrorWithRequest
 	if errors.As(err, &withRequest) {
-		requestID, retryable = withRequest.RequestID, withRequest.Retryable
+		requestID, retryable = withRequest.RequestID, withRequest.Retryable || re.Retryable
 	}
 	if re.Status >= 500 {
 		h.log.Error("request failed", "code", re.Code, "request_id", requestID, "error", err)
@@ -435,6 +451,9 @@ func (h *handler) fail(w http.ResponseWriter, err error, requestID string) {
 	body := map[string]any{"code": re.Code, "retryable": retryable}
 	if requestID != "" {
 		body["request_id"] = requestID
+	}
+	if re.Details != nil {
+		body["details"] = re.Details
 	}
 	writeJSON(w, re.Status, map[string]any{"error": body})
 }

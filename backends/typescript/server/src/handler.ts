@@ -360,6 +360,18 @@ export function createRouterHandler(
           }
           if (path === "/v1/credits")
             return json(200, { buckets: await control.buckets(principal) });
+          if (path === "/v1/windows")
+            return json(200, { windows: await control.windows(principal) });
+          const windows = /^\/v1\/admin\/customers\/([^/]+)\/windows$/.exec(
+            path,
+          );
+          if (windows)
+            return json(200, {
+              windows: await control.windows(
+                principal,
+                decodeURIComponent(windows[1]!),
+              ),
+            });
           if (path === "/v1/admin/audit-events")
             return json(
               200,
@@ -481,6 +493,7 @@ export function createRouterHandler(
           code: error.code,
           retryable: error.retryable,
           request_id: error.request_id ?? requestId,
+          ...(error.details ? { details: error.details } : {}),
         },
       });
     }

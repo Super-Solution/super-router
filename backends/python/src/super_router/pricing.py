@@ -23,11 +23,15 @@ _ID = re.compile(r"[a-zA-Z0-9_.:/-]+")
 
 
 class RouterError(Exception):
-    def __init__(self, code: str, status: int = 400, retryable: bool = False) -> None:
+    def __init__(
+        self, code: str, status: int = 400, retryable: bool = False, details: Mapping[str, Any] | None = None
+    ) -> None:
         super().__init__(code)
         self.code = code
         self.status = status
         self.retryable = retryable
+        # Safe, customer-visible facts about the refusal (for example which window and when it resets).
+        self.details = details
 
 
 def charge(usage: Mapping[str, int], price: Mapping[str, Any]) -> int:

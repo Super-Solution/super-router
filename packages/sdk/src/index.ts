@@ -33,6 +33,8 @@ export class SuperRouterClient {
       throw Object.assign(new Error(e.error?.code ?? "http_error"), {
         status: r.status,
         request_id: e.error?.request_id,
+        retryable: e.error?.retryable,
+        details: e.error?.details,
       });
     }
     return r;
@@ -188,6 +190,10 @@ export class SuperRouterClient {
   }
   async credits() {
     return (await this.send("/v1/credits")).json();
+  }
+  /** Session/weekly window usage of the authenticated customer's subscriptions (option on only). */
+  async windows() {
+    return (await this.send("/v1/windows")).json();
   }
   async subscription(id: string) {
     return (

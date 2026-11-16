@@ -574,9 +574,15 @@ func (s *Store) Reserve(ctx context.Context, p contracts.Principal, key, digest 
 			type bucketRow struct {
 				id              string
 				remaining, held string
+				subscription    sql.NullString
+				windowLimits    sql.NullString
 			}
+			var blocked *windowBlock
+			// A subscription bucket may carry session/weekly window limits (its entitlement's snapshot). They
+			// gate only that bucket: once its windows are full the draw falls through to the next bucket
+			// (purchased or promotional credits) as for an empty one.
 			rows, err := tx.QueryContext(ctx,
-				"SELECT id,remaining::text,held::text FROM sr_buckets WHERE workspace=$1 AND environment=$2 AND account=$3 AND (expires_at IS NULL OR expires_at>now()) AND (service_ids IS NULL OR $4=ANY(service_ids)) ORDER BY expires_at ASC NULLS LAST, CASE source_kind WHEN 'subscription' THEN 0 WHEN 'promotion' THEN 1 ELSE 2 END,id FOR UPDATE",
+				"SELECT b.id,b.remaining::text,b.held::text,e.subscription,e.window_limits::text FROM sr_buckets b LEFT JOIN sr_entitlements e ON (e.workspace,e.environment,e.bucket)=(b.workspace,b.environment,b.id) WHERE b.workspace=$1 AND b.environment=$2 AND b.account=$3 AND (b.expires_at IS NULL OR b.expires_at>now()) AND (b.service_ids IS NULL OR $4=ANY(b.service_ids)) ORDER BY b.expires_at ASC NULLS LAST, CASE b.source_kind WHEN 'subscription' THEN 0 WHEN 'promotion' THEN 1 ELSE 2 END,b.id FOR UPDATE OF b",
 				p.Workspace, p.Environment, leg.Account, svc.ID)
 			if err != nil {
 				return err
@@ -584,7 +590,7 @@ func (s *Store) Reserve(ctx context.Context, p contracts.Principal, key, digest 
 			var buckets []bucketRow
 			for rows.Next() {
 				var b bucketRow
-				if err := rows.Scan(&b.id, &b.remaining, &b.held); err != nil {
+				if err := rows.Scan(&b.id, &b.remaining, &b.held, &b.subscription, &b.windowLimits); err != nil {
 					rows.Close()
 					return err
 				}
@@ -602,11 +608,31 @@ func (s *Store) Reserve(ctx context.Context, p contracts.Principal, key, digest 
 				if take.Sign() <= 0 {
 					continue
 				}
+				var windowIDs []string
+				if b.subscription.Valid {
+					specs, err := windowSpecs(b.windowLimits)
+					if err != nil {
+						return err
+					}
+					if len(specs) > 0 {
+						admitted, ids, gate, err := s.admit(ctx, tx, p, b.subscription.String, specs, take)
+						if err != nil {
+							return err
+						}
+						if gate != nil {
+							blocked = gate
+						}
+						take, windowIDs = admitted, ids
+						if take.Sign() <= 0 {
+							continue
+						}
+					}
+				}
 				if _, err := tx.ExecContext(ctx, "UPDATE sr_buckets SET held=held+$4::numeric WHERE workspace=$1 AND environment=$2 AND id=$3", p.Workspace, p.Environment, b.id, take.String()); err != nil {
 					return err
 				}
-				if _, err := tx.ExecContext(ctx, "INSERT INTO sr_allocations(workspace,environment,request,bucket,account,amount) VALUES($1,$2,$3,$4,$5,$6::numeric)",
-					p.Workspace, p.Environment, id, b.id, leg.Account, take.String()); err != nil {
+				if _, err := tx.ExecContext(ctx, "INSERT INTO sr_allocations(workspace,environment,request,bucket,account,amount,windows) VALUES($1,$2,$3,$4,$5,$6::numeric,COALESCE("+fmt.Sprintf(arrayExpr, "$7")+",'{}'))",
+					p.Workspace, p.Environment, id, b.id, leg.Account, take.String(), arrayArg(append([]string{}, windowIDs...))); err != nil {
 					return err
 				}
 				remaining = new(big.Int).Sub(remaining, take)
@@ -615,6 +641,9 @@ func (s *Store) Reserve(ctx context.Context, p contracts.Principal, key, digest 
 				}
 			}
 			if remaining.Sign() > 0 {
+				if blocked != nil {
+					return windowError(blocked)
+				}
 				return fail("insufficient_balance", 402)
 			}
 			if _, err := tx.ExecContext(ctx, "UPDATE sr_accounts SET held=held+$4::numeric WHERE workspace=$1 AND environment=$2 AND id=$3", p.Workspace, p.Environment, leg.Account, leg.Reserved); err != nil {
@@ -823,16 +852,19 @@ func (s *Store) finishTx(ctx context.Context, tx *sql.Tx, p contracts.Principal,
 		remaining := new(big.Int).Set(due[i])
 		amount := due[i].String()
 		rows, err := tx.QueryContext(ctx,
-			"SELECT a.bucket,a.amount::text FROM sr_allocations a JOIN sr_buckets b ON (a.workspace,a.environment,a.bucket)=(b.workspace,b.environment,b.id) WHERE a.workspace=$1 AND a.environment=$2 AND a.request=$3 AND a.account=$4 ORDER BY b.expires_at ASC NULLS LAST, CASE b.source_kind WHEN 'subscription' THEN 0 WHEN 'promotion' THEN 1 ELSE 2 END,b.id",
+			"SELECT a.bucket,a.amount::text,to_json(a.windows)::text FROM sr_allocations a JOIN sr_buckets b ON (a.workspace,a.environment,a.bucket)=(b.workspace,b.environment,b.id) WHERE a.workspace=$1 AND a.environment=$2 AND a.request=$3 AND a.account=$4 ORDER BY b.expires_at ASC NULLS LAST, CASE b.source_kind WHEN 'subscription' THEN 0 WHEN 'promotion' THEN 1 ELSE 2 END,b.id",
 			p.Workspace, p.Environment, id, leg.Account)
 		if err != nil {
 			return err
 		}
-		type allocation struct{ bucket, amount string }
+		type allocation struct {
+			bucket, amount string
+			windows        []byte
+		}
 		var allocations []allocation
 		for rows.Next() {
 			var a allocation
-			if err := rows.Scan(&a.bucket, &a.amount); err != nil {
+			if err := rows.Scan(&a.bucket, &a.amount, &a.windows); err != nil {
 				rows.Close()
 				return err
 			}
@@ -852,6 +884,9 @@ func (s *Store) finishTx(ctx context.Context, tx *sql.Tx, p contracts.Principal,
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, "UPDATE sr_buckets SET remaining=remaining-$4::numeric,held=held-$5::numeric WHERE workspace=$1 AND environment=$2 AND id=$3", p.Workspace, p.Environment, a.bucket, take.String(), a.amount); err != nil {
+				return err
+			}
+			if err := settleWindows(ctx, tx, p, jsonStrings(a.windows), a.amount, take.String()); err != nil {
 				return err
 			}
 		}
@@ -1033,9 +1068,19 @@ func (s *Store) Recover(ctx context.Context) (int, error) {
 // Entitle lets a customer use subscription-only services for a period. Control planes do this together with a
 // subscription payment; this helper is for self-hosts and tests. bucket must be an existing bucket id.
 func (s *Store) Entitle(ctx context.Context, p contracts.Principal, subscription string, cycle int, serviceIDs []string, start, end time.Time, bucket string) error {
+	return s.EntitleWith(ctx, p, subscription, cycle, serviceIDs, start, end, bucket, nil)
+}
+
+// EntitleWith is Entitle with the paid cycle's window limits snapshot (the plan's window_limits object with
+// enabled:true), or nil when the option is off. The control plane writes this row in the TypeScript store.
+func (s *Store) EntitleWith(ctx context.Context, p contracts.Principal, subscription string, cycle int, serviceIDs []string, start, end time.Time, bucket string, windowLimits json.RawMessage) error {
+	var limits any
+	if len(windowLimits) > 0 {
+		limits = string(windowLimits)
+	}
 	_, err := s.db.ExecContext(ctx,
-		"INSERT INTO sr_entitlements(workspace,environment,subscription,cycle,customer,service_ids,period_start,period_end,bucket) VALUES($1,$2,$3,$4,$5,"+fmt.Sprintf(arrayExpr, "$6")+",$7,$8,$9)",
-		p.Workspace, p.Environment, subscription, cycle, p.Customer, arrayArg(serviceIDs), start, end, bucket)
+		"INSERT INTO sr_entitlements(workspace,environment,subscription,cycle,customer,service_ids,period_start,period_end,bucket,window_limits) VALUES($1,$2,$3,$4,$5,"+fmt.Sprintf(arrayExpr, "$6")+",$7,$8,$9,$10::jsonb)",
+		p.Workspace, p.Environment, subscription, cycle, p.Customer, arrayArg(serviceIDs), start, end, bucket, limits)
 	return err
 }
 

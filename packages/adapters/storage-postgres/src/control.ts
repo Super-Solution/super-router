@@ -26,6 +26,7 @@ import {
 } from "@supersolutions/super-router-contracts";
 import type { PostgresStore } from "./index.js";
 import { keyPrincipal, revalidate } from "./access.js";
+import { windowSpecs } from "./windows.js";
 export interface SandboxPaymentIntegration {
   id: string;
   workspace: string;
@@ -776,6 +777,7 @@ export class ControlPlane {
     return {
       ...data,
       buckets: await this.buckets(customer),
+      windows: await this.windows(customer),
       as_of: this.clock().toISOString(),
     };
   }
@@ -963,7 +965,7 @@ export class ControlPlane {
             [...scope(p), "subscription:" + sub.id + ":" + order.cycle],
           );
           await c.query(
-            "INSERT INTO sr_entitlements VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+            "INSERT INTO sr_entitlements VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
             [
               ...scope(p),
               sub.id,
@@ -973,6 +975,8 @@ export class ControlPlane {
               order.period_start,
               order.period_end,
               bucket.rows[0].id,
+              // Snapshot of the paid cycle's window limits; null when the option is off.
+              plan.window_limits?.enabled ? plan.window_limits : null,
             ],
           );
           await c.query(
@@ -1275,6 +1279,50 @@ export class ControlPlane {
               ? "0"
               : (BigInt(b.remaining) - BigInt(b.held)).toString(),
         }));
+      },
+      p.scopes.includes("billing:read") ? "billing:read" : "credits:read",
+    );
+  }
+  /**
+   * Session/weekly window usage of the customer's paid subscriptions that have the option on.
+   * A window that has not opened yet reports nothing spent and no reset time: it starts with the
+   * next request. Times and amounts come from the database clock the enforcement uses.
+   */
+  async windows(p: Principal, customer = p.customer) {
+    return this.tx(
+      p,
+      async (c) => {
+        if (customer !== p.customer && !p.scopes.includes("billing:read"))
+          throw new RouterError("scope_denied", 403);
+        const entitlements = await c.query(
+          "SELECT subscription,window_limits FROM sr_entitlements WHERE workspace=$1 AND environment=$2 AND customer=$3 AND window_limits IS NOT NULL AND period_start<=now() AND period_end>now() ORDER BY subscription",
+          [...scope(p), customer],
+        );
+        const out = [];
+        for (const e of entitlements.rows)
+          for (const spec of windowSpecs(e.window_limits)) {
+            const w = await c.query(
+              "SELECT window_start,window_end,spent::text,held::text FROM sr_usage_windows WHERE workspace=$1 AND environment=$2 AND subscription=$3 AND kind=$4 AND window_end>now() ORDER BY window_start DESC LIMIT 1",
+              [...scope(p), e.subscription, spec.kind],
+            );
+            const row = w.rows[0];
+            const used = row ? BigInt(row.spent) + BigInt(row.held) : 0n;
+            out.push({
+              subscription: e.subscription as string,
+              window: spec.kind,
+              hours: spec.hours,
+              limit: spec.limit.toString(),
+              spent: (row?.spent ?? "0") as string,
+              held: (row?.held ?? "0") as string,
+              remaining: (spec.limit > used
+                ? spec.limit - used
+                : 0n
+              ).toString(),
+              window_start: (row?.window_start ?? null) as Date | null,
+              resets_at: (row?.window_end ?? null) as Date | null,
+            });
+          }
+        return out;
       },
       p.scopes.includes("billing:read") ? "billing:read" : "credits:read",
     );

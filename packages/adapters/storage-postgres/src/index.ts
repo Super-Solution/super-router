@@ -11,6 +11,8 @@ import {
   type Usage,
   EventSchema,
 } from "@supersolutions/super-router-contracts";
+import { admit, settle, refund, windowSpecs, windowError } from "./windows.js";
+import type { WindowBlock } from "./windows.js";
 import {
   route,
   charge,
@@ -54,6 +56,7 @@ export class PostgresStore implements DataStore {
         [3, "003_membership_subscriptions.sql"],
         [4, "004_integration_bindings.sql"],
         [5, "005_checkouts.sql"],
+        [6, "006_window_limits.sql"],
       ] as const) {
         const done = await c.query(
           "SELECT 1 FROM sr_migrations WHERE version=$1",
@@ -384,26 +387,44 @@ export class PostgresStore implements DataStore {
         a.account.localeCompare(b.account),
       )) {
         let remaining = BigInt(leg.reserved);
+        let blocked: WindowBlock | undefined;
+        // A subscription bucket may carry session/weekly window limits (its entitlement's snapshot).
+        // They gate only that bucket: once its windows are full the draw falls through to the next
+        // bucket (purchased or promotional credits) exactly as an empty bucket would.
         const buckets = await c.query(
-          "SELECT * FROM sr_buckets WHERE workspace=$1 AND environment=$2 AND account=$3 AND (expires_at IS NULL OR expires_at>now()) AND (service_ids IS NULL OR $4=ANY(service_ids)) ORDER BY expires_at ASC NULLS LAST, CASE source_kind WHEN 'subscription' THEN 0 WHEN 'promotion' THEN 1 ELSE 2 END,id FOR UPDATE",
+          "SELECT b.*,e.subscription AS window_subscription,e.window_limits FROM sr_buckets b LEFT JOIN sr_entitlements e ON (e.workspace,e.environment,e.bucket)=(b.workspace,b.environment,b.id) WHERE b.workspace=$1 AND b.environment=$2 AND b.account=$3 AND (b.expires_at IS NULL OR b.expires_at>now()) AND (b.service_ids IS NULL OR $4=ANY(b.service_ids)) ORDER BY b.expires_at ASC NULLS LAST, CASE b.source_kind WHEN 'subscription' THEN 0 WHEN 'promotion' THEN 1 ELSE 2 END,b.id FOR UPDATE OF b",
           [...scope(p), leg.account, service.id],
         );
         for (const b of buckets.rows) {
           const available = BigInt(b.remaining) - BigInt(b.held);
-          const take = available < remaining ? available : remaining;
+          let take = available < remaining ? available : remaining;
           if (take <= 0n) continue;
+          let windows: string[] = [];
+          const specs = b.window_subscription
+            ? windowSpecs(b.window_limits)
+            : [];
+          if (specs.length) {
+            const gate = await admit(c, p, b.window_subscription, specs, take);
+            if (gate.blocked) blocked = gate.blocked;
+            take = gate.take;
+            windows = gate.ids;
+            if (take <= 0n) continue;
+          }
           await c.query(
             "UPDATE sr_buckets SET held=held+$4 WHERE workspace=$1 AND environment=$2 AND id=$3",
             [...scope(p), b.id, take.toString()],
           );
           await c.query(
-            "INSERT INTO sr_allocations(workspace,environment,request,bucket,account,amount) VALUES($1,$2,$3,$4,$5,$6)",
-            [...scope(p), id, b.id, leg.account, take.toString()],
+            "INSERT INTO sr_allocations(workspace,environment,request,bucket,account,amount,windows) VALUES($1,$2,$3,$4,$5,$6,$7)",
+            [...scope(p), id, b.id, leg.account, take.toString(), windows],
           );
           remaining -= take;
           if (!remaining) break;
         }
-        if (remaining > 0n) throw new RouterError("insufficient_balance", 402);
+        if (remaining > 0n)
+          throw blocked
+            ? windowError(blocked)
+            : new RouterError("insufficient_balance", 402);
         await c.query(
           "UPDATE sr_accounts SET held=held+$4 WHERE workspace=$1 AND environment=$2 AND id=$3",
           [...scope(p), leg.account, leg.reserved],
@@ -576,6 +597,7 @@ export class PostgresStore implements DataStore {
           "UPDATE sr_buckets SET remaining=remaining-$4,held=held-$5 WHERE workspace=$1 AND environment=$2 AND id=$3",
           [...scope(p), a.bucket, take.toString(), a.amount],
         );
+        await settle(c, p, a.windows, a.amount, take.toString());
       }
       await c.query(
         "UPDATE sr_accounts SET balance=balance-$4,held=held-$5 WHERE workspace=$1 AND environment=$2 AND id=$3",
@@ -829,6 +851,7 @@ export class PostgresStore implements DataStore {
           "UPDATE sr_buckets SET remaining=remaining+$4 WHERE workspace=$1 AND environment=$2 AND id=$3",
           [...scope(p), a.bucket, n.toString()],
         );
+        await refund(c, p, a.windows, n.toString());
         remaining -= n;
       }
       if (remaining !== 0n) throw new RouterError("allocation_invariant", 500);

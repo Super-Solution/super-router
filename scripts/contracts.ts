@@ -9,6 +9,7 @@ import {
   CustomerInput,
   KeyInput,
   PlanInput,
+  WindowLimits,
   SubscriptionInput,
   PlanChangeInput,
   PaymentInput,
@@ -25,6 +26,7 @@ const schemas = {
   CustomerInput: schema(CustomerInput),
   KeyInput: schema(KeyInput),
   PlanInput: schema(PlanInput),
+  WindowLimits: schema(WindowLimits),
   SubscriptionInput: schema(SubscriptionInput),
   PlanChangeInput: schema(PlanChangeInput),
   PaymentInput: schema(PaymentInput),
@@ -379,6 +381,14 @@ for (const [path, description] of [
     "Customer balances with expiry-aware buckets.",
   ],
   ["/v1/credits", "Only the authenticated customer credit buckets."],
+  [
+    "/v1/windows",
+    "Session and weekly usage windows of the authenticated customer's subscriptions whose plan enables window limits.",
+  ],
+  [
+    "/v1/admin/customers/{id}/windows",
+    "The same window usage for one customer (billing:read).",
+  ],
   [
     "/v1/admin/audit-events",
     "Tenant/environment audit log, limit 1..100, opaque cursor.",

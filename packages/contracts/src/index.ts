@@ -180,6 +180,8 @@ export class RouterError extends Error {
     public code: string,
     public status = 400,
     public retryable = false,
+    /** Safe, customer-visible facts about the refusal (for example which window and when it resets). */
+    public details?: Record<string, unknown>,
   ) {
     super(code);
     this.name = "RouterError";

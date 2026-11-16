@@ -46,6 +46,47 @@ export const KeyInput = z
     expires_at: z.string().datetime(),
   })
   .strict();
+/** The long window is a fixed 7 days; only the short window's length is configurable. */
+export const WEEK_HOURS = 168;
+export const SESSION_MAX_HOURS = 72;
+/**
+ * Optional usage-rate limits on a plan's credits: a short "session" window and a long weekly
+ * window, both counted in the plan's asset. A window opens at the first reservation drawn from
+ * the subscription's bucket after the previous window ended and closes after its length, so the
+ * limits shape how fast the period's credits can be spent; they never add credits.
+ * `enabled:false` keeps the configuration on the plan version without enforcing it.
+ */
+export const WindowLimits = z
+  .object({
+    enabled: z.boolean(),
+    session: z
+      .object({
+        hours: z.number().int().min(1).max(SESSION_MAX_HOURS),
+        credits: positive,
+      })
+      .strict()
+      .optional(),
+    weekly: z.object({ credits: positive }).strict().optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.enabled && !v.session && !v.weekly)
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "enabled window limits need a session limit, a weekly limit, or both",
+      });
+    if (
+      v.session &&
+      v.weekly &&
+      BigInt(v.session.credits) > BigInt(v.weekly.credits)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "the session limit cannot exceed the weekly limit",
+      });
+  });
+export type WindowLimits = z.infer<typeof WindowLimits>;
 export const PlanInput = z
   .object({
     id,
@@ -56,6 +97,7 @@ export const PlanInput = z
     service_ids: z.array(id).min(1).max(100),
     amount_minor: positive,
     currency: z.string().regex(/^[A-Z]{3}$/),
+    window_limits: WindowLimits.optional(),
   })
   .strict();
 export type PlanInput = z.infer<typeof PlanInput>;

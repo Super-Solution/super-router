@@ -20,6 +20,7 @@ from ..contracts import Json, Principal, parse_service
 from ..pricing import RouterError, charge
 from ..router import BalanceRow, Clock, Leg, RequestRecord, wall_clock
 from .sql import Database, Row, Tx
+from .windows import admit, settle, usage, window_error, window_specs
 
 _AMOUNT = re.compile(r"[1-9][0-9]{0,29}")
 _COLUMNS = (
@@ -435,12 +436,21 @@ class PostgresStore:
             )
             for leg in sorted(legs, key=lambda x: x.account):
                 remaining = int(leg.reserved)
+                blocked = None
+                # A subscription bucket may carry session/weekly window limits (its entitlement's snapshot). They
+                # gate only that bucket: once its windows are full the draw falls through to the next bucket
+                # (purchased or promotional credits) as for an empty one.
                 buckets = await tx.fetch_all(
-                    "SELECT id,remaining::text AS remaining,held::text AS held FROM sr_buckets"
-                    " WHERE workspace=$1 AND environment=$2 AND account=$3 AND (expires_at IS NULL OR expires_at>now())"
-                    " AND (service_ids IS NULL OR $4=ANY(service_ids))"
-                    " ORDER BY expires_at ASC NULLS LAST,"
-                    " CASE source_kind WHEN 'subscription' THEN 0 WHEN 'promotion' THEN 1 ELSE 2 END,id FOR UPDATE",
+                    "SELECT b.id,b.remaining::text AS remaining,b.held::text AS held,"
+                    " e.subscription AS window_subscription,e.window_limits::text AS window_limits"
+                    " FROM sr_buckets b LEFT JOIN sr_entitlements e"
+                    " ON (e.workspace,e.environment,e.bucket)=(b.workspace,b.environment,b.id)"
+                    " WHERE b.workspace=$1 AND b.environment=$2 AND b.account=$3"
+                    " AND (b.expires_at IS NULL OR b.expires_at>now())"
+                    " AND (b.service_ids IS NULL OR $4=ANY(b.service_ids))"
+                    " ORDER BY b.expires_at ASC NULLS LAST,"
+                    " CASE b.source_kind WHEN 'subscription' THEN 0 WHEN 'promotion' THEN 1 ELSE 2 END,b.id"
+                    " FOR UPDATE OF b",
                     p.workspace,
                     p.environment,
                     leg.account,
@@ -450,6 +460,14 @@ class PostgresStore:
                     take = min(int(b["remaining"]) - int(b["held"]), remaining)
                     if take <= 0:
                         continue
+                    window_ids: list[str] = []
+                    specs = window_specs(b["window_limits"]) if b["window_subscription"] else []
+                    if specs:
+                        take, window_ids, gate = await admit(tx, p, b["window_subscription"], specs, take)
+                        if gate is not None:
+                            blocked = gate
+                        if take <= 0:
+                            continue
                     await tx.execute(
                         "UPDATE sr_buckets SET held=held+$4::numeric WHERE workspace=$1 AND environment=$2 AND id=$3",
                         p.workspace,
@@ -458,19 +476,22 @@ class PostgresStore:
                         str(take),
                     )
                     await tx.execute(
-                        "INSERT INTO sr_allocations(workspace,environment,request,bucket,account,amount)"
-                        " VALUES($1,$2,$3,$4,$5,$6::numeric)",
+                        "INSERT INTO sr_allocations(workspace,environment,request,bucket,account,amount,windows)"
+                        f" VALUES($1,$2,$3,$4,$5,$6::numeric,COALESCE({_ARRAY.format('$7')},'{{}}'))",
                         p.workspace,
                         p.environment,
                         id,
                         b["id"],
                         leg.account,
                         str(take),
+                        _json(window_ids),
                     )
                     remaining -= take
                     if not remaining:
                         break
                 if remaining > 0:
+                    if blocked is not None:
+                        raise window_error(blocked)
                     raise RouterError("insufficient_balance", 402)
                 await tx.execute(
                     "UPDATE sr_accounts SET held=held+$4::numeric WHERE workspace=$1 AND environment=$2 AND id=$3",
@@ -661,7 +682,7 @@ class PostgresStore:
         for leg, amount in zip(r.legs, due, strict=True):
             remaining = amount
             allocations = await tx.fetch_all(
-                "SELECT a.bucket,a.amount::text AS amount FROM sr_allocations a"
+                "SELECT a.bucket,a.amount::text AS amount,to_json(a.windows)::text AS windows FROM sr_allocations a"
                 " JOIN sr_buckets b ON (a.workspace,a.environment,a.bucket)=(b.workspace,b.environment,b.id)"
                 " WHERE a.workspace=$1 AND a.environment=$2 AND a.request=$3 AND a.account=$4"
                 " ORDER BY b.expires_at ASC NULLS LAST,"
@@ -692,6 +713,7 @@ class PostgresStore:
                     str(take),
                     a["amount"],
                 )
+                await settle(tx, p, _load(a["windows"]) or [], a["amount"], str(take))
             await tx.execute(
                 "UPDATE sr_accounts SET balance=balance-$4::numeric,held=held-$5::numeric"
                 " WHERE workspace=$1 AND environment=$2 AND id=$3",
@@ -782,6 +804,42 @@ class PostgresStore:
                 p.customer,
             )
         return [BalanceRow(r["id"], r["kind"], r["asset"], r["balance"], r["held"], r["available"]) for r in rows]
+
+    async def windows(self, p: Principal) -> list[dict[str, Any]]:
+        """Session/weekly window usage of the customer's paid subscriptions that have the option on."""
+        async with self._tx(p) as tx:
+            return await usage(tx, p)
+
+    async def entitle(
+        self,
+        p: Principal,
+        subscription: str,
+        cycle: int,
+        service_ids: list[str],
+        start_ms: int,
+        end_ms: int,
+        bucket: str,
+        window_limits: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Record a paid cycle's entitlement with its window limits snapshot (the plan's ``window_limits`` object
+        with ``enabled`` true, or None when the option is off). The control plane writes this row in the TypeScript
+        store; this is for hosts and tests that fund subscriptions themselves."""
+        async with self._tx(p) as tx:
+            await tx.execute(
+                "INSERT INTO sr_entitlements(workspace,environment,subscription,cycle,customer,service_ids,"
+                f"period_start,period_end,bucket,window_limits) VALUES($1,$2,$3,$4,$5,{_ARRAY.format('$6')},"
+                f"{_MS.format('$7')},{_MS.format('$8')},$9,$10::jsonb)",
+                p.workspace,
+                p.environment,
+                subscription,
+                cycle,
+                p.customer,
+                _json(service_ids),
+                start_ms,
+                end_ms,
+                bucket,
+                _json(window_limits) if window_limits else None,
+            )
 
     async def cancel(self, p: Principal, id: str) -> None:
         async with self._tx(p) as tx:

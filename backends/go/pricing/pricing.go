@@ -31,6 +31,10 @@ var (
 type RouterError struct {
 	Code   string
 	Status int
+	// Retryable reports that the same call can succeed later without changes (a window that resets).
+	Retryable bool
+	// Details are safe, customer-visible facts about the refusal, such as which window and when it resets.
+	Details map[string]any
 }
 
 func (e *RouterError) Error() string { return e.Code }
