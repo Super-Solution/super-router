@@ -1,0 +1,27 @@
+[package]
+name = "super-router-router"
+description = "The Super Router data plane: idempotent admission, reserve, execute and settle."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+super-router-contracts = { path = "../contracts" }
+super-router-pricing = { path = "../pricing" }
+super-router-routing = { path = "../routing" }
+serde.workspace = true
+serde_json.workspace = true
+num-bigint.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+futures-util.workspace = true
+async-trait.workspace = true
+async-stream.workspace = true
+uuid.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+hex.workspace = true
+
+[lints]
+workspace = true

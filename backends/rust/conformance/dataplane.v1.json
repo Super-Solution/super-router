@@ -1,0 +1,2268 @@
+{
+ "version": 1,
+ "description": "Data-plane scenarios: a Router over a Store with mock providers. Every implementation (memory, PostgreSQL, any other) must reproduce each step. Atoms are decimal strings. A step's expect is a partial match; \"$name\" is an id captured earlier; \">0\" means a positive decimal string. Time-based steps use small durations: virtual clocks advance instantly, SQL stores really sleep.",
+ "providers": {
+  "ok": "success",
+  "bad": "reject",
+  "lost": "unknown",
+  "half": "partial"
+ },
+ "principals": {
+  "owner": {
+   "customer": "c1",
+   "scopes": [
+    "invoke",
+    "service:write",
+    "billing:write",
+    "billing:read",
+    "operations:read",
+    "routing:write"
+   ]
+  },
+  "no_invoke": {
+   "customer": "c1",
+   "scopes": [
+    "billing:write"
+   ]
+  },
+  "other": {
+   "customer": "c2",
+   "scopes": [
+    "invoke",
+    "billing:write"
+   ]
+  },
+  "scoped": {
+   "customer": "c1",
+   "scopes": [
+    "invoke"
+   ],
+   "service_ids": [
+    "not-chat"
+   ]
+  }
+ },
+ "invocation": {
+  "service": "chat",
+  "customer_id": "c1",
+  "payer_mode": "developer",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "Hello"
+    }
+   ]
+  },
+  "limits": {
+   "max_output_tokens": 32,
+   "timeout_ms": 30000
+  },
+  "stream": false
+ },
+ "services": {
+  "chat": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/low",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "ok",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     }
+    }
+   ]
+  },
+  "chat_two": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/low",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "bad",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     }
+    },
+    {
+     "id": "b",
+     "provider": "ok",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     }
+    }
+   ]
+  },
+  "chat_bad": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/low",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "bad",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     }
+    }
+   ]
+  },
+  "chat_lost": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/low",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "lost",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     }
+    }
+   ]
+  },
+  "chat_half": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/low",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "half",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     }
+    }
+   ]
+  },
+  "chat_platform": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/low",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "ok",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     }
+    }
+   ],
+   "platform_price": {
+    "asset": "credit:platform",
+    "input": "1",
+    "cached": "1",
+    "cache_write": "1",
+    "output": "1",
+    "per": 1
+   }
+  },
+  "chat_downgrade": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/pro",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "bad",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     }
+    }
+   ],
+   "downgrade_policy": {
+    "tier": "chat/basic",
+    "offerings": [
+     {
+      "id": "lower",
+      "provider": "ok",
+      "model": "basic-model",
+      "upstream_model": "mock-model",
+      "region": "test",
+      "labels": [],
+      "enabled": true,
+      "source": "byok",
+      "max_input_tokens": 1024,
+      "max_output_tokens": 128,
+      "price": {
+       "asset": "USD",
+       "input": "1",
+       "cached": "1",
+       "cache_write": "1",
+       "output": "1",
+       "per": 1
+      },
+      "quality_metadata": {
+       "source": "eval-v1",
+       "task": "chat",
+       "updated_at": "2026-11-01T00:00:00Z"
+      }
+     }
+    ]
+   }
+  },
+  "chat_label_expired": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/low",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [
+    "safe"
+   ],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "ok",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [
+      "safe"
+     ],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     },
+     "label_evidence": {
+      "safe": {
+       "source": "audit",
+       "verification": "verified",
+       "expires_at": "2000-01-01T00:00:00Z"
+      }
+     }
+    }
+   ],
+   "require_verified_labels": true
+  },
+  "chat_label_unverified": {
+   "id": "chat",
+   "version": 1,
+   "mode": "tier",
+   "tier": "chat/low",
+   "regions": [
+    "test"
+   ],
+   "required_labels": [
+    "safe"
+   ],
+   "price": {
+    "asset": "credit:demo",
+    "input": "2",
+    "cached": "1",
+    "cache_write": "2",
+    "output": "3",
+    "per": 1
+   },
+   "max_attempts": 2,
+   "max_provider_cost": "10000",
+   "max_output_tokens": 128,
+   "weights": {
+    "cost": 1,
+    "latency": 0,
+    "reliability": 0,
+    "quality": 0
+   },
+   "cost_scale": "10000",
+   "latency_scale_ms": 1000,
+   "offerings": [
+    {
+     "id": "a",
+     "provider": "ok",
+     "model": "mock-model",
+     "upstream_model": "mock-model",
+     "region": "test",
+     "labels": [
+      "safe"
+     ],
+     "enabled": true,
+     "source": "byok",
+     "max_input_tokens": 1024,
+     "max_output_tokens": 128,
+     "price": {
+      "asset": "USD",
+      "input": "1",
+      "cached": "1",
+      "cache_write": "1",
+      "output": "1",
+      "per": 1
+     },
+     "label_evidence": {
+      "safe": {
+       "source": "audit",
+       "verification": "unverified"
+      }
+     }
+    }
+   ],
+   "require_verified_labels": true
+  }
+ },
+ "scenarios": [
+  {
+   "name": "settle a successful request",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "as": "r1",
+     "expect": {
+      "execution_status": "succeeded",
+      "billing_status": "settled",
+      "service_version": 1,
+      "model": "mock-model",
+      "tier": "chat/low",
+      "output": {
+       "role": "assistant",
+       "content": "Hello from SuperRouter."
+      },
+      "usage": {
+       "status": "confirmed",
+       "meters": {
+        "input": 10,
+        "cached": 0,
+        "cache_write": 0,
+        "output": 5
+       }
+      },
+      "billing": {
+       "charges": [
+        {
+         "kind": "customer_sale",
+         "asset": "credit:demo",
+         "atoms": "35",
+         "scale": 9
+        }
+       ]
+      }
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "99965",
+       "held": "0",
+       "available": "99965"
+      }
+     ]
+    },
+    {
+     "op": "get",
+     "request": "r1",
+     "expect": {
+      "execution": "succeeded",
+      "billing": "settled",
+      "output_started": true,
+      "provider_spent": "15"
+     }
+    }
+   ]
+  },
+  {
+   "name": "platform leg is charged and shown to billing readers",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_platform"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "grant",
+     "kind": "platform_sale",
+     "asset": "credit:platform",
+     "amount": "50000",
+     "source": "p1"
+    },
+    {
+     "op": "infer",
+     "as": "r1",
+     "expect": {
+      "billing": {
+       "charges": [
+        {
+         "kind": "customer_sale",
+         "atoms": "35"
+        },
+        {
+         "kind": "platform_sale",
+         "asset": "credit:platform",
+         "atoms": "15"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "99965",
+       "held": "0",
+       "available": "99965"
+      },
+      {
+       "kind": "platform_sale",
+       "asset": "credit:platform",
+       "balance": "49985",
+       "held": "0",
+       "available": "49985"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "replay with the same key returns the first request and does not call the provider again",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "key": "k1",
+     "as": "r1"
+    },
+    {
+     "op": "infer",
+     "key": "k1",
+     "expect": {
+      "replayed": true,
+      "id": "$r1",
+      "execution_status": "succeeded",
+      "billing_status": "settled"
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 1
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "99965",
+       "held": "0",
+       "available": "99965"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "same key with a different body conflicts",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "key": "k1"
+    },
+    {
+     "op": "infer",
+     "key": "k1",
+     "input": {
+      "input": {
+       "messages": [
+        {
+         "role": "user",
+         "content": "Different"
+        }
+       ]
+      }
+     },
+     "error": {
+      "code": "idempotency_conflict",
+      "status": 409
+     }
+    }
+   ]
+  },
+  {
+   "name": "insufficient balance is refused before any provider call",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "error": {
+      "code": "insufficient_balance",
+      "status": 402
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 0
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100",
+       "held": "0",
+       "available": "100"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a customer with no account is refused",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "infer",
+     "error": {
+      "code": "insufficient_balance",
+      "status": 402
+     }
+    }
+   ]
+  },
+  {
+   "name": "a definitive retryable failure falls back to the next offering",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_two"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "expect": {
+      "execution_status": "succeeded",
+      "billing_status": "settled"
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "bad",
+     "expect": 1
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 1
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "99965",
+       "held": "0",
+       "available": "99965"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "every offering failing releases the reservation",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_bad"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "as": "r1",
+     "expect": {
+      "execution_status": "failed",
+      "billing_status": "released",
+      "usage": {
+       "status": "not_billable"
+      },
+      "billing": {
+       "charges": []
+      }
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "0",
+       "available": "100000"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "an unknown provider outcome keeps the reservation pending",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_lost"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "as": "r1",
+     "expect": {
+      "execution_status": "unknown",
+      "billing_status": "pending",
+      "usage": {
+       "status": "pending"
+      }
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "balance": "100000",
+       "held": ">0"
+      }
+     ]
+    },
+    {
+     "op": "get",
+     "request": "r1",
+     "expect": {
+      "execution": "unknown",
+      "billing": "pending",
+      "provider_spent": "0"
+     }
+    }
+   ]
+  },
+  {
+   "name": "output delivered before a failure is partial and pending",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_half"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "as": "r1",
+     "expect": {
+      "execution_status": "partial",
+      "billing_status": "pending",
+      "output": {
+       "content": "Hello from SuperRouter."
+      }
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "balance": "100000",
+       "held": ">0"
+      }
+     ]
+    },
+    {
+     "op": "get",
+     "request": "r1",
+     "expect": {
+      "execution": "partial",
+      "billing": "pending",
+      "output_started": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "scope and customer binding",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "principal": "no_invoke",
+     "error": {
+      "code": "scope_denied",
+      "status": 403
+     }
+    },
+    {
+     "op": "infer",
+     "principal": "scoped",
+     "error": {
+      "code": "scope_denied",
+      "status": 403
+     }
+    },
+    {
+     "op": "infer",
+     "input": {
+      "customer_id": "c2"
+     },
+     "error": {
+      "code": "scope_denied",
+      "status": 403
+     }
+    },
+    {
+     "op": "infer",
+     "principal": "other",
+     "input": {
+      "customer_id": "c2"
+     },
+     "error": {
+      "code": "insufficient_balance",
+      "status": 402
+     }
+    },
+    {
+     "op": "infer",
+     "as": "r1"
+    },
+    {
+     "op": "get",
+     "request": "r1",
+     "principal": "other",
+     "error": {
+      "code": "resource_not_found",
+      "status": 404
+     }
+    }
+   ]
+  },
+  {
+   "name": "unknown service",
+   "steps": [
+    {
+     "op": "infer",
+     "input": {
+      "service": "nope"
+     },
+     "error": {
+      "code": "resource_not_found",
+      "status": 404
+     }
+    }
+   ]
+  },
+  {
+   "name": "customer budget below the reservation",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "input": {
+      "limits": {
+       "max_charge": {
+        "asset": "credit:demo",
+        "atoms": "100",
+        "scale": 9
+       }
+      }
+     },
+     "error": {
+      "code": "budget_exceeded",
+      "status": 402
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "0",
+       "available": "100000"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a disabled offering is skipped at dispatch",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "disable",
+     "offering": "a"
+    },
+    {
+     "op": "infer",
+     "expect": {
+      "execution_status": "failed",
+      "billing_status": "released"
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 0
+    }
+   ]
+  },
+  {
+   "name": "publishing rules",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "publish",
+     "service": "chat",
+     "patch": {
+      "max_attempts": 3
+     },
+     "error": {
+      "code": "version_exists",
+      "status": 409
+     }
+    },
+    {
+     "op": "publish",
+     "service": "chat",
+     "patch": {
+      "version": 2
+     }
+    },
+    {
+     "op": "publish",
+     "service": "chat",
+     "patch": {
+      "version": 2
+     }
+    },
+    {
+     "op": "publish",
+     "service": "chat",
+     "patch": {
+      "version": 3
+     }
+    },
+    {
+     "op": "publish",
+     "service": "chat",
+     "patch": {
+      "version": 3,
+      "max_attempts": 3
+     },
+     "error": {
+      "code": "version_exists",
+      "status": 409
+     }
+    },
+    {
+     "op": "publish",
+     "service": "chat",
+     "principal": "no_invoke",
+     "error": {
+      "code": "scope_denied",
+      "status": 403
+     }
+    },
+    {
+     "op": "publish",
+     "service": "chat",
+     "mode": "cloud",
+     "patch": {
+      "id": "other-chat"
+     },
+     "error": {
+      "code": "byok_not_allowed",
+      "status": 403
+     }
+    }
+   ]
+  },
+  {
+   "name": "only the active service version admits new work",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "publish",
+     "service": "chat",
+     "patch": {
+      "version": 2
+     }
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "input": {
+      "service_version": 1
+     },
+     "error": {
+      "code": "inactive_service_version",
+      "status": 409
+     }
+    },
+    {
+     "op": "infer",
+     "input": {
+      "service_version": 2
+     },
+     "expect": {
+      "execution_status": "succeeded",
+      "service_version": 2
+     }
+    },
+    {
+     "op": "infer",
+     "expect": {
+      "service_version": 2
+     }
+    }
+   ]
+  },
+  {
+   "name": "expired credits leave the balance",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1",
+     "expires_in_ms": 150
+    },
+    {
+     "op": "advance",
+     "ms": 400
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "0",
+       "held": "0",
+       "available": "0"
+      }
+     ]
+    },
+    {
+     "op": "infer",
+     "error": {
+      "code": "insufficient_balance",
+      "status": 402
+     }
+    }
+   ]
+  },
+  {
+   "name": "the soonest-expiring credits are spent first",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g_late"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "3000",
+     "source": "g_soon",
+     "expires_in_ms": 600000
+    },
+    {
+     "op": "infer",
+     "as": "r1"
+    },
+    {
+     "op": "buckets",
+     "expect": [
+      {
+       "source": "g_late",
+       "remaining": "100000",
+       "held": "0"
+      },
+      {
+       "source": "g_soon",
+       "remaining": "2965",
+       "held": "0"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a reservation spills into the next bucket but only the usage is charged",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g_big"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "1000",
+     "source": "g_small",
+     "expires_in_ms": 600000
+    },
+    {
+     "op": "infer",
+     "as": "r1"
+    },
+    {
+     "op": "buckets",
+     "expect": [
+      {
+       "source": "g_big",
+       "remaining": "100000",
+       "held": "0"
+      },
+      {
+       "source": "g_small",
+       "remaining": "965",
+       "held": "0"
+      }
+     ]
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100965",
+       "held": "0",
+       "available": "100965"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "grants are idempotent by source and conflicting reuse fails",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "5",
+     "source": "g1",
+     "error": {
+      "code": "idempotency_conflict",
+      "status": 409
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "0",
+       "available": "100000"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "recover releases an expired reservation that never dispatched",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "reserve",
+     "as": "q1",
+     "key": "kq",
+     "service": "chat",
+     "reserved": {
+      "customer_sale": "500"
+     },
+     "timeout_ms": 100,
+     "expect": {
+      "fresh": true,
+      "execution": "accepted",
+      "billing": "reserved"
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "500",
+       "available": "99500"
+      }
+     ]
+    },
+    {
+     "op": "recover",
+     "expect": 0
+    },
+    {
+     "op": "advance",
+     "ms": 300
+    },
+    {
+     "op": "recover",
+     "expect": 1
+    },
+    {
+     "op": "get",
+     "request": "q1",
+     "expect": {
+      "execution": "cancelled",
+      "billing": "released"
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "0",
+       "available": "100000"
+      }
+     ]
+    },
+    {
+     "op": "recover",
+     "expect": 0
+    }
+   ]
+  },
+  {
+   "name": "recover settles an expired request whose success was recorded",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "reserve",
+     "as": "q1",
+     "key": "kq",
+     "service": "chat",
+     "reserved": {
+      "customer_sale": "500"
+     },
+     "timeout_ms": 100
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "as": "t1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "100"
+    },
+    {
+     "op": "attempt",
+     "request": "q1",
+     "attempt": "t1",
+     "status": "succeeded",
+     "usage": {
+      "input": 10,
+      "cached": 0,
+      "cache_write": 0,
+      "output": 5
+     },
+     "cost": "15"
+    },
+    {
+     "op": "advance",
+     "ms": 300
+    },
+    {
+     "op": "recover",
+     "expect": 1
+    },
+    {
+     "op": "get",
+     "request": "q1",
+     "expect": {
+      "execution": "succeeded",
+      "billing": "settled",
+      "provider_spent": "15"
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "99965",
+       "held": "0",
+       "available": "99965"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "recover never settles or redispatches an expired dispatch with no result",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "reserve",
+     "as": "q1",
+     "key": "kq",
+     "service": "chat",
+     "reserved": {
+      "customer_sale": "500"
+     },
+     "timeout_ms": 100
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "as": "t1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "100"
+    },
+    {
+     "op": "advance",
+     "ms": 300
+    },
+    {
+     "op": "recover",
+     "expect": 1
+    },
+    {
+     "op": "get",
+     "request": "q1",
+     "expect": {
+      "execution": "unknown",
+      "billing": "pending"
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "500",
+       "available": "99500"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "cancel stops a reserved request from dispatching",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "reserve",
+     "as": "q1",
+     "key": "kq",
+     "service": "chat",
+     "reserved": {
+      "customer_sale": "500"
+     },
+     "timeout_ms": 30000
+    },
+    {
+     "op": "cancel",
+     "request": "q1"
+    },
+    {
+     "op": "get",
+     "request": "q1",
+     "expect": {
+      "cancel_requested": true
+     }
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "100",
+     "error": {
+      "code": "cancelled",
+      "status": 409
+     }
+    }
+   ]
+  },
+  {
+   "name": "the provider cost budget is enforced per request",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "reserve",
+     "as": "q1",
+     "key": "kq",
+     "service": "chat",
+     "reserved": {
+      "customer_sale": "500"
+     },
+     "timeout_ms": 30000
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "10001",
+     "error": {
+      "code": "budget_exceeded",
+      "status": 402
+     }
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "as": "t1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "6000"
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "6000",
+     "error": {
+      "code": "budget_exceeded",
+      "status": 402
+     }
+    },
+    {
+     "op": "attempt",
+     "request": "q1",
+     "attempt": "t1",
+     "status": "failed",
+     "cost": "0"
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "6000"
+    }
+   ]
+  },
+  {
+   "name": "finish without usage releases, and finish is idempotent",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "reserve",
+     "as": "q1",
+     "key": "kq",
+     "service": "chat",
+     "reserved": {
+      "customer_sale": "500"
+     },
+     "timeout_ms": 30000
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "500",
+       "available": "99500"
+      }
+     ]
+    },
+    {
+     "op": "finish",
+     "request": "q1",
+     "execution": "failed",
+     "pending": false
+    },
+    {
+     "op": "get",
+     "request": "q1",
+     "expect": {
+      "billing": "released",
+      "execution": "failed"
+     }
+    },
+    {
+     "op": "finish",
+     "request": "q1",
+     "execution": "failed",
+     "pending": false
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "0",
+       "available": "100000"
+      }
+     ]
+    },
+    {
+     "op": "attempt",
+     "request": "q1",
+     "attempt": "t1",
+     "status": "failed",
+     "cost": "0",
+     "error": {
+      "code": "state_conflict",
+      "status": 409
+     }
+    }
+   ]
+  },
+  {
+   "name": "usage above the reservation goes to reconciliation instead of settling",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "reserve",
+     "as": "q1",
+     "key": "kq",
+     "service": "chat",
+     "reserved": {
+      "customer_sale": "10"
+     },
+     "timeout_ms": 30000
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "as": "t1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "100"
+    },
+    {
+     "op": "attempt",
+     "request": "q1",
+     "attempt": "t1",
+     "status": "succeeded",
+     "usage": {
+      "input": 10,
+      "cached": 0,
+      "cache_write": 0,
+      "output": 5
+     },
+     "cost": "15"
+    },
+    {
+     "op": "finish",
+     "request": "q1",
+     "execution": "succeeded",
+     "usage": {
+      "input": 10,
+      "cached": 0,
+      "cache_write": 0,
+      "output": 5
+     },
+     "pending": false
+    },
+    {
+     "op": "get",
+     "request": "q1",
+     "expect": {
+      "billing": "pending",
+      "execution": "succeeded"
+     }
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "10",
+       "available": "99990"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "the first recorded result of an attempt is final",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "reserve",
+     "as": "q1",
+     "key": "kq",
+     "service": "chat",
+     "reserved": {
+      "customer_sale": "500"
+     },
+     "timeout_ms": 30000
+    },
+    {
+     "op": "begin",
+     "request": "q1",
+     "as": "t1",
+     "service": "chat",
+     "offering": "a",
+     "bound": "100"
+    },
+    {
+     "op": "attempt",
+     "request": "q1",
+     "attempt": "t1",
+     "status": "succeeded",
+     "usage": {
+      "input": 10,
+      "cached": 0,
+      "cache_write": 0,
+      "output": 5
+     },
+     "cost": "15"
+    },
+    {
+     "op": "attempt",
+     "request": "q1",
+     "attempt": "t1",
+     "status": "failed",
+     "cost": "7"
+    },
+    {
+     "op": "attempt",
+     "request": "q1",
+     "attempt": "nope",
+     "status": "failed",
+     "cost": "0",
+     "error": {
+      "code": "resource_not_found",
+      "status": 404
+     }
+    },
+    {
+     "op": "get",
+     "request": "q1",
+     "expect": {
+      "provider_spent": "15"
+     }
+    }
+   ]
+  },
+  {
+   "name": "W5 lower-tier downgrade after primary rejection",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_downgrade"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "as": "r1",
+     "expect": {
+      "execution_status": "succeeded",
+      "billing_status": "settled",
+      "tier": "chat/basic",
+      "downgrade": {
+       "from_tier": "chat/pro",
+       "to_tier": "chat/basic"
+      }
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "bad",
+     "expect": 1
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 1
+    },
+    {
+     "op": "get",
+     "request": "r1",
+     "expect": {
+      "provider_spent": "15"
+     }
+    }
+   ]
+  },
+  {
+   "name": "W5 lower-tier downgrade after primary exclusion",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_downgrade",
+     "patch": {
+      "offerings": [
+       {
+        "id": "a",
+        "provider": "bad",
+        "model": "mock-model",
+        "upstream_model": "mock-model",
+        "region": "test",
+        "labels": [],
+        "enabled": false,
+        "source": "byok",
+        "max_input_tokens": 1024,
+        "max_output_tokens": 128,
+        "price": {
+         "asset": "USD",
+         "input": "1",
+         "cached": "1",
+         "cache_write": "1",
+         "output": "1",
+         "per": 1
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "as": "r1",
+     "expect": {
+      "execution_status": "succeeded",
+      "billing_status": "settled",
+      "tier": "chat/basic",
+      "downgrade": {
+       "from_tier": "chat/pro",
+       "to_tier": "chat/basic"
+      }
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "bad",
+     "expect": 0
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 1
+    },
+    {
+     "op": "get",
+     "request": "r1",
+     "expect": {
+      "provider_spent": "15"
+     }
+    }
+   ]
+  },
+  {
+   "name": "W5 expired evidence excludes required label before dispatch",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_label_expired"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "error": {
+      "code": "no_eligible_offering",
+      "status": 422
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 0
+    }
+   ]
+  },
+  {
+   "name": "W5 unverified evidence excludes required label before dispatch",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_label_unverified"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "error": {
+      "code": "no_eligible_offering",
+      "status": 422
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 0
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+[package]
+name = "super-router-cli"
+description = "The super-router-server binary: the Rust data plane, configured through environment variables."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "super-router-server"
+path = "src/main.rs"
+
+[dependencies]
+super-router-contracts = { path = "../contracts" }
+super-router-router = { path = "../router" }
+super-router-server = { path = "../server" }
+super-router-store-memory = { path = "../store-memory" }
+super-router-store-postgres = { path = "../store-postgres" }
+super-router-provider-openai = { path = "../provider-openai" }
+super-router-provider-anthropic = { path = "../provider-anthropic" }
+tokio = { workspace = true, features = ["net", "signal"] }
+tokio-util.workspace = true
+axum = "0.8"
+async-trait.workspace = true
+serde_json.workspace = true
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "json", "env-filter"] }
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres"] }
+
+[lints]
+workspace = true
