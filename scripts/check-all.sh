@@ -4,7 +4,7 @@
 #
 #   npm run db:up                      # or point DATABASE_URL at any PostgreSQL
 #   python -m venv .venv && . .venv/bin/activate && pip install -e "backends/python[dev]"
-#   scripts/check-all.sh [ts|go|python ...]     # no argument runs all three
+#   scripts/check-all.sh [ts|go|python|rust ...]  # no argument runs the first three; Rust needs a database of its own
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export SR_REQUIRE_POSTGRES=1
@@ -37,6 +37,14 @@ python_() {
     python -m pytest -q)
 }
 
+rust_() {
+  step "Rust: fmt, clippy, tests"
+  (cd backends/rust
+    cargo fmt --all --check
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo test --workspace)
+}
+
 targets=("$@")
 [ ${#targets[@]} -gt 0 ] || targets=(ts go python)
 for t in "${targets[@]}"; do
@@ -44,7 +52,8 @@ for t in "${targets[@]}"; do
     ts) ts ;;
     go) go_ ;;
     python) python_ ;;
-    *) echo "unknown target: $t (use ts, go or python)" >&2; exit 2 ;;
+    rust) rust_ ;;
+    *) echo "unknown target: $t (use ts, go, python or rust)" >&2; exit 2 ;;
   esac
 done
 step "all checks passed: ${targets[*]}"

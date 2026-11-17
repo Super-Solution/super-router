@@ -1,0 +1,32 @@
+[package]
+name = "super-router-store-postgres"
+description = "PostgreSQL DataStore for Super Router on the shared migrations."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[dependencies]
+super-router-contracts = { path = "../contracts" }
+super-router-pricing = { path = "../pricing" }
+super-router-router = { path = "../router" }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "json", "migrate"] }
+include_dir = "0.7"
+serde.workspace = true
+serde_json.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+hex.workspace = true
+
+[dev-dependencies]
+super-router-dataplane-test = { path = "../dataplane-test" }
+tokio-util.workspace = true
+futures-util.workspace = true
+
+[lints]
+workspace = true

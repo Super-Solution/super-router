@@ -1,0 +1,27 @@
+[package]
+name = "super-router-store-memory"
+description = "In-memory DataStore for Super Router: tests, demos and single-process self-hosting."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+super-router-contracts = { path = "../contracts" }
+super-router-pricing = { path = "../pricing" }
+super-router-router = { path = "../router" }
+serde_json.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+async-trait.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+super-router-dataplane-test = { path = "../dataplane-test" }
+tokio.workspace = true
+tokio-util.workspace = true
+futures-util.workspace = true
+async-stream.workspace = true
+
+[lints]
+workspace = true

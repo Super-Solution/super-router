@@ -1,0 +1,20 @@
+[package]
+name = "super-router-routing"
+description = "Offering selection for Super Router: hard limits, weighted scoring and ordering."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+super-router-contracts = { path = "../contracts" }
+super-router-pricing = { path = "../pricing" }
+serde.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true
