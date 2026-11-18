@@ -17,7 +17,70 @@ export function normalizeOpenAI(raw: Record<string, any>) {
     output: raw.output_tokens,
   });
 }
+/** The Responses API `input` list. Plain text messages pass through unchanged. */
+export function toOpenAIInput(messages: Invocation["input"]["messages"]) {
+  return messages.flatMap((m): unknown[] => {
+    if (m.role === "tool")
+      return [
+        {
+          type: "function_call_output",
+          call_id: m.tool_call_id,
+          output: m.content,
+        },
+      ];
+    if ("tool_calls" in m)
+      return [
+        ...(m.content ? [{ role: "assistant", content: m.content }] : []),
+        ...m.tool_calls.map((call) => ({
+          type: "function_call",
+          call_id: call.id,
+          name: call.name,
+          arguments: call.arguments,
+        })),
+      ];
+    if (typeof m.content === "string") return [m];
+    return [
+      {
+        role: m.role,
+        content: m.content.map((part) =>
+          part.type === "text"
+            ? { type: "input_text", text: part.text }
+            : {
+                type: "input_image",
+                image_url: part.url,
+                ...(part.detail ? { detail: part.detail } : {}),
+              },
+        ),
+      },
+    ];
+  });
+}
+function toolFields(input: Invocation["input"]) {
+  const choice = input.tool_choice;
+  return {
+    ...(input.tools
+      ? {
+          tools: input.tools.map((tool) => ({
+            type: "function",
+            name: tool.name,
+            ...(tool.description ? { description: tool.description } : {}),
+            parameters: tool.input_schema,
+            strict: false,
+          })),
+        }
+      : {}),
+    ...(choice === undefined
+      ? {}
+      : {
+          tool_choice:
+            typeof choice === "string"
+              ? choice
+              : { type: "function", name: choice.name },
+        }),
+  };
+}
 export class OpenAIProvider implements Provider {
+  capabilities = { tools: true, images: true };
   constructor(
     private key: () => string,
     private transport: typeof fetch = fetch,
@@ -39,7 +102,8 @@ export class OpenAIProvider implements Provider {
         },
         body: JSON.stringify({
           model: offering.upstream_model,
-          input: input.input.messages,
+          input: toOpenAIInput(input.input.messages),
+          ...toolFields(input.input),
           max_output_tokens: input.limits.max_output_tokens,
           store: false,
           stream: true,
@@ -58,6 +122,8 @@ export class OpenAIProvider implements Provider {
     }
     if (!response.body) throw new ProviderError(false, false, "empty_stream");
     let terminal = false;
+    // Upstream numbers every output item; tool calls are numbered from zero among themselves.
+    const calls = new Map<number, { index: number; streamed: boolean }>();
     for await (const frame of parseSSE(response.body)) {
       let e: any;
       try {
@@ -67,6 +133,43 @@ export class OpenAIProvider implements Provider {
       }
       if (e.type === "response.output_text.delta")
         yield { type: "delta" as const, text: String(e.delta) };
+      if (
+        e.type === "response.output_item.added" &&
+        e.item?.type === "function_call"
+      ) {
+        const index = calls.size;
+        calls.set(e.output_index, { index, streamed: false });
+        yield {
+          type: "tool_call" as const,
+          index,
+          id: String(e.item.call_id),
+          name: String(e.item.name),
+          arguments_delta: "",
+        };
+      }
+      if (e.type === "response.function_call_arguments.delta") {
+        const call = calls.get(e.output_index);
+        if (!call)
+          throw new ProviderError(false, false, "invalid_upstream_event");
+        call.streamed = true;
+        yield {
+          type: "tool_call" as const,
+          index: call.index,
+          arguments_delta: String(e.delta),
+        };
+      }
+      if (e.type === "response.function_call_arguments.done") {
+        const call = calls.get(e.output_index);
+        if (!call)
+          throw new ProviderError(false, false, "invalid_upstream_event");
+        // Some models send the arguments only here.
+        if (!call.streamed)
+          yield {
+            type: "tool_call" as const,
+            index: call.index,
+            arguments_delta: String(e.arguments ?? ""),
+          };
+      }
       if (e.type === "response.completed" || e.type === "response.incomplete") {
         if (!e.response?.usage)
           throw new ProviderError(false, false, "usage_unknown");

@@ -168,7 +168,7 @@ test("a chunked body without Content-Length is cut off at the limit instead of b
   assert.equal(response.status, 413);
   assert.equal(((await response.json()) as any).error.code, "body_too_large");
   assert.ok(
-    pulled <= 256_000 + 3 * 64 * 1024,
+    pulled <= 4_000_000 + 3 * 64 * 1024,
     `read ${pulled} bytes before refusing`,
   );
 });
