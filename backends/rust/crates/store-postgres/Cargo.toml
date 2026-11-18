@@ -4,13 +4,19 @@ description = "PostgreSQL DataStore for Super Router on the shared migrations."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-publish.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+keywords = ["llm", "router", "postgres", "sqlx", "billing"]
+categories = ["database", "asynchronous"]
+exclude = ["/tests"]
 build = "build.rs"
 
 [dependencies]
-super-router-contracts = { path = "../contracts" }
-super-router-pricing = { path = "../pricing" }
-super-router-router = { path = "../router" }
+super-router-contracts.workspace = true
+super-router-pricing.workspace = true
+super-router-router.workspace = true
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "json", "migrate"] }
 include_dir = "0.7"
 serde.workspace = true

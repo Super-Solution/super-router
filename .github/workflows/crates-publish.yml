@@ -1,0 +1,114 @@
+name: Publish crates
+
+# Manual release of the Rust crates in backends/rust to crates.io. Publishes with Trusted Publishing (OIDC): no
+# crates.io token and no repository secret. Runs as a dry run unless you untick "dry_run". Runbook: docs/CRATES-PUBLISHING.md.
+#
+# Each crate's trusted publisher must name this repository, this file (crates-publish.yml) and the environment
+# "crates-io". A crate can only be configured once it exists, so the first release of every crate is published by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact version already committed in every publishable crate (X.Y.Z or X.Y.Z-(alpha|beta|rc).N)
+        required: true
+        type: string
+      dry_run:
+        description: Package and verify every crate, publish nothing
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crates-publish
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  verify:
+    if: github.repository == 'Super-Solution/super-router' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+      - name: Install a current stable Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup default stable
+          rustc --version
+          cargo --version
+      - name: Require cargo 1.90 or newer (cargo publish --workspace)
+        run: |
+          node -e "const [a,b]=process.argv[1].split('.').map(Number); if (a<1||(a===1&&b<90)) { console.error('cargo '+process.argv[1]+' cannot publish a workspace'); process.exit(1) }" "$(cargo --version | cut -d' ' -f2)"
+      - name: Verify the release (crates, version, metadata, publish order, not on crates.io yet)
+        run: |
+          node scripts/check-crates-release.mjs "$RELEASE_VERSION" --online > "$RUNNER_TEMP/publish-order.txt"
+          cat "$RUNNER_TEMP/publish-order.txt"
+      - name: Format, lint and test
+        working-directory: backends/rust
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --locked
+      - name: Package and verify every crate (dry run)
+        working-directory: backends/rust
+        run: cargo publish --workspace --dry-run --locked
+
+  msrv:
+    # `rust-version` is a promise to users: the sources must build on it with dependencies that also support it.
+    if: github.repository == 'Super-Solution/super-router' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check the declared rust-version
+        working-directory: backends/rust
+        run: |
+          msrv="$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)"
+          rustup toolchain install "$msrv" --profile minimal --no-self-update
+          rm Cargo.lock
+          CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo "+$msrv" generate-lockfile
+          cargo "+$msrv" check --workspace --locked
+
+  publish:
+    needs: [verify, msrv]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    # The trusted publishers name this environment; give it a required reviewer so a release needs an approval.
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install a current stable Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+      # Exchanges the job's OIDC token for a short-lived crates.io token and revokes it when the job ends.
+      # TODO before the first real run: pin this action to a commit SHA, as the other actions here are.
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish in dependency order
+        working-directory: backends/rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --workspace --locked

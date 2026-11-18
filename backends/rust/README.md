@@ -8,8 +8,10 @@ reproduces the data in [`conformance`](conformance), the same checks the Go and 
 > ([`crates/store-postgres/migrations`](crates/store-postgres/migrations)) and its own copy of the shared data
 > ([`conformance`](conformance)). It supports custom billing units, durable tasks, attempt failures, database-backed
 > keys and session/weekly usage windows, which the TypeScript, Go and Python backends in this repository do not have
-> yet. Use a database of its own: the other backends' migration history is different. The crates are
-> `publish = false`; depend on them as a git dependency pinned to one commit.
+> yet. Use a database of its own: the other backends' migration history is different. Ten crates are prepared for
+> crates.io (`super-router-*`, released together; see [`docs/CRATES-PUBLISHING.md`](../../docs/CRATES-PUBLISHING.md));
+> the first release has not been made yet, so until then depend on them as a git dependency pinned to one commit.
+> `super-router-cli` and `super-router-dataplane-test` are not published.
 
 ```
 backends/rust

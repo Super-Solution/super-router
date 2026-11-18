@@ -4,20 +4,25 @@ description = "The super-router-server binary: the Rust data plane, configured t
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-publish.workspace = true
+license.workspace = true
+publish = false
+repository.workspace = true
+homepage.workspace = true
+keywords = ["llm", "router", "server", "self-hosting", "cli"]
+categories = ["command-line-utilities", "web-programming"]
 
 [[bin]]
 name = "super-router-server"
 path = "src/main.rs"
 
 [dependencies]
-super-router-contracts = { path = "../contracts" }
-super-router-router = { path = "../router" }
-super-router-server = { path = "../server" }
-super-router-store-memory = { path = "../store-memory" }
-super-router-store-postgres = { path = "../store-postgres" }
-super-router-provider-openai = { path = "../provider-openai" }
-super-router-provider-anthropic = { path = "../provider-anthropic" }
+super-router-contracts.workspace = true
+super-router-router.workspace = true
+super-router-server.workspace = true
+super-router-store-memory.workspace = true
+super-router-store-postgres.workspace = true
+super-router-provider-openai.workspace = true
+super-router-provider-anthropic.workspace = true
 tokio = { workspace = true, features = ["net", "signal"] }
 tokio-util.workspace = true
 axum = "0.8"

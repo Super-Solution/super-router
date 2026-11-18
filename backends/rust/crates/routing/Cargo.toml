@@ -4,11 +4,17 @@ description = "Offering selection for Super Router: hard limits, weighted scorin
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-publish.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+keywords = ["llm", "routing", "router", "scoring", "ai"]
+categories = ["algorithms", "artificial-intelligence"]
+exclude = ["/tests"]
 
 [dependencies]
-super-router-contracts = { path = "../contracts" }
-super-router-pricing = { path = "../pricing" }
+super-router-contracts.workspace = true
+super-router-pricing.workspace = true
 serde.workspace = true
 num-bigint.workspace = true
 num-traits.workspace = true

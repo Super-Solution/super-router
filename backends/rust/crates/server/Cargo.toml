@@ -4,13 +4,19 @@ description = "HTTP API of the Super Router data plane as an axum router."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-publish.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+keywords = ["llm", "router", "axum", "http", "api"]
+categories = ["web-programming", "asynchronous"]
+exclude = ["/tests"]
 
 [dependencies]
-super-router-contracts = { path = "../contracts" }
-super-router-pricing = { path = "../pricing" }
-super-router-router = { path = "../router" }
-super-router-routing = { path = "../routing" }
+super-router-contracts.workspace = true
+super-router-pricing.workspace = true
+super-router-router.workspace = true
+super-router-routing.workspace = true
 axum = "0.8"
 tokio.workspace = true
 tokio-util.workspace = true

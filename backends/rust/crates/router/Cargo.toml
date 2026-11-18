@@ -4,12 +4,17 @@ description = "The Super Router data plane: idempotent admission, reserve, execu
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-publish.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+keywords = ["llm", "router", "metering", "billing", "ai"]
+categories = ["web-programming", "asynchronous", "artificial-intelligence"]
 
 [dependencies]
-super-router-contracts = { path = "../contracts" }
-super-router-pricing = { path = "../pricing" }
-super-router-routing = { path = "../routing" }
+super-router-contracts.workspace = true
+super-router-pricing.workspace = true
+super-router-routing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 num-bigint.workspace = true
