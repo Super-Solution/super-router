@@ -4,7 +4,13 @@ description = "Exact big-integer pricing for Super Router: Charge, Bound and Com
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-publish.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+keywords = ["pricing", "billing", "bigint", "metering", "llm"]
+categories = ["finance", "mathematics"]
+exclude = ["/tests"]
 
 [dependencies]
 serde.workspace = true

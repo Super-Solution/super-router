@@ -5,11 +5,26 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.86"
-publish = false
+rust-version = "1.89"
 license = "Apache-2.0"
+repository = "https://github.com/Super-Solution/super-router"
+homepage = "https://github.com/Super-Solution/super-router/tree/main/backends/rust"
 
 [workspace.dependencies]
+# Internal crates. `version` is what crates.io sees; `path` is what the workspace builds. All crates are released
+# together at one version, so every `version` here equals `[workspace.package] version`.
+super-router-pricing = { path = "crates/pricing", version = "0.2.0" }
+super-router-sse = { path = "crates/sse", version = "0.2.0" }
+super-router-contracts = { path = "crates/contracts", version = "0.2.0" }
+super-router-routing = { path = "crates/routing", version = "0.2.0" }
+super-router-router = { path = "crates/router", version = "0.2.0" }
+super-router-store-memory = { path = "crates/store-memory", version = "0.2.0" }
+super-router-store-postgres = { path = "crates/store-postgres", version = "0.2.0" }
+super-router-provider-openai = { path = "crates/provider-openai", version = "0.2.0" }
+super-router-provider-anthropic = { path = "crates/provider-anthropic", version = "0.2.0" }
+super-router-server = { path = "crates/server", version = "0.2.0" }
+
+# External.
 serde = { version = "1", features = ["derive"] }
 # float_roundtrip: routing scores are compared bit for bit with the TypeScript reference.
 serde_json = { version = "1", features = ["float_roundtrip"] }
