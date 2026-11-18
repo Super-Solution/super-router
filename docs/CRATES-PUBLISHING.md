@@ -78,9 +78,18 @@ by yanking: a published version stays on crates.io for ever.
    script prints, one by one (`cargo publish -p super-router-routing --locked`, and so on), or ask crates.io support
    (help@crates.io) to raise the limit before you start. Do not change any file between the first and the last
    publish.
-5. **Owners.** On crates.io each crate is owned by your account. To add a team: `cargo owner --add github:<org>:<team>
-   super-router-pricing` for each crate (the team must be visible to crates.io; the organization has to approve the
-   crates.io OAuth app).
+5. **Owners.** Make the organization the owner, not one person. Once: GitHub → organization `Super-Solution` → Teams →
+   New team `crates-publishers` (visible, members: the people who may manage crate ownership). crates.io must be allowed
+   to see the organization's teams: in your GitHub organization settings, approve the crates.io OAuth application
+   (Settings → Third-party access), and sign in to crates.io again so it reads your memberships. Then, for each of the ten
+   crates, with the token still set:
+   ```bash
+   for c in pricing sse contracts routing router store-memory store-postgres provider-openai provider-anthropic server; do
+     cargo owner --add github:Super-Solution:crates-publishers "super-router-$c"
+   done
+   ```
+   `cargo owner --list super-router-pricing` shows the result. Your own account stays an owner until you remove it
+   (`cargo owner --remove`); keep at least one person besides the team until you have seen the team work.
 6. **Trusted publishers.** For each of the ten crates: crates.io → the crate → Settings → Trusted Publishing → add a
    GitHub publisher with repository owner `Super-Solution`, repository `super-router`, workflow filename
    `crates-publish.yml`, environment `crates-io`.

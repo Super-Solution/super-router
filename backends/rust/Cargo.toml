@@ -5,7 +5,7 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.86"
+rust-version = "1.89"
 license = "Apache-2.0"
 repository = "https://github.com/Super-Solution/super-router"
 homepage = "https://github.com/Super-Solution/super-router/tree/main/backends/rust"
