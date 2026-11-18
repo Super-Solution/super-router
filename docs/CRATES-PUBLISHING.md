@@ -80,7 +80,7 @@ by yanking: a published version stays on crates.io for ever.
    publish.
 5. **Owners.** On crates.io each crate is owned by your account. To add a team: `cargo owner --add github:<org>:<team>
    super-router-pricing` for each crate (the team must be visible to crates.io; the organization has to approve the
-   crates.io OAuth app). Do this before the organization rename if the rename is still planned, see below.
+   crates.io OAuth app).
 6. **Trusted publishers.** For each of the ten crates: crates.io → the crate → Settings → Trusted Publishing → add a
    GitHub publisher with repository owner `Super-Solution`, repository `super-router`, workflow filename
    `crates-publish.yml`, environment `crates-io`.
@@ -89,10 +89,6 @@ by yanking: a published version stays on crates.io for ever.
 8. **Delete the token** on <https://crates.io/settings/tokens> and unset it in your shell. Optionally turn on
    "Trusted Publishing only" for each crate, which makes crates.io refuse token publishes altogether.
 9. **Tag.** Create the `vX.Y.Z` tag and GitHub Release for the commit you published, as for the npm packages.
-
-If the GitHub organization or repository is renamed later, the trusted publishers stop matching: edit all ten after the
-rename. The `repository` and `homepage` fields of already published versions keep the old URL (GitHub redirects it);
-the next release carries the new one.
 
 ## Releasing
 
