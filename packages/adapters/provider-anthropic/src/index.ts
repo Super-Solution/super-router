@@ -14,7 +14,80 @@ export function normalizeAnthropic(raw: Record<string, any>) {
     output: raw.output_tokens,
   });
 }
+/** The Messages API `messages` list. Plain text messages pass through unchanged. */
+export function toAnthropicMessages(messages: Invocation["input"]["messages"]) {
+  const out: { role: string; content: unknown }[] = [];
+  let results: unknown[] | undefined;
+  for (const m of messages) {
+    if (m.role === "system") continue;
+    if (m.role === "tool") {
+      const block = {
+        type: "tool_result",
+        tool_use_id: m.tool_call_id,
+        content: m.content,
+        ...(m.is_error ? { is_error: true } : {}),
+      };
+      // Results of one step travel together in a single user message.
+      if (results) results.push(block);
+      else out.push({ role: "user", content: (results = [block]) });
+      continue;
+    }
+    results = undefined;
+    if ("tool_calls" in m)
+      out.push({
+        role: "assistant",
+        content: [
+          ...(m.content ? [{ type: "text", text: m.content }] : []),
+          ...m.tool_calls.map((call) => ({
+            type: "tool_use",
+            id: call.id,
+            name: call.name,
+            input: JSON.parse(call.arguments),
+          })),
+        ],
+      });
+    else if (typeof m.content === "string") out.push(m);
+    else
+      out.push({
+        role: m.role,
+        content: m.content.map((part) => {
+          if (part.type === "text") return part;
+          const data = /^data:([^;]+);base64,(.*)$/s.exec(part.url);
+          return {
+            type: "image",
+            source: data
+              ? { type: "base64", media_type: data[1], data: data[2] }
+              : { type: "url", url: part.url },
+          };
+        }),
+      });
+  }
+  return out;
+}
+function toolFields(input: Invocation["input"]) {
+  const choice = input.tool_choice;
+  return {
+    ...(input.tools
+      ? {
+          tools: input.tools.map((tool) => ({
+            name: tool.name,
+            ...(tool.description ? { description: tool.description } : {}),
+            input_schema: tool.input_schema,
+          })),
+        }
+      : {}),
+    ...(choice === undefined
+      ? {}
+      : {
+          tool_choice:
+            typeof choice === "object"
+              ? { type: "tool", name: choice.name }
+              : { type: choice === "required" ? "any" : choice },
+        }),
+  };
+}
 export class AnthropicProvider implements Provider {
+  capabilities = { tools: true, images: true };
   constructor(
     private key: () => string,
     private transport: typeof fetch = fetch,
@@ -24,7 +97,7 @@ export class AnthropicProvider implements Provider {
       throw new ProviderError(true, false, "unsupported_task");
     const key = this.key();
     if (!key) throw new ProviderError(true, false, "credentials_missing");
-    const messages = input.input.messages.filter((m) => m.role !== "system");
+    const messages = toAnthropicMessages(input.input.messages);
     if (!messages.length)
       throw new ProviderError(true, false, "messages_required");
     let response: Response;
@@ -46,6 +119,7 @@ export class AnthropicProvider implements Provider {
             .map((m) => m.content)
             .join("\n"),
           messages,
+          ...toolFields(input.input),
           stream: true,
         }),
       });
@@ -65,6 +139,11 @@ export class AnthropicProvider implements Provider {
       id: string | undefined,
       terminal = false,
       completion: "succeeded" | "partial" = "succeeded";
+    // Upstream numbers every content block; tool calls are numbered from zero among themselves.
+    const calls = new Map<
+      number,
+      { index: number; streamed: boolean; input: unknown }
+    >();
     for await (const frame of parseSSE(response.body)) {
       let e: any;
       try {
@@ -78,6 +157,53 @@ export class AnthropicProvider implements Provider {
       }
       if (e.type === "content_block_delta" && e.delta?.type === "text_delta")
         yield { type: "delta" as const, text: String(e.delta.text) };
+      if (
+        e.type === "content_block_start" &&
+        e.content_block?.type === "tool_use"
+      ) {
+        const index = calls.size;
+        calls.set(e.index, {
+          index,
+          streamed: false,
+          input: e.content_block.input,
+        });
+        yield {
+          type: "tool_call" as const,
+          index,
+          id: String(e.content_block.id),
+          name: String(e.content_block.name),
+          arguments_delta: "",
+        };
+      }
+      if (
+        e.type === "content_block_delta" &&
+        e.delta?.type === "input_json_delta"
+      ) {
+        const call = calls.get(e.index);
+        if (!call)
+          throw new ProviderError(false, false, "invalid_upstream_event");
+        call.streamed = true;
+        yield {
+          type: "tool_call" as const,
+          index: call.index,
+          arguments_delta: String(e.delta.partial_json),
+        };
+      }
+      if (e.type === "content_block_stop") {
+        const call = calls.get(e.index);
+        // A block may carry its whole input at the start and stream nothing.
+        if (
+          call &&
+          !call.streamed &&
+          call.input &&
+          Object.keys(call.input).length
+        )
+          yield {
+            type: "tool_call" as const,
+            index: call.index,
+            arguments_delta: JSON.stringify(call.input),
+          };
+      }
       if (e.type === "message_delta" && usage) {
         usage = { ...usage, ...e.usage };
         if (e.delta?.stop_reason === "max_tokens") completion = "partial";

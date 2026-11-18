@@ -48,6 +48,99 @@ export const Price = z
   })
   .strict();
 export type Price = z.infer<typeof Price>;
+const jsonDepth = (value: unknown, limit: number): boolean => {
+  if (limit < 0) return false;
+  if (Array.isArray(value)) return value.every((v) => jsonDepth(v, limit - 1));
+  if (value && typeof value === "object")
+    return Object.values(value).every((v) => jsonDepth(v, limit - 1));
+  return true;
+};
+const isJsonObject = (text: string): boolean => {
+  try {
+    const value: unknown = JSON.parse(text);
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  } catch {
+    return false;
+  }
+};
+const toolName = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
+const toolCallId = z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/);
+export const ToolCall = z
+  .object({
+    id: toolCallId,
+    name: toolName,
+    arguments: z.string().max(256000).refine(isJsonObject),
+  })
+  .strict();
+export type ToolCall = z.infer<typeof ToolCall>;
+export const Tool = z
+  .object({
+    name: toolName,
+    description: z.string().min(1).max(4096).optional(),
+    input_schema: z
+      .record(z.string(), z.unknown())
+      .refine((s) => s.type === "object" && jsonDepth(s, 32)),
+  })
+  .strict();
+export type Tool = z.infer<typeof Tool>;
+export const ToolChoice = z.union([
+  z.enum(["auto", "none", "required"]),
+  z.object({ name: toolName }).strict(),
+]);
+export type ToolChoice = z.infer<typeof ToolChoice>;
+const imageUrl = z
+  .string()
+  .max(3_000_000)
+  .refine(
+    (url) =>
+      /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(
+        url,
+      ) ||
+      (url.length <= 4096 && /^https:\/\/[^\s]+$/.test(url)),
+  );
+export const ContentPart = z.union([
+  z
+    .object({ type: z.literal("text"), text: z.string().min(1).max(32000) })
+    .strict(),
+  z
+    .object({
+      type: z.literal("image"),
+      url: imageUrl,
+      detail: z.enum(["auto", "low", "high"]).optional(),
+    })
+    .strict(),
+]);
+export type ContentPart = z.infer<typeof ContentPart>;
+export const InputMessage = z.union([
+  z
+    .object({
+      role: z.enum(["system", "user", "assistant"]),
+      content: z.string().min(1).max(32000),
+    })
+    .strict(),
+  z
+    .object({
+      role: z.literal("user"),
+      content: z.array(ContentPart).min(1).max(32),
+    })
+    .strict(),
+  z
+    .object({
+      role: z.literal("assistant"),
+      content: z.string().min(1).max(32000).optional(),
+      tool_calls: z.array(ToolCall).min(1).max(64),
+    })
+    .strict(),
+  z
+    .object({
+      role: z.literal("tool"),
+      tool_call_id: toolCallId,
+      content: z.string().max(256000),
+      is_error: z.boolean().optional(),
+    })
+    .strict(),
+]);
+export type InputMessage = z.infer<typeof InputMessage>;
 export const Invocation = z
   .object({
     service: id,
@@ -56,17 +149,10 @@ export const Invocation = z
     payer_mode: z.literal("developer").default("developer"),
     input: z
       .object({
-        messages: z
-          .array(
-            z
-              .object({
-                role: z.enum(["system", "user", "assistant"]),
-                content: z.string().min(1).max(32000),
-              })
-              .strict(),
-          )
-          .max(100)
-          .default([]),
+        messages: z.array(InputMessage).max(100).default([]),
+        // No defaults here: a request without tools must keep its exact canonical form and idempotency digest.
+        tools: z.array(Tool).min(1).max(64).optional(),
+        tool_choice: ToolChoice.optional(),
         task: z
           .object({ kind: TaskKind, prompt: z.string().min(1).max(32000) })
           .strict()
@@ -86,8 +172,52 @@ export const Invocation = z
       .strict(),
     stream: z.boolean().default(false),
   })
-  .strict();
+  .strict()
+  .superRefine((value, c) => {
+    const { messages, tools, tool_choice: choice, task } = value.input;
+    const issue = (message: string) => c.addIssue({ code: "custom", message });
+    const names = new Set(tools?.map((t) => t.name));
+    if (tools && names.size !== tools.length) issue("duplicate tool name");
+    if (task && (tools || choice)) issue("a task cannot declare tools");
+    if (choice !== undefined && !tools) issue("tool_choice requires tools");
+    if (typeof choice === "object" && !names.has(choice.name))
+      issue("tool_choice names an undeclared tool");
+    // Every result answers an earlier call, and no call is left unanswered: upstreams refuse both.
+    const seen = new Set<string>();
+    const open = new Set<string>();
+    for (const m of messages) {
+      if (m.role === "tool") {
+        if (!open.delete(m.tool_call_id)) issue("unmatched tool result");
+        continue;
+      }
+      if (open.size) issue("unanswered tool call");
+      open.clear();
+      if (m.role === "assistant" && "tool_calls" in m)
+        for (const call of m.tool_calls) {
+          if (seen.has(call.id)) issue("duplicate tool call id");
+          seen.add(call.id);
+          open.add(call.id);
+        }
+    }
+    if (open.size) issue("unanswered tool call");
+  });
 export type Invocation = z.infer<typeof Invocation>;
+/** What a request needs from a provider beyond plain text. */
+export function invocationNeeds(input: Invocation): {
+  tools: boolean;
+  images: boolean;
+} {
+  const messages = input.input.messages;
+  return {
+    tools:
+      input.input.tools !== undefined ||
+      messages.some((m) => m.role === "tool" || "tool_calls" in m),
+    images: messages.some(
+      (m) =>
+        Array.isArray(m.content) && m.content.some((p) => p.type === "image"),
+    ),
+  };
+}
 export const Offering = z
   .object({
     id,
@@ -165,9 +295,23 @@ export interface Principal {
 }
 export type ProviderEvent =
   | { type: "delta"; text: string }
+  /** Part of a tool call. `id` and `name` are required on the first event of each `index`. */
+  | {
+      type: "tool_call";
+      index: number;
+      id?: string;
+      name?: string;
+      arguments_delta: string;
+    }
   | { type: "usage"; usage: Usage; upstream_id?: string }
   | { type: "done"; completion?: "succeeded" | "partial" };
+/** What a provider can carry besides text. Absent means text only, so such a request is refused before any charge. */
+export interface ProviderCapabilities {
+  tools?: boolean;
+  images?: boolean;
+}
 export interface Provider {
+  capabilities?: ProviderCapabilities;
   invoke(
     input: Invocation,
     offering: Offering,

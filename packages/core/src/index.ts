@@ -5,6 +5,7 @@ import {
   Service,
   RouterError,
   ProviderError,
+  invocationNeeds,
   type Principal,
   type Provider,
   type Offering,
@@ -329,8 +330,22 @@ export class Router {
       throw new RouterError("no_eligible_offering", 422);
     if (decision.candidates.some((c) => !this.providerFor(c.offering.provider)))
       throw new RouterError("provider_unavailable", 503);
+    // Refused here, before anything is reserved: a provider that cannot carry tools or images would drop them.
+    const needs = invocationNeeds(input);
+    const candidates = decision.candidates.filter((c) => {
+      const can = this.providerFor(c.offering.provider)?.capabilities;
+      const ok = (!needs.tools || can?.tools) && (!needs.images || can?.images);
+      if (!ok)
+        decision.excluded.push({
+          id: c.offering.id,
+          reason: "capability_unsupported",
+        });
+      return ok;
+    });
+    if (!candidates.length)
+      throw new RouterError("unsupported_capability", 422);
     const maxInput = Math.max(
-      ...decision.candidates.map((c) => c.offering.max_input_tokens),
+      ...candidates.map((c) => c.offering.max_input_tokens),
     );
     const legs = await this.store.accounts(principal, service);
     for (const leg of legs) {
@@ -352,7 +367,7 @@ export class Router {
       new Date(this.clock() + input.limits.timeout_ms).toISOString(),
       {
         excluded: decision.excluded,
-        candidates: decision.candidates.map((c) => ({
+        candidates: candidates.map((c) => ({
           id: c.offering.id,
           score: c.score,
           cost: c.cost.toString(),
@@ -373,7 +388,12 @@ export class Router {
       finalUsage: Usage | null = null,
       execution = "failed",
       pending = false,
-      lastModel: string | undefined;
+      lastModel: string | undefined,
+      toolBytes = 0;
+    const toolCalls = new Map<
+      number,
+      { id: string; name: string; arguments: string }
+    >();
     const send = async (type: string, data: Record<string, unknown> = {}) => {
       await emit?.({ type, request_id: request.id, sequence: ++seq, ...data });
     };
@@ -399,10 +419,7 @@ export class Router {
     poll.unref();
     try {
       await send("request.started", { service_version: service.version });
-      for (const candidate of decision.candidates.slice(
-        0,
-        service.max_attempts,
-      )) {
+      for (const candidate of candidates.slice(0, service.max_attempts)) {
         if (controller.signal.aborted) {
           execution = "cancelled";
           break;
@@ -449,6 +466,35 @@ export class Router {
               if (Buffer.byteLength(text) > 1_000_000)
                 throw new ProviderError(false, false, "output_too_large");
               await send("output.delta", { text: event.text });
+            } else if (event.type === "tool_call") {
+              const known = toolCalls.get(event.index);
+              if (
+                !input.input.tools ||
+                !Number.isSafeInteger(event.index) ||
+                event.index < 0 ||
+                (!known && (toolCalls.size >= 64 || !event.id || !event.name))
+              )
+                throw new ProviderError(false, false, "invalid_tool_call");
+              // A tool call is output: after this point a failure is partial and never falls back to another offering.
+              if (!started) {
+                await this.store.output(principal, request.id);
+                started = true;
+              }
+              toolBytes += Buffer.byteLength(event.arguments_delta);
+              if (Buffer.byteLength(text) + toolBytes > 1_000_000)
+                throw new ProviderError(false, false, "output_too_large");
+              if (known) known.arguments += event.arguments_delta;
+              else
+                toolCalls.set(event.index, {
+                  id: event.id!,
+                  name: event.name!,
+                  arguments: event.arguments_delta,
+                });
+              await send("output.tool_call.delta", {
+                index: event.index,
+                ...(known ? {} : { id: event.id, name: event.name }),
+                arguments_delta: event.arguments_delta,
+              });
             } else if (event.type === "usage") {
               const parsedUsage = Meters.safeParse(event.usage);
               if (!parsedUsage.success)
@@ -526,9 +572,41 @@ export class Router {
         pending,
       );
       const settled = await this.store.get(principal, request.id);
+      // Only a finished response has whole tool calls; a cut-off one must never look callable.
+      const completedCalls =
+        execution === "succeeded"
+          ? [...toolCalls.entries()]
+              .sort(([a], [b]) => a - b)
+              .map(([index, call]) => ({
+                index,
+                id: call.id,
+                name: call.name,
+                arguments: call.arguments.trim() || "{}",
+              }))
+          : [];
+      for (const call of completedCalls)
+        await send("output.tool_call.completed", call);
+      const finishReason =
+        execution === "partial" && finalUsage
+          ? "length"
+          : execution !== "succeeded"
+            ? undefined
+            : completedCalls.length
+              ? "tool_calls"
+              : "stop";
+      const usageReport = finalUsage
+        ? { status: "confirmed", meters: finalUsage }
+        : {
+            status: settled.billing === "released" ? "not_billable" : "pending",
+          };
       await send(
         execution === "succeeded" ? "request.completed" : "request.failed",
-        { execution_status: execution, billing_status: settled.billing },
+        {
+          execution_status: execution,
+          billing_status: settled.billing,
+          ...(finishReason ? { finish_reason: finishReason } : {}),
+          usage: usageReport,
+        },
       );
       return {
         id: request.id,
@@ -537,13 +615,17 @@ export class Router {
         service_version: service.version,
         model: lastModel,
         tier: service.tier,
-        output: { role: "assistant", content: text },
-        usage: finalUsage
-          ? { status: "confirmed", meters: finalUsage }
-          : {
-              status:
-                settled.billing === "released" ? "not_billable" : "pending",
-            },
+        output: {
+          role: "assistant",
+          content: text,
+          ...(completedCalls.length
+            ? {
+                tool_calls: completedCalls.map(({ index: _, ...call }) => call),
+              }
+            : {}),
+        },
+        finish_reason: finishReason,
+        usage: usageReport,
         billing: {
           charges:
             finalUsage && settled.billing === "settled"
@@ -624,6 +706,61 @@ export class MockProvider implements Provider {
       },
       upstream_id: randomUUID(),
     };
+    yield { type: "done" as const };
+  }
+}
+
+/**
+ * A scripted model for demos and tests that calls tools without a network. It calls the tool named by `tool_choice`
+ * (or the first declared tool) with `args`, and answers in text once the last message is a tool result.
+ */
+export class MockToolProvider implements Provider {
+  capabilities = { tools: true, images: true };
+  calls = 0;
+  constructor(
+    private args: Record<string, unknown> = {},
+    private behavior: "success" | "truncated" | "reject" = "success",
+  ) {}
+  async *invoke(input: Invocation, _offering: Offering, signal: AbortSignal) {
+    this.calls++;
+    if (this.behavior === "reject")
+      throw new ProviderError(true, true, "rate_limited");
+    if (signal.aborted) throw new ProviderError(false, false);
+    const { messages, tools, tool_choice: choice } = input.input;
+    const usage = { input: 10, cached: 0, cache_write: 0, output: 5 };
+    const last = messages[messages.length - 1];
+    if (!tools || choice === "none" || last?.role === "tool") {
+      yield {
+        type: "delta" as const,
+        text:
+          last?.role === "tool"
+            ? "The tool finished."
+            : "Hello from SuperRouter.",
+      };
+    } else {
+      const name = typeof choice === "object" ? choice.name : tools[0]!.name;
+      const json = JSON.stringify(this.args);
+      const middle = Math.ceil(json.length / 2);
+      const id = "call_" + randomUUID().replaceAll("-", "");
+      yield {
+        type: "tool_call" as const,
+        index: 0,
+        id,
+        name,
+        arguments_delta: json.slice(0, middle),
+      };
+      if (this.behavior === "truncated") {
+        yield { type: "usage" as const, usage, upstream_id: randomUUID() };
+        yield { type: "done" as const, completion: "partial" as const };
+        return;
+      }
+      yield {
+        type: "tool_call" as const,
+        index: 0,
+        arguments_delta: json.slice(middle),
+      };
+    }
+    yield { type: "usage" as const, usage, upstream_id: randomUUID() };
     yield { type: "done" as const };
   }
 }

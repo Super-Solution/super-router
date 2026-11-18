@@ -13,14 +13,19 @@ import {
 import type { ControlPlane } from "@supersolutions/super-router-storage-postgres";
 
 const MAX_BODY_BYTES = 256_000;
+/** Inference bodies carry tool schemas, tool results and images. Only read after the caller has authenticated. */
+const MAX_INFERENCE_BODY_BYTES = 4_000_000;
 /**
  * Read a request body of at most MAX_BODY_BYTES. The declared length is checked first, and the stream is read
  * chunk by chunk and cancelled the moment it passes the limit, so a chunked body with no Content-Length cannot make
  * the process buffer more than the limit (this runs before authentication on payment notifications).
  */
-async function rawBody(request: Request): Promise<Buffer> {
+async function rawBody(
+  request: Request,
+  limit = MAX_BODY_BYTES,
+): Promise<Buffer> {
   const declared = Number(request.headers.get("content-length") ?? 0);
-  if (declared > MAX_BODY_BYTES) throw new RouterError("body_too_large", 413);
+  if (declared > limit) throw new RouterError("body_too_large", 413);
   if (!request.body) return Buffer.alloc(0);
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -29,7 +34,7 @@ async function rawBody(request: Request): Promise<Buffer> {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.length;
-    if (total > MAX_BODY_BYTES) {
+    if (total > limit) {
       await reader.cancel().catch(() => undefined);
       throw new RouterError("body_too_large", 413);
     }
@@ -37,9 +42,9 @@ async function rawBody(request: Request): Promise<Buffer> {
   }
   return Buffer.concat(chunks);
 }
-async function body(request: Request): Promise<any> {
+async function body(request: Request, limit?: number): Promise<any> {
   try {
-    return JSON.parse((await rawBody(request)).toString());
+    return JSON.parse((await rawBody(request, limit)).toString());
   } catch (e) {
     if (e instanceof RouterError) throw e;
     throw new RouterError("invalid_json");
@@ -399,7 +404,9 @@ export function createRouterHandler(
         });
       }
       if (req.method === "POST" && path === "/v1/inferences") {
-        const input = Invocation.parse(await body(req));
+        const input = Invocation.parse(
+          await body(req, MAX_INFERENCE_BODY_BYTES),
+        );
         return await infer(router, principal, input, key, req.signal);
       }
       const match = /^\/v1\/requests\/([^/]+)(\/cancel)?$/.exec(path);
@@ -469,7 +476,9 @@ export function createRouterHandler(
       if (req.method === "POST" && path === "/v1/admin/routing/dry-run") {
         if (!principal.scopes.includes("routing:write"))
           throw new RouterError("scope_denied", 403);
-        const input = Invocation.parse(await body(req));
+        const input = Invocation.parse(
+          await body(req, MAX_INFERENCE_BODY_BYTES),
+        );
         const s = await store.getService(
           principal,
           input.service,
