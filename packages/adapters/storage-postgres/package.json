@@ -1,6 +1,6 @@
 {
   "name": "@supersolutions/super-router-storage-postgres",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -19,10 +19,10 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@supersolutions/super-router-contracts": "0.2.0",
+    "@supersolutions/super-router-contracts": "0.3.0",
     "pg": "8.23.1",
-    "@supersolutions/super-router-core": "0.2.0",
-    "@supersolutions/super-router-payments": "0.2.0"
+    "@supersolutions/super-router-core": "0.3.0",
+    "@supersolutions/super-router-payments": "0.3.0"
   },
   "author": "SUPER SOLUTION LABS INC",
   "repository": {

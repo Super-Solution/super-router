@@ -4,7 +4,7 @@
 
 以套件形式整合的 AI routing、計價與 serving 基礎設施。你定義 **Service**（要販售的 AI 能力）、選擇背後的模型、設定售價、訂閱與額度，由 SuperRouter 負責選路、計量與結算。
 
-> **狀態：開發版（0.2.0）。** 本地核心可完整執行：Service 版本、模型選路、PostgreSQL 預留／結算、HTTP + SSE、SDK、恢復 worker、多租戶角色與 keys、訂閱與 scoped credits。OpenAI 與 Anthropic adapters 已用官方格式 fixtures 測試，尚未完成真實上游驗收；三家金流 adapters 也尚未用真實商戶帳號跑過。目前沒有託管 Cloud，也沒有 production readiness 宣稱。
+> **狀態：開發版（0.3.0）。** 本地核心可完整執行：Service 版本、模型選路、PostgreSQL 預留／結算、HTTP + SSE、SDK、恢復 worker、多租戶角色與 keys、訂閱與 scoped credits。OpenAI 與 Anthropic adapters 已用官方格式 fixtures 測試，尚未完成真實上游驗收；三家金流 adapters 也尚未用真實商戶帳號跑過。目前沒有託管 Cloud，也沒有 production readiness 宣稱。
 
 ## 功能
 

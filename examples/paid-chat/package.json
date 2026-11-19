@@ -1,6 +1,6 @@
 {
   "name": "@supersolutions/super-router-paid-chat",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,8 +11,8 @@
     "@supersolutions/super-chat-core": "0.1.0",
     "@supersolutions/super-chat-react": "0.1.0",
     "@supersolutions/super-chat-ui": "0.1.0",
-    "@supersolutions/super-router-billing-presets": "0.2.0",
-    "@supersolutions/super-router-ui": "0.2.0",
+    "@supersolutions/super-router-billing-presets": "0.3.0",
+    "@supersolutions/super-router-ui": "0.3.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
