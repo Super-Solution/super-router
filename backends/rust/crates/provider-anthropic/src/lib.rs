@@ -2,17 +2,21 @@
 //! classifies failures like the OpenAI provider: redirects are never followed, keys never appear in errors, and
 //! a completed message whose usage is missing or malformed is refused rather than billed as free.
 
+mod tools;
+
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_stream::try_stream;
 use futures_util::StreamExt;
-use reqwest::header::{HeaderName, HeaderValue};
+use reqwest::header::{HeaderName, HeaderValue, CONTENT_TYPE};
 use reqwest::{redirect, Client, ClientBuilder};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::value::RawValue;
 use serde_json::{json, Map, Value};
-use super_router_contracts::{Invocation, Meters, Offering, Provider, ProviderError, ProviderEvent, ProviderStream};
+use super_router_contracts::{Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream};
 
 const DEFAULT_BASE: &str = "https://api.anthropic.com";
 const API_VERSION: &str = "2023-06-01";
@@ -122,6 +126,28 @@ struct Delta {
     text: String,
     #[serde(default, deserialize_with = "lenient")]
     stop_reason: String,
+    #[serde(default)]
+    partial_json: Option<Value>,
+}
+
+#[derive(Deserialize, Default)]
+struct Block {
+    #[serde(default, rename = "type")]
+    kind: Option<Value>,
+    #[serde(default)]
+    id: Option<Value>,
+    #[serde(default)]
+    name: Option<Value>,
+    #[serde(default)]
+    input: Option<Box<RawValue>>,
+}
+
+/// One tool call of the message: its number among the calls, whether its input was streamed, and the input its
+/// block started with.
+struct Call {
+    index: usize,
+    streamed: bool,
+    input: Option<Box<RawValue>>,
 }
 
 #[derive(Deserialize, Default)]
@@ -134,15 +160,20 @@ struct Event {
     delta: Option<Delta>,
     #[serde(default)]
     usage: Option<Map<String, Value>>,
+    #[serde(default)]
+    index: Option<Value>,
+    #[serde(default)]
+    content_block: Option<Block>,
 }
 
+/// Read straight from the text, so a tool call's input keeps its own key order.
 fn parse_event(data: &str) -> Result<Event, ProviderError> {
     let invalid = || perr(false, false, "invalid_upstream_event");
-    let value: Value = serde_json::from_str(data).map_err(|_| invalid())?;
-    if !value.is_object() {
+    let raw: &RawValue = serde_json::from_str(data).map_err(|_| invalid())?;
+    if !raw.get().starts_with('{') {
         return Err(invalid());
     }
-    serde_json::from_value(value).map_err(|_| invalid())
+    serde_json::from_str(raw.get()).map_err(|_| invalid())
 }
 
 impl Usage {
@@ -187,20 +218,27 @@ fn classify_status(status: u16) -> ProviderError {
     }
 }
 
+/// A request body: the plain fields, then the messages.
+#[derive(Serialize)]
+struct Body<'a> {
+    #[serde(flatten)]
+    fields: Map<String, Value>,
+    messages: &'a [tools::Turn],
+}
+
 impl Provider for Anthropic {
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities { tools: true, images: true }
+    }
+
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream {
         let this = self.clone();
         let is_task = input.input.task.is_some();
-        let mut system: Vec<&str> = Vec::new();
-        let mut turns = Vec::new();
-        for m in &input.input.messages {
-            if m.role == "system" {
-                system.push(&m.content);
-            } else {
-                turns.push(json!({"role": m.role, "content": m.content}));
-            }
-        }
+        let system: Vec<&str> = input.input.messages.iter().filter(|m| m.role == "system").map(|m| m.content.as_str()).collect();
         let system = system.join("\n");
+        let turns = tools::messages(&input.input.messages);
+        let mut fields = Map::new();
+        tools::tool_fields(&mut fields, &input.input);
         let max_tokens = input.limits.max_output_tokens;
         let timeout = u64::try_from(input.limits.timeout_ms).ok().filter(|ms| *ms > 0).map(Duration::from_millis);
         let model = offering.upstream_model.clone();
@@ -212,22 +250,29 @@ impl Provider for Anthropic {
             if key.is_empty() {
                 Err(perr(true, false, "credentials_missing"))?;
             }
+            // Tool-call arguments that are not JSON, from a hand-built invocation, never leave the process.
+            let turns = turns.map_err(|_| perr(true, false, "request_invalid"))?;
             if turns.is_empty() {
                 Err(perr(true, false, "messages_required"))?;
             }
             // A key that cannot be a header value never leaves the process, so nothing was dispatched.
             let mut api_key = HeaderValue::from_str(&key).map_err(|_| perr(true, false, "request_invalid"))?;
             api_key.set_sensitive(true);
-            let mut body = json!({"model": model, "max_tokens": max_tokens, "messages": turns, "stream": true});
+            fields.insert("model".into(), json!(model));
+            fields.insert("max_tokens".into(), json!(max_tokens));
+            fields.insert("stream".into(), json!(true));
+            // Omitted rather than sent empty when there is no system message.
             if !system.is_empty() {
-                body["system"] = Value::String(system);
+                fields.insert("system".into(), Value::String(system));
             }
+            let body = serde_json::to_vec(&Body { fields, messages: &turns }).map_err(|_| perr(true, false, "request_invalid"))?;
             let mut request = this
                 .client
                 .post(format!("{}/v1/messages", this.base))
                 .header(HeaderName::from_static("x-api-key"), api_key)
                 .header("anthropic-version", API_VERSION)
-                .json(&body);
+                .header(CONTENT_TYPE, "application/json")
+                .body(body);
             if let Some(timeout) = timeout {
                 request = request.timeout(timeout);
             }
@@ -241,6 +286,9 @@ impl Provider for Anthropic {
             let mut id = String::new();
             let mut completion = "succeeded";
             let mut terminal = false;
+            // Upstream numbers every content block; tool calls are numbered from zero among themselves.
+            let mut calls: HashMap<i64, Call> = HashMap::new();
+            let bad = || perr(false, false, "invalid_upstream_event");
             while let Some(item) = frames.next().await {
                 let frame = item.map_err(|e| match e {
                     super_router_sse::Error::FrameTooLarge => perr(false, false, "stream_frame_too_large"),
@@ -253,11 +301,41 @@ impl Provider for Anthropic {
                         current = message.usage;
                         id = message.id;
                     }
-                    "content_block_delta" => {
-                        if let Some(delta) = event.delta.filter(|d| d.kind == "text_delta") {
-                            yield ProviderEvent::Delta { text: delta.text };
+                    "content_block_start" => {
+                        let block = event.content_block.unwrap_or_default();
+                        if block.kind.as_ref().and_then(Value::as_str) == Some("tool_use") {
+                            // A call without its id, name or position cannot be answered later: refuse it rather
+                            // than invent one.
+                            let id = tools::text(block.id.as_ref()).ok_or_else(bad)?;
+                            let name = tools::text(block.name.as_ref()).ok_or_else(bad)?;
+                            let position = tools::safe_index(event.index.as_ref()).ok_or_else(bad)?;
+                            if calls.contains_key(&position) {
+                                Err(bad())?;
+                            }
+                            let index = calls.len();
+                            calls.insert(position, Call { index, streamed: false, input: block.input });
+                            yield ProviderEvent::ToolCall { index, id: Some(id), name: Some(name), arguments_delta: String::new() };
                         }
                     }
+                    "content_block_stop" => {
+                        // A block may carry its whole input at the start and stream nothing.
+                        let call = tools::safe_index(event.index.as_ref()).and_then(|p| calls.get(&p)).filter(|c| !c.streamed);
+                        if let Some(call) = call {
+                            if let Some(arguments) = tools::whole_input(call.input.as_deref()) {
+                                yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, arguments_delta: arguments };
+                            }
+                        }
+                    }
+                    "content_block_delta" => match event.delta {
+                        Some(delta) if delta.kind == "text_delta" => yield ProviderEvent::Delta { text: delta.text },
+                        Some(delta) if delta.kind == "input_json_delta" => {
+                            let call = tools::safe_index(event.index.as_ref()).and_then(|p| calls.get_mut(&p)).ok_or_else(bad)?;
+                            let partial = tools::text(delta.partial_json.as_ref()).ok_or_else(bad)?;
+                            call.streamed = true;
+                            yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, arguments_delta: partial };
+                        }
+                        _ => {}
+                    },
                     "message_delta" => {
                         if let Some(usage) = current.as_mut() {
                             if let Some(fields) = &event.usage {

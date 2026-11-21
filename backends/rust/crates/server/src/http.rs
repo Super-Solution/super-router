@@ -9,8 +9,6 @@ use serde_json::{Map, Value};
 use super_router_contracts::{RouterError, StreamEvent};
 use super_router_router::{InferError, StoreError};
 
-use crate::MAX_BODY_BYTES;
-
 /// A failure on its way to the client: the error, the request it belongs to once one exists, and for internal
 /// failures the text that is logged but never sent.
 #[derive(Debug)]
@@ -109,19 +107,19 @@ fn declared_length(headers: &HeaderMap, body: &Body) -> Option<u64> {
     header.or_else(|| HttpBody::size_hint(body).exact())
 }
 
-/// Reads a JSON body of at most [`MAX_BODY_BYTES`]. A declared length over the limit is refused without reading;
+/// Reads a JSON body of at most `limit` bytes. A declared length over the limit is refused without reading;
 /// otherwise the body is read frame by frame and abandoned the moment it passes the limit, so a chunked body of
 /// unknown length can never make the process buffer more than the limit.
-pub(crate) async fn read_body(headers: &HeaderMap, mut body: Body) -> Result<Bytes, ApiError> {
+pub(crate) async fn read_body(headers: &HeaderMap, mut body: Body, limit: usize) -> Result<Bytes, ApiError> {
     let too_large = || ApiError::new("body_too_large", 413);
-    if declared_length(headers, &body).is_some_and(|n| n > MAX_BODY_BYTES as u64) {
+    if declared_length(headers, &body).is_some_and(|n| n > limit as u64) {
         return Err(too_large());
     }
     let mut raw: Vec<u8> = Vec::new();
     while let Some(frame) = body.frame().await {
         let frame = frame.map_err(|_| ApiError::new("invalid_json", 400))?;
         if let Ok(data) = frame.into_data() {
-            if raw.len() + data.len() > MAX_BODY_BYTES {
+            if raw.len() + data.len() > limit {
                 return Err(too_large());
             }
             raw.extend_from_slice(&data);

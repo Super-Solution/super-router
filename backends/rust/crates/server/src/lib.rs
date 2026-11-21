@@ -35,8 +35,11 @@ pub use auth::{Key, StaticKeys};
 use crate::http::{decode_path, error_response, event_frame, json, number, read_body, sse_frame, ApiError};
 use crate::time::parse_rfc3339_millis;
 
-/// The most one request body may hold.
+/// The most one request body may hold, except on the inference routes.
 pub const MAX_BODY_BYTES: usize = 256_000;
+/// The most an invocation body may hold (`POST /v1/inferences` and the routing dry run): a tool-calling
+/// conversation carries tool results of up to 256,000 characters each. It is read only after authentication.
+pub const MAX_INFERENCE_BODY_BYTES: usize = 4_000_000;
 
 /// Reports the session and weekly usage windows of a principal for `GET /v1/windows`. Stores that track them
 /// implement it; without one the endpoint answers `resource_not_found`.
@@ -136,7 +139,7 @@ impl Shared {
             return Ok(json(StatusCode::OK, &json!({ "data": data, "next_cursor": null })));
         }
         if *method == Method::POST && path == "/v1/inferences" {
-            let raw = read_body(&parts.headers, body).await?;
+            let raw = read_body(&parts.headers, body, MAX_INFERENCE_BODY_BYTES).await?;
             return self.infer(p, raw, key).await;
         }
         if segments.len() >= 3 && segments[0] == "v1" && segments[1] == "requests" && segments.len() <= 4 {
@@ -178,22 +181,22 @@ impl Shared {
             && segments[2] == "services"
             && segments[4] == "credit-rates"
         {
-            let raw = read_body(&parts.headers, body).await?;
+            let raw = read_body(&parts.headers, body, MAX_BODY_BYTES).await?;
             return self.credit_rates(&p, segments[3], &raw).await;
         }
         if *method == Method::POST && path == "/v1/admin/credits/grants" {
-            let raw = read_body(&parts.headers, body).await?;
+            let raw = read_body(&parts.headers, body, MAX_BODY_BYTES).await?;
             return self.grant(&p, &raw, &key).await;
         }
         if *method == Method::POST && path == "/v1/admin/service-versions" {
-            let raw = read_body(&parts.headers, body).await?;
+            let raw = read_body(&parts.headers, body, MAX_BODY_BYTES).await?;
             let service = parse_service(&raw)?;
             let published = self.store.publish(&p, &service, &self.mode, None).await?;
             return Ok(json(StatusCode::CREATED, &serde_json::to_value(&published).unwrap_or(Value::Null)));
         }
         if *method == Method::POST && path == "/v1/admin/routing/dry-run" {
             require(&p, "routing:write")?;
-            let raw = read_body(&parts.headers, body).await?;
+            let raw = read_body(&parts.headers, body, MAX_INFERENCE_BODY_BYTES).await?;
             let input = parse_invocation(&raw)?;
             let service = self.store.get_service(&p, &input.service, input.service_version).await?;
             let (candidates, excluded) = super_router_routing::route(&service, &input)?;

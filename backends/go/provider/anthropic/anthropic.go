@@ -26,7 +26,12 @@ type Provider struct {
 	base   string
 }
 
-var _ contracts.Provider = (*Provider)(nil)
+var _ contracts.CapableProvider = (*Provider)(nil)
+
+// Capabilities implements contracts.CapableProvider: tool calling and image input.
+func (p *Provider) Capabilities() contracts.ProviderCapabilities {
+	return contracts.ProviderCapabilities{Tools: true, Images: true}
+}
 
 // Option configures New.
 type Option func(*Provider)
@@ -84,21 +89,25 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 		return perr(true, false, "credentials_missing")
 	}
 	var system []string
-	messages := []contracts.Message{}
 	for _, m := range in.Input.Messages {
 		if m.Role == "system" {
 			system = append(system, m.Content)
-		} else {
-			messages = append(messages, m)
 		}
 	}
+	messages := Messages(in.Input.Messages)
 	if len(messages) == 0 {
 		return perr(true, false, "messages_required")
 	}
-	body, _ := json.Marshal(map[string]any{
-		"model": offering.UpstreamModel, "max_tokens": in.Limits.MaxOutputTokens, "system": strings.Join(system, "\n"),
-		"messages": messages, "stream": true,
-	})
+	fields := map[string]any{"model": offering.UpstreamModel, "max_tokens": in.Limits.MaxOutputTokens, "messages": messages, "stream": true}
+	// Omitted rather than sent empty when there is no system message.
+	if joined := strings.Join(system, "\n"); joined != "" {
+		fields["system"] = joined
+	}
+	toolFields(fields, in.Input)
+	body, err := json.Marshal(fields)
+	if err != nil {
+		return perr(true, false, "request_invalid") // tool-call arguments that are not JSON, from a hand-built invocation
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.base+"/v1/messages", bytes.NewReader(body))
 	if err != nil {
 		return perr(true, false, "request_invalid")
@@ -126,6 +135,13 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 		terminal   bool
 		completion = "succeeded"
 	)
+	// Upstream numbers every content block; tool calls are numbered from zero among themselves.
+	type call struct {
+		index    int
+		streamed bool
+		input    json.RawMessage
+	}
+	calls := map[int]*call{}
 	err = sse.Read(res.Body, func(f sse.Frame) error {
 		var e struct {
 			Type    string `json:"type"`
@@ -133,22 +149,63 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 				ID    string `json:"id"`
 				Usage *usage `json:"usage"`
 			} `json:"message"`
+			Index        json.RawMessage `json:"index"`
+			ContentBlock struct {
+				Type  string          `json:"type"`
+				ID    json.RawMessage `json:"id"`
+				Name  json.RawMessage `json:"name"`
+				Input json.RawMessage `json:"input"`
+			} `json:"content_block"`
 			Delta struct {
-				Type       string `json:"type"`
-				Text       string `json:"text"`
-				StopReason string `json:"stop_reason"`
+				Type        string          `json:"type"`
+				Text        string          `json:"text"`
+				PartialJSON json.RawMessage `json:"partial_json"`
+				StopReason  string          `json:"stop_reason"`
 			} `json:"delta"`
 			Usage map[string]json.RawMessage `json:"usage"`
 		}
 		if json.Unmarshal([]byte(f.Data), &e) != nil {
 			return perr(false, false, "invalid_upstream_event")
 		}
+		bad := perr(false, false, "invalid_upstream_event")
+		position, positioned := safeIndex(e.Index)
 		switch e.Type {
 		case "message_start":
 			current, id = e.Message.Usage, e.Message.ID
+		case "content_block_start":
+			if e.ContentBlock.Type != "tool_use" {
+				return nil
+			}
+			// A call without its id, name or position cannot be answered later: refuse it rather than invent one.
+			callID, okID := text(e.ContentBlock.ID)
+			name, okName := text(e.ContentBlock.Name)
+			if !okID || !okName || !positioned || calls[position] != nil {
+				return bad
+			}
+			c := &call{index: len(calls), input: e.ContentBlock.Input}
+			calls[position] = c
+			return emit(contracts.ProviderEvent{Type: "tool_call", Index: c.index, ID: callID, Name: name})
+		case "content_block_stop":
+			c := calls[position]
+			// A block may carry its whole input at the start and stream nothing.
+			if !positioned || c == nil || c.streamed {
+				return nil
+			}
+			if args, ok := wholeInput(c.input); ok {
+				return emit(contracts.ProviderEvent{Type: "tool_call", Index: c.index, ArgumentsDelta: args})
+			}
 		case "content_block_delta":
-			if e.Delta.Type == "text_delta" {
+			switch e.Delta.Type {
+			case "text_delta":
 				return emit(contracts.ProviderEvent{Type: "delta", Text: e.Delta.Text})
+			case "input_json_delta":
+				c := calls[position]
+				partial, ok := text(e.Delta.PartialJSON)
+				if !positioned || c == nil || !ok {
+					return bad
+				}
+				c.streamed = true
+				return emit(contracts.ProviderEvent{Type: "tool_call", Index: c.index, ArgumentsDelta: partial})
 			}
 		case "message_delta":
 			if current != nil {

@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 
@@ -52,10 +53,12 @@ func New(store Store, providers map[string]contracts.Provider, digestKey string,
 // Store returns the router's storage, for hosts that expose balances or cancellation next to inference.
 func (r *Router) Store() Store { return r.store }
 
-// Output is the assistant's answer.
+// Output is the assistant's answer. ToolCalls holds the calls of a finished answer only: a call cut off by a
+// limit or a failure is never reported, so nothing incomplete can be executed.
 type Output struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string               `json:"role"`
+	Content   string               `json:"content"`
+	ToolCalls []contracts.ToolCall `json:"tool_calls,omitempty"`
 }
 
 // UsageReport tells the caller whether usage is known.
@@ -87,6 +90,7 @@ type Result struct {
 	Model           string         `json:"model,omitempty"`
 	Tier            string         `json:"tier,omitempty"`
 	Output          *Output        `json:"output,omitempty"`
+	FinishReason    string         `json:"finish_reason,omitempty"` // stop, length or tool_calls
 	Usage           *UsageReport   `json:"usage,omitempty"`
 	Billing         *BillingReport `json:"billing,omitempty"`
 }
@@ -187,12 +191,28 @@ func (r *Router) Infer(ctx context.Context, p contracts.Principal, raw []byte, k
 	if len(candidates) == 0 {
 		return nil, fail("no_eligible_offering", 422)
 	}
-	var maxInput int64
-	decision := Decision{Excluded: excluded, Candidates: make([]DecisionCandidate, 0, len(candidates))}
 	for _, c := range candidates {
 		if r.providers[c.Offering.Provider] == nil {
 			return nil, fail("provider_unavailable", 503)
 		}
+	}
+	// Refused here, before anything is reserved: a provider that cannot carry tools or images would drop them.
+	needs := contracts.InvocationNeeds(in)
+	capable := candidates[:0:0]
+	for _, c := range candidates {
+		if contracts.CapabilitiesOf(r.providers[c.Offering.Provider]).Can(needs) {
+			capable = append(capable, c)
+		} else {
+			excluded = append(excluded, routing.Excluded{ID: c.Offering.ID, Reason: "capability_unsupported"})
+		}
+	}
+	candidates = capable
+	if len(candidates) == 0 {
+		return nil, fail("unsupported_capability", 422)
+	}
+	var maxInput int64
+	decision := Decision{Excluded: excluded, Candidates: make([]DecisionCandidate, 0, len(candidates))}
+	for _, c := range candidates {
 		maxInput = max(maxInput, c.Offering.MaxInputTokens)
 		decision.Candidates = append(decision.Candidates, DecisionCandidate{ID: c.Offering.ID, Score: c.Score, Cost: c.Cost.String()})
 	}
@@ -236,6 +256,8 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 		execution  = "failed"
 		pending    bool
 		lastModel  string
+		toolBytes  int
+		toolCalls  = map[int]*contracts.ToolCall{}
 	)
 	send := func(kind string, data map[string]any) error {
 		seq++
@@ -336,10 +358,35 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 					started = true
 				}
 				text = append(text, ev.Text...)
-				if len(text) > 1_000_000 {
+				if len(text)+toolBytes > 1_000_000 {
 					return &contracts.ProviderError{Code: "output_too_large"}
 				}
 				return send("output.delta", map[string]any{"text": ev.Text})
+			case "tool_call":
+				known := toolCalls[ev.Index]
+				if in.Input.Tools == nil || ev.Index < 0 || ev.Index > 1<<53-1 ||
+					known == nil && (len(toolCalls) >= 64 || ev.ID == "" || ev.Name == "") {
+					return &contracts.ProviderError{Code: "invalid_tool_call"}
+				}
+				// A tool call is output: after this point a failure is partial and never falls back to another offering.
+				if !started {
+					if err := r.store.Output(bg, p, request.ID); err != nil {
+						return err
+					}
+					started = true
+				}
+				toolBytes += len(ev.ArgumentsDelta)
+				if len(text)+toolBytes > 1_000_000 {
+					return &contracts.ProviderError{Code: "output_too_large"}
+				}
+				data := map[string]any{"index": ev.Index, "arguments_delta": ev.ArgumentsDelta}
+				if known != nil {
+					known.Arguments += ev.ArgumentsDelta
+				} else {
+					toolCalls[ev.Index] = &contracts.ToolCall{ID: ev.ID, Name: ev.Name, Arguments: ev.ArgumentsDelta}
+					data["id"], data["name"] = ev.ID, ev.Name
+				}
+				return send("output.tool_call.delta", data)
 			case "usage":
 				if !ev.Usage.Valid() {
 					return &contracts.ProviderError{Code: "invalid_usage"}
@@ -415,14 +462,49 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 	if err != nil {
 		return nil, err
 	}
+	// Only a finished response has whole tool calls; a cut-off one must never look callable.
+	var calls []contracts.ToolCall
+	if execution == "succeeded" && len(toolCalls) > 0 {
+		indexes := make([]int, 0, len(toolCalls))
+		for i := range toolCalls {
+			indexes = append(indexes, i)
+		}
+		sort.Ints(indexes)
+		for _, i := range indexes {
+			call := *toolCalls[i]
+			if call.Arguments = contracts.JSTrim(call.Arguments); call.Arguments == "" {
+				call.Arguments = "{}"
+			}
+			calls = append(calls, call)
+			if err := send("output.tool_call.completed", map[string]any{"index": i, "id": call.ID, "name": call.Name, "arguments": call.Arguments}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	finish := ""
+	switch {
+	case execution == "partial" && finalUsage != nil:
+		finish = "length"
+	case execution != "succeeded":
+	case len(calls) > 0:
+		finish = "tool_calls"
+	default:
+		finish = "stop"
+	}
+	res := r.result(p, service, legs, request, settled, lastModel, string(text), execution, finalUsage)
+	res.Output.ToolCalls, res.FinishReason = calls, finish
 	kind := "request.failed"
 	if execution == "succeeded" {
 		kind = "request.completed"
 	}
-	if err := send(kind, map[string]any{"execution_status": execution, "billing_status": settled.Billing}); err != nil {
+	data := map[string]any{"execution_status": execution, "billing_status": settled.Billing, "usage": res.Usage}
+	if finish != "" {
+		data["finish_reason"] = finish
+	}
+	if err := send(kind, data); err != nil {
 		return nil, err
 	}
-	return r.result(p, service, legs, request, settled, lastModel, string(text), execution, finalUsage), nil
+	return res, nil
 }
 
 // checkUsage applies the per-kind limits to what a provider reported. It returns an error code, or "".

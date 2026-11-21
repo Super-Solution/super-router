@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/Super-Solution/super-router/backends/go/contracts"
+	"github.com/Super-Solution/super-router/backends/go/internal/providertest"
 	"github.com/Super-Solution/super-router/backends/go/provider/anthropic"
 )
 
@@ -65,7 +66,7 @@ func TestStreamsTextAndMergesUsage(t *testing.T) {
 		stream(
 			frame(`{"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":50,"cache_read_input_tokens":20,"cache_creation_input_tokens":5,"output_tokens":1,"cache_creation":{"ephemeral_5m_input_tokens":5}}}}`),
 			frame(`{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}`),
-			frame(`{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{}"}}`),
+			frame(`{"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"hmm"}}`),
 			frame(`{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":9,"server_tool_use":{"web_search_requests":0}}}`),
 			frame(`{"type":"message_stop"}`),
 		)(w, r)
@@ -169,4 +170,10 @@ func TestNullCounterCannotZeroARealCount(t *testing.T) {
 			t.Fatalf("the response was accepted and billed with %+v", e)
 		}
 	}
+}
+
+func TestToolsConformance(t *testing.T) {
+	providertest.Run(t, "anthropic", func(base string) contracts.Provider {
+		return anthropic.New(func() string { return "test-key" }, anthropic.WithBaseURL(base))
+	})
 }

@@ -98,6 +98,10 @@ export class AnthropicProvider implements Provider {
     const key = this.key();
     if (!key) throw new ProviderError(true, false, "credentials_missing");
     const messages = toAnthropicMessages(input.input.messages);
+    const system = input.input.messages
+      .filter((m) => m.role === "system")
+      .map((m) => m.content)
+      .join("\n");
     if (!messages.length)
       throw new ProviderError(true, false, "messages_required");
     let response: Response;
@@ -114,10 +118,8 @@ export class AnthropicProvider implements Provider {
         body: JSON.stringify({
           model: offering.upstream_model,
           max_tokens: input.limits.max_output_tokens,
-          system: input.input.messages
-            .filter((m) => m.role === "system")
-            .map((m) => m.content)
-            .join("\n"),
+          // Omitted rather than sent empty when there is no system message.
+          ...(system ? { system } : {}),
           messages,
           ...toolFields(input.input),
           stream: true,
@@ -161,6 +163,14 @@ export class AnthropicProvider implements Provider {
         e.type === "content_block_start" &&
         e.content_block?.type === "tool_use"
       ) {
+        // A call without its id, name or position cannot be answered later: refuse it rather than invent one.
+        if (
+          typeof e.content_block.id !== "string" ||
+          typeof e.content_block.name !== "string" ||
+          !Number.isSafeInteger(e.index) ||
+          calls.has(e.index)
+        )
+          throw new ProviderError(false, false, "invalid_upstream_event");
         const index = calls.size;
         calls.set(e.index, {
           index,
@@ -170,8 +180,8 @@ export class AnthropicProvider implements Provider {
         yield {
           type: "tool_call" as const,
           index,
-          id: String(e.content_block.id),
-          name: String(e.content_block.name),
+          id: e.content_block.id,
+          name: e.content_block.name,
           arguments_delta: "",
         };
       }
@@ -180,13 +190,13 @@ export class AnthropicProvider implements Provider {
         e.delta?.type === "input_json_delta"
       ) {
         const call = calls.get(e.index);
-        if (!call)
+        if (!call || typeof e.delta.partial_json !== "string")
           throw new ProviderError(false, false, "invalid_upstream_event");
         call.streamed = true;
         yield {
           type: "tool_call" as const,
           index: call.index,
-          arguments_delta: String(e.delta.partial_json),
+          arguments_delta: e.delta.partial_json,
         };
       }
       if (e.type === "content_block_stop") {
@@ -195,7 +205,9 @@ export class AnthropicProvider implements Provider {
         if (
           call &&
           !call.streamed &&
-          call.input &&
+          typeof call.input === "object" &&
+          call.input !== null &&
+          !Array.isArray(call.input) &&
           Object.keys(call.input).length
         )
           yield {

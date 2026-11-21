@@ -9,7 +9,7 @@ mod router;
 mod store;
 
 pub use credit_rates::publish_credit_rate_version;
-pub use mock::{MockProvider, MockTaskProvider};
+pub use mock::{MockProvider, MockTaskProvider, MockToolProvider};
 pub use router::{BillingReport, Charge, Downgrade, Emit, EmitClosed, InferError, InferResult, Output, Router, UsageReport};
 pub use store::{
     system_clock, Authenticator, BalanceRow, Clock, DataStore, Decision, DecisionCandidate, Leg, RequestRecord, Reservation, Store,

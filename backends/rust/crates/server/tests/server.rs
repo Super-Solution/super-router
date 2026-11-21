@@ -16,7 +16,7 @@ use super_router_contracts::{parse_service, Meters, Offering, Principal, Provide
 use super_router_router::{
     BalanceRow, DataStore, Decision, Leg, MockProvider, RequestRecord, Reservation, Router, Store, StoreError, StoreResult,
 };
-use super_router_server::{handler, Key, Options, StaticKeys, WindowsSource, MAX_BODY_BYTES};
+use super_router_server::{handler, Key, Options, StaticKeys, WindowsSource, MAX_INFERENCE_BODY_BYTES};
 use super_router_store_memory::MemoryStore;
 use tower::ServiceExt;
 
@@ -352,7 +352,7 @@ async fn healthz_needs_no_credentials() {
 #[tokio::test]
 async fn a_body_over_the_limit_is_refused() {
     let f = setup("success", Duration::ZERO).await;
-    let huge = format!(r#"{{"x":"{}"}}"#, "a".repeat(MAX_BODY_BYTES));
+    let huge = format!(r#"{{"x":"{}"}}"#, "a".repeat(MAX_INFERENCE_BODY_BYTES));
     let res = f.call("POST", "/v1/inferences", "owner-key", "k", &huge).await;
     assert_eq!((res.status, res.code().as_str()), (StatusCode::PAYLOAD_TOO_LARGE, "body_too_large"));
     // The same through a declared Content-Length, which is refused without reading anything.
@@ -361,7 +361,7 @@ async fn a_body_over_the_limit_is_refused() {
         .uri("/v1/inferences")
         .header(header::AUTHORIZATION, "Bearer owner-key")
         .header("idempotency-key", "k2")
-        .header(header::CONTENT_LENGTH, (MAX_BODY_BYTES + 1).to_string())
+        .header(header::CONTENT_LENGTH, (MAX_INFERENCE_BODY_BYTES + 1).to_string())
         .body(Body::from_stream(stream::pending::<Result<Bytes, std::io::Error>>()))
         .unwrap();
     let res = tokio::time::timeout(Duration::from_secs(2), f.send(declared)).await.expect("a declared oversize body must not be read");
@@ -392,7 +392,7 @@ async fn an_endless_chunked_body_is_cut_off_at_the_limit() {
     let res = tokio::time::timeout(Duration::from_secs(5), f.send(req)).await.expect("an endless body was buffered instead of refused");
     assert_eq!((res.status, res.code().as_str()), (StatusCode::PAYLOAD_TOO_LARGE, "body_too_large"));
     let read = pulled.load(Ordering::SeqCst);
-    assert!((MAX_BODY_BYTES..=MAX_BODY_BYTES + 2 * 8192).contains(&read), "read {read} bytes before giving up");
+    assert!((MAX_INFERENCE_BODY_BYTES..=MAX_INFERENCE_BODY_BYTES + 2 * 8192).contains(&read), "read {read} bytes before giving up");
 }
 
 fn events(text: &str) -> Vec<(String, Value)> {

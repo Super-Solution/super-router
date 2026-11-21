@@ -1,5 +1,10 @@
 //! Runs `conformance/dataplane.v1.json` against any [`DataStore`]. The same file drives the TypeScript, Go and
-//! Python implementations, so every store behaves identically.
+//! Python implementations, so every store behaves identically. [`run_tool_cases`] does the same for the provider
+//! sections of `conformance/tools.v1.json`.
+
+mod providers;
+
+pub use providers::run_tool_cases;
 
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;

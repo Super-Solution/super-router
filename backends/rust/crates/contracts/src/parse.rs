@@ -34,7 +34,8 @@ fn has_null(v: &Value) -> bool {
     match v {
         Value::Null => true,
         Value::Array(items) => items.iter().any(has_null),
-        Value::Object(m) => m.iter().any(|(k, e)| !(k == "schema" && e.is_object()) && has_null(e)),
+        // A JSON Schema (`response_format`'s `schema`, a tool's `input_schema`) may hold null.
+        Value::Object(m) => m.iter().any(|(k, e)| !((k == "schema" || k == "input_schema") && e.is_object()) && has_null(e)),
         _ => false,
     }
 }
@@ -180,7 +181,8 @@ fn valid_invocation(i: &Invocation) -> bool {
     if i.input.messages.len() > 100 {
         return false;
     }
-    if !i.input.messages.iter().all(|m| matches!(m.role.as_str(), "system" | "user" | "assistant") && valid_content(&m.content)) {
+    // Each message's own shape is checked as it is decoded (`Message`'s `Deserialize`).
+    if !crate::tools::valid_tool_use(i) {
         return false;
     }
     if let Some(t) = &i.input.task {
@@ -219,7 +221,7 @@ pub fn parse_invocation(data: &[u8]) -> Result<Invocation, RouterError> {
     }
 }
 
-/// Renders a value as JSON with object keys sorted bytewise and no whitespace. It is the input of the
+/// Renders a value as JSON with object keys sorted by code point (bytewise) and no whitespace. It is the input of the
 /// idempotency digest, so two equal invocations produce the same bytes in every language. Numbers print as
 /// JavaScript prints them.
 pub fn canonical<T: Serialize>(v: &T) -> Result<String, serde_json::Error> {
@@ -262,7 +264,7 @@ fn write_canonical(out: &mut String, v: &Value) {
 }
 
 /// Escapes like `JSON.stringify`: quotes, backslashes and control characters only.
-fn write_string(out: &mut String, s: &str) {
+pub(crate) fn write_string(out: &mut String, s: &str) {
     out.push('"');
     for c in s.chars() {
         match c {

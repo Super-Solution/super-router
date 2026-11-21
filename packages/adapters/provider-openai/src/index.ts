@@ -137,37 +137,48 @@ export class OpenAIProvider implements Provider {
         e.type === "response.output_item.added" &&
         e.item?.type === "function_call"
       ) {
+        // A call without its id, name or position cannot be answered later: refuse it rather than invent one.
+        if (
+          typeof e.item.call_id !== "string" ||
+          typeof e.item.name !== "string" ||
+          !Number.isSafeInteger(e.output_index) ||
+          calls.has(e.output_index)
+        )
+          throw new ProviderError(false, false, "invalid_upstream_event");
         const index = calls.size;
         calls.set(e.output_index, { index, streamed: false });
         yield {
           type: "tool_call" as const,
           index,
-          id: String(e.item.call_id),
-          name: String(e.item.name),
+          id: e.item.call_id,
+          name: e.item.name,
           arguments_delta: "",
         };
       }
       if (e.type === "response.function_call_arguments.delta") {
         const call = calls.get(e.output_index);
-        if (!call)
+        if (!call || typeof e.delta !== "string")
           throw new ProviderError(false, false, "invalid_upstream_event");
         call.streamed = true;
         yield {
           type: "tool_call" as const,
           index: call.index,
-          arguments_delta: String(e.delta),
+          arguments_delta: e.delta,
         };
       }
       if (e.type === "response.function_call_arguments.done") {
         const call = calls.get(e.output_index);
-        if (!call)
+        if (
+          !call ||
+          (e.arguments !== undefined && typeof e.arguments !== "string")
+        )
           throw new ProviderError(false, false, "invalid_upstream_event");
         // Some models send the arguments only here.
         if (!call.streamed)
           yield {
             type: "tool_call" as const,
             index: call.index,
-            arguments_delta: String(e.arguments ?? ""),
+            arguments_delta: e.arguments ?? "",
           };
       }
       if (e.type === "response.completed" || e.type === "response.incomplete") {

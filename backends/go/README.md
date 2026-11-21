@@ -9,7 +9,7 @@ backends/go
 ├── contracts/        wire types, strict parsing of untrusted JSON, canonical JSON for the idempotency digest
 ├── pricing/          Charge, Bound, CompileCreditPrice (exact big-integer money)
 ├── routing/          Route: hard limits, weighted scores, ordering
-├── router/           Router.Infer plus the Store and DataStore ports and a mock provider
+├── router/           Router.Infer plus the Store and DataStore ports and mock providers (text, tools)
 ├── store/
 │   ├── memory/       in-memory DataStore (tests, demos, single-process self-hosting)
 │   └── postgres/     PostgreSQL DataStore on database/sql, shared schema and migrations
@@ -75,6 +75,18 @@ go vet ./... && gofmt -l .
 
 The Postgres tests use `postgresql://superrouter:local-development-only@127.0.0.1:25432/superrouter` unless
 `DATABASE_URL` is set (the repo's `docker compose` database).
+
+## Tool calling
+
+The Go data plane speaks the same tool-calling wire as the TypeScript reference: `input.tools`, `input.tool_choice`,
+assistant `tool_calls`, `role: "tool"` results, image parts and several system messages; the stream adds
+`output.tool_call.delta` and `output.tool_call.completed`, and the terminal event carries `finish_reason` and `usage`.
+A provider says what it can carry through `contracts.CapableProvider`; an invocation that needs tools or images and
+finds no capable offering is refused with `422 unsupported_capability` before anything is reserved. Once a call has
+started streaming it is output, so a later failure is partial and never falls back. `/v1/inferences` and the routing
+dry run accept bodies up to 4 MB (read after authentication); other routes keep 256 KB. `conformance/tools.v1.json`
+pins the parsing, the canonical JSON and the OpenAI and Anthropic mappings, and `SUPERROUTER_MOCK=1` also registers a
+scripted `mock-tools` provider for demos.
 
 Not yet in Go: payments, subscriptions and the control plane (members, keys, plans). The TypeScript server has them.
 

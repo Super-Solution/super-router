@@ -26,7 +26,12 @@ type Provider struct {
 	base   string
 }
 
-var _ contracts.Provider = (*Provider)(nil)
+var _ contracts.CapableProvider = (*Provider)(nil)
+
+// Capabilities implements contracts.CapableProvider: tool calling and image input.
+func (p *Provider) Capabilities() contracts.ProviderCapabilities {
+	return contracts.ProviderCapabilities{Tools: true, Images: true}
+}
 
 // Option configures New.
 type Option func(*Provider)
@@ -90,10 +95,12 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	if key == "" {
 		return perr(true, false, "credentials_missing")
 	}
-	body, _ := json.Marshal(map[string]any{
-		"model": offering.UpstreamModel, "input": in.Input.Messages, "max_output_tokens": in.Limits.MaxOutputTokens,
+	fields := map[string]any{
+		"model": offering.UpstreamModel, "input": Input(in.Input.Messages), "max_output_tokens": in.Limits.MaxOutputTokens,
 		"store": false, "stream": true,
-	})
+	}
+	toolFields(fields, in.Input)
+	body, _ := json.Marshal(fields)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.base+"/v1/responses", bytes.NewReader(body))
 	if err != nil {
 		return perr(true, false, "request_invalid")
@@ -115,10 +122,23 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 		return perr(false, false, "upstream_http_"+strconv.Itoa(res.StatusCode))
 	}
 	terminal := false
+	// Upstream numbers every output item; tool calls are numbered from zero among themselves.
+	type call struct {
+		index    int
+		streamed bool
+	}
+	calls := map[int]*call{}
 	err = sse.Read(res.Body, func(f sse.Frame) error {
 		var e struct {
-			Type     string `json:"type"`
-			Delta    string `json:"delta"`
+			Type        string          `json:"type"`
+			Delta       json.RawMessage `json:"delta"`
+			OutputIndex json.RawMessage `json:"output_index"`
+			Arguments   json.RawMessage `json:"arguments"`
+			Item        struct {
+				Type   string          `json:"type"`
+				CallID json.RawMessage `json:"call_id"`
+				Name   json.RawMessage `json:"name"`
+			} `json:"item"`
 			Response struct {
 				ID    string `json:"id"`
 				Usage *usage `json:"usage"`
@@ -127,9 +147,47 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 		if json.Unmarshal([]byte(f.Data), &e) != nil {
 			return perr(false, false, "invalid_upstream_event")
 		}
+		bad := perr(false, false, "invalid_upstream_event")
+		position, positioned := safeIndex(e.OutputIndex)
 		switch e.Type {
 		case "response.output_text.delta":
-			return emit(contracts.ProviderEvent{Type: "delta", Text: e.Delta})
+			delta, ok := text(e.Delta)
+			if !ok && e.Delta != nil && !isNull(e.Delta) {
+				return bad
+			}
+			return emit(contracts.ProviderEvent{Type: "delta", Text: delta})
+		case "response.output_item.added":
+			if e.Item.Type != "function_call" {
+				return nil
+			}
+			// A call without its id, name or position cannot be answered later: refuse it rather than invent one.
+			id, okID := text(e.Item.CallID)
+			name, okName := text(e.Item.Name)
+			if !okID || !okName || !positioned || calls[position] != nil {
+				return bad
+			}
+			c := &call{index: len(calls)}
+			calls[position] = c
+			return emit(contracts.ProviderEvent{Type: "tool_call", Index: c.index, ID: id, Name: name})
+		case "response.function_call_arguments.delta":
+			c := calls[position]
+			delta, ok := text(e.Delta)
+			if !positioned || c == nil || !ok {
+				return bad
+			}
+			c.streamed = true
+			return emit(contracts.ProviderEvent{Type: "tool_call", Index: c.index, ArgumentsDelta: delta})
+		case "response.function_call_arguments.done":
+			c := calls[position]
+			args, ok := text(e.Arguments)
+			if !positioned || c == nil || !ok && e.Arguments != nil {
+				return bad
+			}
+			// Some models send the arguments only here.
+			if !c.streamed {
+				return emit(contracts.ProviderEvent{Type: "tool_call", Index: c.index, ArgumentsDelta: args})
+			}
+			return nil
 		case "response.completed", "response.incomplete":
 			if e.Response.Usage == nil {
 				return perr(false, false, "usage_unknown")

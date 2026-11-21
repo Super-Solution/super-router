@@ -186,8 +186,13 @@ func TestErrors(t *testing.T) {
 
 func TestBodyLimit(t *testing.T) {
 	f := setup(t, "success", 0)
-	huge := `{"x":"` + strings.Repeat("a", server.MaxBodyBytes) + `"}`
+	huge := `{"x":"` + strings.Repeat("a", server.MaxInferenceBodyBytes) + `"}`
 	res := f.do(t, "POST", "/v1/inferences", "owner-key", "k", huge)
+	if res.StatusCode != 413 || errorCode(t, res) != "body_too_large" {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	large := `{"x":"` + strings.Repeat("a", server.MaxBodyBytes) + `"}`
+	res = f.do(t, "POST", "/v1/admin/service-versions", "owner-key", "k", large)
 	if res.StatusCode != 413 || errorCode(t, res) != "body_too_large" {
 		t.Fatalf("status %d", res.StatusCode)
 	}

@@ -15,7 +15,7 @@
 //	                         tenant of the owner key, default default, prod, default
 //	OPENAI_API_KEY, ANTHROPIC_API_KEY
 //	                         enable the "openai" and "anthropic" providers (offering.provider names them)
-//	SUPERROUTER_MOCK=1       enable the deterministic "mock" provider
+//	SUPERROUTER_MOCK=1       enable the deterministic "mock" provider and the scripted "mock-tools" one
 package main
 
 import (
@@ -108,6 +108,8 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, r
 	}
 	if getenv("SUPERROUTER_MOCK") == "1" {
 		providers["mock"] = router.NewMockProvider("success")
+		// Scripted tool calling, so a client's tool loop can be exercised without a model key.
+		providers["mock-tools"] = &router.MockToolProvider{}
 	}
 	if len(providers) == 0 {
 		logger.Warn("no provider is configured: set OPENAI_API_KEY, ANTHROPIC_API_KEY or SUPERROUTER_MOCK=1")

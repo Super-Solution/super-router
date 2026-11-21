@@ -3,7 +3,9 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use super_router_contracts::{Invocation, Meters, Offering, Provider, ProviderError, ProviderEvent, ProviderStream};
+use super_router_contracts::{
+    Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream, ToolChoice,
+};
 use uuid::Uuid;
 
 /// A deterministic chat provider. `behavior` is `success`, `reject` (a definitive, retryable rejection),
@@ -133,6 +135,83 @@ impl Provider for MockTaskProvider {
             }
             yield Ok(ProviderEvent::Usage { usage, upstream_id: Uuid::new_v4().to_string() });
             yield Ok(ProviderEvent::Done { completion: Some(if partial { "partial" } else { "succeeded" }.to_string()) });
+        })
+    }
+}
+
+/// A scripted model that calls tools without a network, for demos and tests. It calls the tool named by
+/// `tool_choice` (or the first declared tool) with `args`, and answers in text once the last message is a tool
+/// result. `behavior` is `success`, `truncated` (the call is cut off by the output limit) or `reject`.
+#[derive(Debug, Default)]
+pub struct MockToolProvider {
+    behavior: String,
+    args: serde_json::Map<String, serde_json::Value>,
+    calls: AtomicU64,
+}
+
+impl MockToolProvider {
+    pub fn new(behavior: &str) -> Self {
+        Self { behavior: behavior.to_string(), ..Self::default() }
+    }
+
+    /// The arguments every call carries; none means `{}`.
+    #[must_use]
+    pub fn with_args(mut self, args: serde_json::Map<String, serde_json::Value>) -> Self {
+        self.args = args;
+        self
+    }
+
+    /// How many times [`Provider::invoke`] was called.
+    pub fn calls(&self) -> u64 {
+        self.calls.load(Ordering::SeqCst)
+    }
+}
+
+impl Provider for MockToolProvider {
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities { tools: true, images: true }
+    }
+
+    fn invoke(&self, input: &Invocation, _offering: &Offering) -> ProviderStream {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let behavior = self.behavior.clone();
+        let messages = &input.input.messages;
+        let last_is_result = messages.last().is_some_and(|m| m.role == "tool");
+        let declared = input.input.tools.as_ref().and_then(|t| t.first()).map(|t| t.name.clone());
+        let call = match (&input.input.tool_choice, declared) {
+            (Some(ToolChoice::Mode(mode)), _) if mode == "none" => None,
+            (_, None) => None,
+            _ if last_is_result => None,
+            (Some(ToolChoice::Name(name)), Some(_)) => Some(name.clone()),
+            (_, Some(first)) => Some(first),
+        };
+        let raw = serde_json::Value::Object(self.args.clone()).to_string();
+        Box::pin(async_stream::stream! {
+            if behavior == "reject" {
+                yield Err(ProviderError::definitive("rate_limited", true));
+                return;
+            }
+            let usage = || ProviderEvent::Usage {
+                usage: Meters { input: 10, output: 5, ..Meters::default() },
+                upstream_id: Uuid::new_v4().to_string(),
+            };
+            if let Some(name) = call {
+                let middle = raw.len().div_ceil(2);
+                let middle = (middle..=raw.len()).find(|i| raw.is_char_boundary(*i)).unwrap_or(raw.len());
+                let id = format!("call_{}", Uuid::new_v4().simple());
+                yield Ok(ProviderEvent::ToolCall { index: 0, id: Some(id), name: Some(name), arguments_delta: raw[..middle].to_string() });
+                if behavior == "truncated" {
+                    yield Ok(usage());
+                    yield Ok(ProviderEvent::Done { completion: Some("partial".to_string()) });
+                    return;
+                }
+                yield Ok(ProviderEvent::ToolCall { index: 0, id: None, name: None, arguments_delta: raw[middle..].to_string() });
+            } else {
+                let text = if last_is_result { "The tool finished." } else { "Hello from SuperRouter." };
+                yield Ok(ProviderEvent::Delta { text: text.to_string() });
+            }
+            yield Ok(usage());
+            yield Ok(ProviderEvent::Done { completion: None });
         })
     }
 }

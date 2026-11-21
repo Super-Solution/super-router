@@ -16,10 +16,11 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::Sha256;
 use super_router_contracts::{
-    canonical, parse_invocation, Invocation, Meters, Principal, Provider, ProviderError, ProviderEvent, RouterError, Service, StreamEvent,
+    canonical, invocation_needs, js_trim, parse_invocation, Invocation, Meters, Principal, Provider, ProviderError, ProviderEvent,
+    RouterError, Service, StreamEvent, ToolCall, ToolCalls,
 };
 use super_router_pricing::{atoms, charge};
-use super_router_routing::{invocation_bound, route_at, Candidate};
+use super_router_routing::{invocation_bound, route_at, Candidate, Excluded};
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
 use tokio_util::sync::CancellationToken;
 
@@ -27,14 +28,21 @@ use crate::store::{system_clock, Clock, Decision, DecisionCandidate, Leg, Reques
 
 /// How often a running request checks whether somebody asked to cancel it.
 const CANCEL_POLL: Duration = Duration::from_millis(100);
-/// The most text one request may accumulate.
+/// The most output one request may accumulate: text and tool-call arguments together.
 const MAX_OUTPUT_BYTES: usize = 1_000_000;
+/// The most tool calls one answer may hold.
+const MAX_TOOL_CALLS: usize = 64;
+/// The largest index a JavaScript client can read exactly.
+const MAX_SAFE_INDEX: usize = (1 << 53) - 1;
 
-/// The assistant's answer.
+/// The assistant's answer. `tool_calls` holds the calls of a finished answer only: a call cut off by a failure
+/// is never reported as callable.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Output {
     pub role: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ToolCall>,
 }
 
 /// Tells the caller whether usage is known: `confirmed`, `pending` or `not_billable`.
@@ -85,6 +93,9 @@ pub struct InferResult {
     pub tier: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<Output>,
+    /// `stop`, `length` or `tool_calls`; absent when the request did not finish.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish_reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<UsageReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -154,6 +165,7 @@ fn replayed(rec: &RequestRecord) -> InferResult {
         model: String::new(),
         tier: String::new(),
         output: None,
+        finish_reason: None,
         usage: None,
         billing: None,
     }
@@ -300,19 +312,34 @@ impl Router {
         if input.limits.max_output_tokens > service.max_output_tokens {
             return Err(fail("unsupported_capability", 422).into());
         }
-        let (candidates, excluded) = route_at(&service, &input, (self.clock)())?;
+        let (candidates, mut excluded) = route_at(&service, &input, (self.clock)())?;
         if candidates.is_empty() {
             return Err(fail("no_eligible_offering", 422).into());
         }
         if input.response_format.is_some() {
             return Err(fail("unsupported_capability", 422).into());
         }
+        let mut providers = Vec::with_capacity(candidates.len());
+        for c in &candidates {
+            providers.push(self.providers.get(&c.offering.provider).ok_or_else(|| fail("provider_unavailable", 503))?.capabilities());
+        }
+        // Refused here, before anything is reserved: a provider that cannot carry tools or images would drop them.
+        let needs = invocation_needs(&input);
+        let mut capable = Vec::with_capacity(candidates.len());
+        for (c, caps) in candidates.into_iter().zip(providers) {
+            if caps.can(needs) {
+                capable.push(c);
+            } else {
+                excluded.push(Excluded { id: c.offering.id.clone(), reason: "capability_unsupported".into() });
+            }
+        }
+        let candidates = capable;
+        if candidates.is_empty() {
+            return Err(fail("unsupported_capability", 422).into());
+        }
         let mut max_input = 0;
         let mut decision = Decision { excluded, candidates: Vec::with_capacity(candidates.len()) };
         for c in &candidates {
-            if !self.providers.contains_key(&c.offering.provider) {
-                return Err(fail("provider_unavailable", 503).into());
-            }
             max_input = max_input.max(c.offering.max_input_tokens);
             let downgrade = c.downgrade.then(|| Downgrade {
                 from_tier: service.tier.clone(),
@@ -381,6 +408,8 @@ impl Router {
         let mut aborted = false;
 
         let mut text = String::new();
+        let mut tool_bytes = 0usize;
+        let mut tool_calls = ToolCalls::new();
         let mut final_usage: Option<Meters> = None;
         let mut execution = "failed".to_string();
         let mut pending = false;
@@ -445,10 +474,43 @@ impl Router {
                                 run.started = true;
                             }
                             text.push_str(&delta);
-                            if text.len() > MAX_OUTPUT_BYTES {
+                            if text.len() + tool_bytes > MAX_OUTPUT_BYTES {
                                 break Some(ProviderError::unknown("output_too_large"));
                             }
                             if let Err(e) = run.send(id, "output.delta", json!({ "text": delta })) {
+                                break Some(ProviderError::unknown(format!("emit: {e}")));
+                            }
+                        }
+                        Some(Ok(ProviderEvent::ToolCall { index, id: call_id, name, arguments_delta })) => {
+                            let known = tool_calls.contains_key(&index);
+                            let new_ok = tool_calls.len() < MAX_TOOL_CALLS
+                                && call_id.as_deref().is_some_and(|s| !s.is_empty())
+                                && name.as_deref().is_some_and(|s| !s.is_empty());
+                            if input.input.tools.is_none() || index > MAX_SAFE_INDEX || (!known && !new_ok) {
+                                break Some(ProviderError::unknown("invalid_tool_call"));
+                            }
+                            // A tool call is output: after this point a failure is partial and never falls back to
+                            // another offering.
+                            if !run.started {
+                                if let Err(e) = self.store.output(p, id).await {
+                                    break Some(ProviderError::unknown(format!("store: {e}")));
+                                }
+                                run.started = true;
+                            }
+                            tool_bytes += arguments_delta.len();
+                            if text.len() + tool_bytes > MAX_OUTPUT_BYTES {
+                                break Some(ProviderError::unknown("output_too_large"));
+                            }
+                            let data = if let Some(call) = tool_calls.get_mut(&index) {
+                                call.arguments.push_str(&arguments_delta);
+                                json!({ "index": index, "arguments_delta": arguments_delta })
+                            } else {
+                                let (call_id, name) = (call_id.unwrap_or_default(), name.unwrap_or_default());
+                                let data = json!({ "index": index, "id": call_id, "name": name, "arguments_delta": arguments_delta });
+                                tool_calls.insert(index, ToolCall { id: call_id, name, arguments: arguments_delta });
+                                data
+                            };
+                            if let Err(e) = run.send(id, "output.tool_call.delta", data) {
                                 break Some(ProviderError::unknown(format!("emit: {e}")));
                             }
                         }
@@ -521,9 +583,39 @@ impl Router {
         }
         self.store.finish(p, id, &execution, final_usage.as_ref(), pending).await?;
         let settled = self.store.get(p, id).await?;
-        let kind = if execution == "succeeded" { "request.completed" } else { "request.failed" };
-        run.send(id, kind, json!({ "execution_status": execution, "billing_status": settled.billing }))?;
+        // Only a finished response has whole tool calls; a cut-off one must never look callable.
+        let mut calls = Vec::new();
+        if execution == "succeeded" {
+            for (index, mut call) in tool_calls {
+                call.arguments = match js_trim(&call.arguments) {
+                    "" => "{}".to_string(),
+                    trimmed => trimmed.to_string(),
+                };
+                run.send(
+                    id,
+                    "output.tool_call.completed",
+                    json!({ "index": index, "id": call.id, "name": call.name, "arguments": call.arguments }),
+                )?;
+                calls.push(call);
+            }
+        }
+        let finish_reason = match execution.as_str() {
+            "partial" if final_usage.is_some() => Some("length"),
+            "succeeded" if !calls.is_empty() => Some("tool_calls"),
+            "succeeded" => Some("stop"),
+            _ => None,
+        };
         let mut result = build_result(p, service, legs, request, &settled, &last_model, text, &execution, final_usage);
+        if let Some(output) = result.output.as_mut() {
+            output.tool_calls = calls;
+        }
+        result.finish_reason = finish_reason.map(str::to_string);
+        let kind = if execution == "succeeded" { "request.completed" } else { "request.failed" };
+        let mut data = json!({ "execution_status": execution, "billing_status": settled.billing, "usage": result.usage });
+        if let Some(reason) = finish_reason {
+            data["finish_reason"] = json!(reason);
+        }
+        run.send(id, kind, data)?;
         if let Some(d) = &downgrade {
             result.tier.clone_from(&d.to_tier);
         }
@@ -553,7 +645,8 @@ fn build_result(
         service_version: Some(service.version),
         model: model.to_string(),
         tier: service.tier.clone(),
-        output: Some(Output { role: "assistant".into(), content: text }),
+        output: Some(Output { role: "assistant".into(), content: text, tool_calls: Vec::new() }),
+        finish_reason: None,
         usage: None,
         billing: Some(BillingReport { charges: Vec::new() }),
     };

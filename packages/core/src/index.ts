@@ -189,13 +189,30 @@ export function bound(input: number, output: number, price: Price): bigint {
   );
 }
 /** The canonical JSON of a value: object keys sorted, no whitespace. It is the input of the idempotency digest. */
+/**
+ * Orders two strings by Unicode code point, which is also UTF-8 byte order. `localeCompare` depends on the
+ * runtime's locale and puts `userName` after `user_id`, so a tool schema with mixed-case keys would digest
+ * differently here than in the Go, Rust and Python ports, and differently between two Node installs.
+ */
+function byCodePoint(a: string, b: string): number {
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    const x = a.codePointAt(i)!;
+    const y = b.codePointAt(j)!;
+    if (x !== y) return x - y;
+    i += x > 0xffff ? 2 : 1;
+    j += y > 0xffff ? 2 : 1;
+  }
+  return a.length - i - (b.length - j);
+}
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
   if (value && typeof value === "object")
     return (
       "{" +
       Object.entries(value)
-        .sort(([a], [b]) => a.localeCompare(b))
+        .sort(([a], [b]) => byCodePoint(a, b))
         .map(([k, v]) => JSON.stringify(k) + ":" + canonical(v))
         .join(",") +
       "}"
@@ -463,7 +480,8 @@ export class Router {
                 started = true;
               }
               text += event.text;
-              if (Buffer.byteLength(text) > 1_000_000)
+              // One cap on everything the model produced: text and tool-call arguments together.
+              if (Buffer.byteLength(text) + toolBytes > 1_000_000)
                 throw new ProviderError(false, false, "output_too_large");
               await send("output.delta", { text: event.text });
             } else if (event.type === "tool_call") {

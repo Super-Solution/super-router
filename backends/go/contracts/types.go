@@ -133,12 +133,6 @@ type Service struct {
 	UnknownScore         float64        `json:"unknown_score"`
 }
 
-// Message is one chat message.
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
 // Task is a bounded media or tool task instead of chat messages.
 type Task struct {
 	Kind   string `json:"kind"`
@@ -166,12 +160,18 @@ type Invocation struct {
 	ServiceVersion *int64 `json:"service_version,omitempty"`
 	CustomerID     string `json:"customer_id"`
 	PayerMode      string `json:"payer_mode"`
-	Input          struct {
-		Messages []Message `json:"messages"`
-		Task     *Task     `json:"task,omitempty"`
-	} `json:"input"`
-	Limits Limits `json:"limits"`
-	Stream bool   `json:"stream"`
+	Input          Input  `json:"input"`
+	Limits         Limits `json:"limits"`
+	Stream         bool   `json:"stream"`
+}
+
+// Input is what an invocation asks for: chat messages (optionally with tools), or a bounded task. Tools and
+// ToolChoice are nil when absent, so a request without tools keeps its exact canonical form and digest.
+type Input struct {
+	Messages   []Message   `json:"messages"`
+	Tools      []Tool      `json:"tools,omitempty"`
+	ToolChoice *ToolChoice `json:"tool_choice,omitempty"`
+	Task       *Task       `json:"task,omitempty"`
 }
 
 // Meters is a usage record reported by a provider. Media meters are nil when not reported.
@@ -216,13 +216,19 @@ func (m Meters) Media(key string) int64 {
 	return *v
 }
 
-// ProviderEvent is one step of a provider's answer: a text delta, the final usage, or the end.
+// ProviderEvent is one step of a provider's answer: a text delta, part of a tool call, the final usage, or the end.
 type ProviderEvent struct {
-	Type       string // "delta", "usage" or "done"
+	Type       string // "delta", "tool_call", "usage" or "done"
 	Text       string
 	Usage      Meters
 	UpstreamID string
 	Completion string // for "done": "succeeded" (default) or "partial"
+	// For "tool_call": calls are numbered from zero by Index. The first event of an index carries ID and Name;
+	// ArgumentsDelta is the next piece of the call's JSON arguments.
+	Index          int
+	ID             string
+	Name           string
+	ArgumentsDelta string
 }
 
 // Provider runs one invocation against an upstream model, reporting events through emit as they arrive.

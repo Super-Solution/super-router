@@ -10,7 +10,7 @@
 //! | `ADDR` | listen address, default `127.0.0.1:3410` |
 //! | `SUPERROUTER_WORKSPACE`, `SUPERROUTER_ENVIRONMENT`, `SUPERROUTER_CUSTOMER` | tenant of the owner key, default `default`, `prod`, `default` |
 //! | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | enable the `openai` and `anthropic` providers (`offering.provider` names them) |
-//! | `SUPERROUTER_MOCK` | `1` enables the deterministic `mock` provider |
+//! | `SUPERROUTER_MOCK` | `1` enables the deterministic `mock` provider and the scripted `mock-tools` one |
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -20,7 +20,7 @@ use std::time::Duration;
 use super_router_contracts::{Principal, Provider};
 use super_router_provider_anthropic::Anthropic;
 use super_router_provider_openai::OpenAi;
-use super_router_router::{Authenticator, DataStore, MockProvider, Router};
+use super_router_router::{Authenticator, DataStore, MockProvider, MockToolProvider, Router};
 use super_router_server::{handler, Key, Options, StaticKeys};
 use super_router_store_memory::MemoryStore;
 use super_router_store_postgres::{KeyRevalidator, Keys, Options as PgOptions, PostgresStore};
@@ -143,6 +143,7 @@ pub async fn run(cfg: Config, shutdown: CancellationToken, ready: Option<oneshot
     }
     if cfg.mock {
         providers.insert("mock".into(), Arc::new(MockProvider::new("success")));
+        providers.insert("mock-tools".into(), Arc::new(MockToolProvider::new("success")));
     }
     if providers.is_empty() {
         tracing::warn!("no provider is configured: set OPENAI_API_KEY, ANTHROPIC_API_KEY or SUPERROUTER_MOCK=1");

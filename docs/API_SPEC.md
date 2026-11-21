@@ -63,11 +63,11 @@
 
 `input.messages` 至少一則，允許 system／user／assistant 的文字；structured output 另由 schema capability 定義，不接受任意 Provider 原生參數。限制超出支援範圍回 422。
 
-工具呼叫（TypeScript 參考實作）：`input.tools`（最多 64 個，`name`、`description`、`input_schema`）與 `input.tool_choice`（`auto`、`none`、`required` 或 `{ "name": ... }`）。assistant 訊息可帶 `tool_calls`（`id`、`name`、`arguments` 為 JSON 物件字串），結果以 `{ "role": "tool", "tool_call_id": ..., "content": ..., "is_error": ... }` 回傳；每個結果必須對應先前的呼叫，每個呼叫都必須有結果。user 訊息的 `content` 也可以是 `text` 與 `image`（`https:` 或 base64 的 png、jpeg、gif、webp）組成的陣列。音訊與檔案尚不支援。
+工具呼叫（TypeScript 參考實作、Go 與 Rust 資料平面）：`input.tools`（最多 64 個，`name`、`description`、`input_schema`）與 `input.tool_choice`（`auto`、`none`、`required` 或 `{ "name": ... }`）。assistant 訊息可帶 `tool_calls`（`id`、`name`、`arguments` 為 JSON 物件字串），結果以 `{ "role": "tool", "tool_call_id": ..., "content": ..., "is_error": ... }` 回傳；每個結果必須對應先前的呼叫，每個呼叫都必須有結果。user 訊息的 `content` 也可以是 `text` 與 `image`（`https:` 或 base64 的 png、jpeg、gif、webp）組成的陣列。音訊與檔案尚不支援。
 
 串流事件新增 `output.tool_call.delta`（`index`、首個事件帶 `id` 與 `name`、`arguments_delta`）與 `output.tool_call.completed`（完整的呼叫，僅在模型正常結束時送出，被截斷的呼叫不會送出）。`request.completed`／`request.failed` 新增 `finish_reason`（`stop`、`length`、`tool_calls`）與 `usage`。非串流回應的 `output.tool_calls` 與 `finish_reason` 語意相同。
 
-沒有宣告 tools 的請求，其 canonical JSON 與冪等摘要完全不變。Provider 必須宣告 `capabilities.tools`／`capabilities.images`；沒有任何可用 offering 時回 422 `unsupported_capability`，且不會預留任何款項。`POST /v1/inferences` 的請求本文上限為 4 MB（驗證身分後才讀取），其他路由維持 256 KB。Go、Python 與 Rust 資料平面尚未實作工具呼叫，收到這些欄位會以 `invalid_request` 拒絕。
+沒有宣告 tools 的請求，其 canonical JSON 與冪等摘要完全不變。Provider 必須宣告 `capabilities.tools`／`capabilities.images`；沒有任何可用 offering 時回 422 `unsupported_capability`，且不會預留任何款項。`POST /v1/inferences` 的請求本文上限為 4 MB（驗證身分後才讀取），其他路由維持 256 KB。Go 與 Rust 資料平面以 `conformance/tools.v1.json` 對照參考實作（合約解析、canonical JSON、OpenAI／Anthropic 的請求本文與串流解析）；Python 資料平面尚未實作工具呼叫，收到這些欄位會以 `invalid_request` 拒絕。
 
 ### 3.2 成功回應
 
