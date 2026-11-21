@@ -16,8 +16,8 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::Sha256;
 use super_router_contracts::{
-    canonical, invocation_needs, js_trim, parse_invocation, Invocation, Meters, Principal, Provider, ProviderError, ProviderEvent, RouterError,
-    Service, StreamEvent, ToolCall, ToolCalls,
+    canonical, invocation_needs, js_trim, parse_invocation, Invocation, Meters, Principal, Provider, ProviderError, ProviderEvent,
+    RouterError, Service, StreamEvent, ToolCall, ToolCalls,
 };
 use super_router_pricing::{atoms, charge};
 use super_router_routing::{invocation_bound, route_at, Candidate, Excluded};

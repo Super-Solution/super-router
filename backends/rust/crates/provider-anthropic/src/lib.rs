@@ -16,9 +16,7 @@ use reqwest::{redirect, Client, ClientBuilder};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::value::RawValue;
 use serde_json::{json, Map, Value};
-use super_router_contracts::{
-    Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream,
-};
+use super_router_contracts::{Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream};
 
 const DEFAULT_BASE: &str = "https://api.anthropic.com";
 const API_VERSION: &str = "2023-06-01";

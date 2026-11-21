@@ -19,9 +19,7 @@ use reqwest::header::{HeaderValue, AUTHORIZATION};
 use reqwest::{redirect, Client, ClientBuilder};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
-use super_router_contracts::{
-    Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream,
-};
+use super_router_contracts::{Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream};
 
 pub use tools::input;
 

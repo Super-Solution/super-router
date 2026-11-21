@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -506,59 +507,105 @@ func FormatJSNumber(f float64) string {
 
 // JSStringify re-encodes JSON text the way JSON.stringify(JSON.parse(text)) does: no whitespace, keys in their
 // original order, numbers and string escapes as JavaScript writes them. Providers use it when an upstream hands
-// over a tool call's arguments as a parsed object, so every port reports the same arguments string.
+// over a tool call's arguments as a parsed object, so every port reports the same arguments string. As in
+// JavaScript, the last of duplicate keys wins at the place of the first, and array-index keys come first.
 func JSStringify(raw []byte) (string, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
-	var b strings.Builder
-	// Each open container records whether it is an object and how many items it has written so far.
-	type frame struct {
-		object bool
-		n      int
+	out, err := jsValue(dec)
+	if err != nil {
+		return "", err
 	}
-	var stack []frame
-	for {
-		tok, err := dec.Token()
-		if err == io.EOF {
-			break
+	if _, err := dec.Token(); err != io.EOF {
+		return "", errors.New("contracts: trailing data after JSON value")
+	}
+	return out, nil
+}
+
+// jsValue renders the next value of dec.
+func jsValue(dec *json.Decoder) (string, error) {
+	tok, err := dec.Token()
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	switch x := tok.(type) {
+	case json.Delim:
+		if x == '[' {
+			b.WriteByte('[')
+			for i := 0; dec.More(); i++ {
+				item, err := jsValue(dec)
+				if err != nil {
+					return "", err
+				}
+				if i > 0 {
+					b.WriteByte(',')
+				}
+				b.WriteString(item)
+			}
+		} else {
+			type field struct{ key, value string }
+			var fields []field
+			at := map[string]int{}
+			for dec.More() {
+				kt, err := dec.Token()
+				if err != nil {
+					return "", err
+				}
+				key, _ := kt.(string)
+				value, err := jsValue(dec)
+				if err != nil {
+					return "", err
+				}
+				if i, ok := at[key]; ok {
+					fields[i].value = value
+					continue
+				}
+				at[key] = len(fields)
+				fields = append(fields, field{key, value})
+			}
+			sort.SliceStable(fields, func(i, j int) bool {
+				a, okA := arrayIndex(fields[i].key)
+				c, okC := arrayIndex(fields[j].key)
+				return okA && (!okC || a < c)
+			})
+			b.WriteByte('{')
+			for i, f := range fields {
+				if i > 0 {
+					b.WriteByte(',')
+				}
+				writeString(&b, f.key)
+				b.WriteByte(':')
+				b.WriteString(f.value)
+			}
 		}
-		if err != nil {
+		if _, err := dec.Token(); err != nil { // the closing delimiter
 			return "", err
 		}
-		if d, ok := tok.(json.Delim); ok && (d == '}' || d == ']') {
-			stack = stack[:len(stack)-1]
-			b.WriteRune(rune(d))
-			if len(stack) > 0 {
-				stack[len(stack)-1].n++
-			}
-			continue
-		}
-		if len(stack) > 0 {
-			top := &stack[len(stack)-1]
-			switch {
-			case top.object && top.n%2 == 1:
-				b.WriteByte(':')
-			case top.n > 0:
-				b.WriteByte(',')
-			}
-		}
-		switch x := tok.(type) {
-		case json.Delim:
-			b.WriteRune(rune(x))
-			stack = append(stack, frame{object: x == '{'})
-			continue
-		case string:
-			writeString(&b, x)
-		case json.Number:
-			b.WriteString(jsNumber(x.String()))
-		case bool:
-			b.WriteString(strconv.FormatBool(x))
-		case nil:
-			b.WriteString("null")
-		}
-		if len(stack) > 0 {
-			stack[len(stack)-1].n++
-		}
+		b.WriteByte(map[json.Delim]byte{'[': ']', '{': '}'}[x])
+	case string:
+		writeString(&b, x)
+	case json.Number:
+		b.WriteString(jsNumber(x.String()))
+	case bool:
+		b.WriteString(strconv.FormatBool(x))
+	case nil:
+		b.WriteString("null")
 	}
 	return b.String(), nil
+}
+
+// arrayIndex reports the number a key names when JavaScript treats it as an array index: a canonical integer
+// below 2^32 - 1.
+func arrayIndex(key string) (uint64, bool) {
+	if key == "" || len(key) > 1 && key[0] == '0' {
+		return 0, false
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] < '0' || key[i] > '9' {
+			return 0, false
+		}
+	}
+	n, err := strconv.ParseUint(key, 10, 64)
+	return n, err == nil && n < 1<<32-1
 }

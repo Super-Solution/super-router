@@ -1839,7 +1839,9 @@ dependencies = [
 name = "super-router-dataplane-test"
 version = "0.2.0"
 dependencies = [
+ "axum",
  "futures-util",
+ "serde",
  "serde_json",
  "super-router-contracts",
  "super-router-router",
@@ -1871,6 +1873,7 @@ dependencies = [
  "serde",
  "serde_json",
  "super-router-contracts",
+ "super-router-dataplane-test",
  "super-router-sse",
  "tokio",
 ]
@@ -1887,6 +1890,7 @@ dependencies = [
  "serde",
  "serde_json",
  "super-router-contracts",
+ "super-router-dataplane-test",
  "super-router-sse",
  "tokio",
 ]

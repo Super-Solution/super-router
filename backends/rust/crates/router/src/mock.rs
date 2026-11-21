@@ -196,7 +196,7 @@ impl Provider for MockToolProvider {
                 upstream_id: Uuid::new_v4().to_string(),
             };
             if let Some(name) = call {
-                let middle = (raw.len() + 1) / 2;
+                let middle = raw.len().div_ceil(2);
                 let middle = (middle..=raw.len()).find(|i| raw.is_char_boundary(*i)).unwrap_or(raw.len());
                 let id = format!("call_{}", Uuid::new_v4().simple());
                 yield Ok(ProviderEvent::ToolCall { index: 0, id: Some(id), name: Some(name), arguments_delta: raw[..middle].to_string() });

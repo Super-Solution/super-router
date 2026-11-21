@@ -98,7 +98,7 @@ async fn streams_text_and_merges_usage() {
     let frames = [
         frame(r#"{"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":50,"cache_read_input_tokens":20,"cache_creation_input_tokens":5,"output_tokens":1,"cache_creation":{"ephemeral_5m_input_tokens":5}}}}"#),
         frame(r#"{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}"#),
-        frame(r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{}"}}"#),
+        frame(r#"{"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"hm"}}"#),
         frame(r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":9,"server_tool_use":{"web_search_requests":0}}}"#),
         frame(STOP),
     ]

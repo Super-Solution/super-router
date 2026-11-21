@@ -1,6 +1,6 @@
 [package]
 name = "super-router-dataplane-test"
-description = "Runs conformance/dataplane.v1.json against any DataStore."
+description = "Runs conformance/dataplane.v1.json against any DataStore, and the provider cases of tools.v1.json."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,11 +14,13 @@ categories = ["development-tools::testing"]
 [dependencies]
 super-router-contracts.workspace = true
 super-router-router.workspace = true
-serde_json.workspace = true
-tokio.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+tokio = { workspace = true, features = ["net"] }
 tokio-util.workspace = true
 futures-util.workspace = true
 uuid.workspace = true
+axum = "0.8"
 
 [lints]
 workspace = true

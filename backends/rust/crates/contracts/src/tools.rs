@@ -251,20 +251,8 @@ impl<'de> Deserialize<'de> for Message {
 pub fn is_js_space(c: char) -> bool {
     matches!(
         c,
-        '\t' | '\n'
-            | '\u{b}'
-            | '\u{c}'
-            | '\r'
-            | ' '
-            | '\u{a0}'
-            | '\u{1680}'
-            | '\u{2000}'..='\u{200a}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202f}'
-            | '\u{205f}'
-            | '\u{3000}'
-            | '\u{feff}'
+        '\t' | '\n' | '\u{b}' | '\u{c}' | '\r' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}'
     )
 }
 
@@ -461,20 +449,36 @@ impl<'de> serde::de::Visitor<'de> for Js<'_> {
         Ok(())
     }
     fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<(), A::Error> {
-        self.0.push('{');
-        let mut first = true;
+        // JSON.parse keeps the last of duplicate keys at the place of the first, and a JavaScript object lists
+        // its array-index keys first, in numeric order.
+        let mut fields: Vec<(String, String)> = Vec::new();
         while let Some(key) = map.next_key::<String>()? {
-            if !first {
+            let mut value = String::new();
+            map.next_value_seed(Js(&mut value))?;
+            match fields.iter_mut().find(|(k, _)| *k == key) {
+                Some(field) => field.1 = value,
+                None => fields.push((key, value)),
+            }
+        }
+        fields.sort_by_key(|(k, _)| array_index(k).map_or((1, 0), |i| (0, i)));
+        self.0.push('{');
+        for (i, (key, value)) in fields.iter().enumerate() {
+            if i > 0 {
                 self.0.push(',');
             }
-            first = false;
-            crate::parse::write_string(self.0, &key);
+            crate::parse::write_string(self.0, key);
             self.0.push(':');
-            map.next_value_seed(Js(&mut *self.0))?;
+            self.0.push_str(value);
         }
         self.0.push('}');
         Ok(())
     }
+}
+
+/// The number a key names when JavaScript treats it as an array index: a canonical integer below 2^32 - 1.
+fn array_index(key: &str) -> Option<u32> {
+    let canonical = key == "0" || (!key.starts_with('0') && !key.is_empty() && key.bytes().all(|b| b.is_ascii_digit()));
+    canonical.then(|| key.parse::<u32>().ok()).flatten().filter(|n| *n < u32::MAX)
 }
 
 /// Collected tool calls of one answer, by index.
