@@ -27,8 +27,12 @@ import (
 	"github.com/Super-Solution/super-router/backends/go/routing"
 )
 
-// MaxBodyBytes caps every request body.
+// MaxBodyBytes caps every request body except inference ones.
 const MaxBodyBytes = 256_000
+
+// MaxInferenceBodyBytes caps POST /v1/inferences and the routing dry run, whose bodies carry tool schemas, tool
+// results and images. They are only read after the caller has authenticated.
+const MaxInferenceBodyBytes = 4_000_000
 
 // Authenticator turns a bearer token into a principal. Return a *contracts.RouterError "invalid_key" (401)
 // for an unknown or revoked key. Implement it to back keys with a database or a JWT verifier.
@@ -159,7 +163,7 @@ func (h *handler) route(w http.ResponseWriter, r *http.Request, requestID *strin
 		writeJSON(w, http.StatusOK, map[string]any{"data": data, "next_cursor": nil})
 		return nil
 	case r.Method == http.MethodPost && path == "/v1/inferences":
-		body, err := readBody(w, r)
+		body, err := readBodyUpTo(w, r, MaxInferenceBodyBytes)
 		if err != nil {
 			return err
 		}
@@ -244,7 +248,7 @@ func (h *handler) route(w http.ResponseWriter, r *http.Request, requestID *strin
 		if !p.HasScope("routing:write") {
 			return contracts.NewError("scope_denied", 403)
 		}
-		body, err := readBody(w, r)
+		body, err := readBodyUpTo(w, r, MaxInferenceBodyBytes)
 		if err != nil {
 			return err
 		}
@@ -413,10 +417,14 @@ func writeEvent(w io.Writer, kind string, data map[string]any) error {
 }
 
 func readBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
-	if r.ContentLength > MaxBodyBytes {
+	return readBodyUpTo(w, r, MaxBodyBytes)
+}
+
+func readBodyUpTo(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, error) {
+	if r.ContentLength > limit {
 		return nil, contracts.NewError("body_too_large", 413)
 	}
-	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	if err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {

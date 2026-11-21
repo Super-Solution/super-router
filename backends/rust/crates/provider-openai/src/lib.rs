@@ -6,6 +6,9 @@
 //! never echoed. A completed response whose usage is missing, incomplete or malformed is refused rather than
 //! billed as free.
 
+mod tools;
+
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,7 +19,11 @@ use reqwest::header::{HeaderValue, AUTHORIZATION};
 use reqwest::{redirect, Client, ClientBuilder};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
-use super_router_contracts::{Invocation, Meters, Offering, Provider, ProviderError, ProviderEvent, ProviderStream};
+use super_router_contracts::{
+    Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream,
+};
+
+pub use tools::input;
 
 const DEFAULT_BASE: &str = "https://api.openai.com";
 
@@ -138,10 +145,22 @@ struct Response {
 struct Event {
     #[serde(default, rename = "type", deserialize_with = "lenient")]
     kind: String,
-    #[serde(default, deserialize_with = "lenient")]
-    delta: String,
+    #[serde(default)]
+    delta: Option<Value>,
+    #[serde(default)]
+    output_index: Option<Value>,
+    #[serde(default)]
+    arguments: Option<Value>,
+    #[serde(default)]
+    item: Option<Value>,
     #[serde(default)]
     response: Option<Response>,
+}
+
+/// One tool call of the response: its number among the calls and whether its arguments were streamed.
+struct Call {
+    index: usize,
+    streamed: bool,
 }
 
 fn parse_event(data: &str) -> Result<Event, ProviderError> {
@@ -163,10 +182,16 @@ fn classify_status(status: u16) -> ProviderError {
 }
 
 impl Provider for OpenAi {
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities { tools: true, images: true }
+    }
+
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream {
         let this = self.clone();
         let is_task = input.input.task.is_some();
-        let messages = input.input.messages.clone();
+        let mut body = serde_json::Map::new();
+        body.insert("input".into(), Value::Array(tools::input(&input.input.messages)));
+        tools::tool_fields(&mut body, &input.input);
         let max_output = input.limits.max_output_tokens;
         let timeout = u64::try_from(input.limits.timeout_ms).ok().filter(|ms| *ms > 0).map(Duration::from_millis);
         let model = offering.upstream_model.clone();
@@ -181,9 +206,10 @@ impl Provider for OpenAi {
             // A key that cannot be a header value never leaves the process, so nothing was dispatched.
             let mut auth = HeaderValue::from_str(&format!("Bearer {key}")).map_err(|_| perr(true, false, "request_invalid"))?;
             auth.set_sensitive(true);
-            let body = json!({
-                "model": model, "input": messages, "max_output_tokens": max_output, "store": false, "stream": true,
-            });
+            body.insert("model".into(), json!(model));
+            body.insert("max_output_tokens".into(), json!(max_output));
+            body.insert("store".into(), json!(false));
+            body.insert("stream".into(), json!(true));
             let mut request = this.client.post(format!("{}/v1/responses", this.base)).header(AUTHORIZATION, auth).json(&body);
             if let Some(timeout) = timeout {
                 request = request.timeout(timeout);
@@ -195,6 +221,9 @@ impl Provider for OpenAi {
             }
             let mut frames = Box::pin(super_router_sse::frames(response.bytes_stream()));
             let mut terminal = false;
+            // Upstream numbers every output item; tool calls are numbered from zero among themselves.
+            let mut calls: HashMap<i64, Call> = HashMap::new();
+            let bad = || perr(false, false, "invalid_upstream_event");
             while let Some(item) = frames.next().await {
                 let frame = item.map_err(|e| match e {
                     super_router_sse::Error::FrameTooLarge => perr(false, false, "stream_frame_too_large"),
@@ -202,7 +231,48 @@ impl Provider for OpenAi {
                 })?;
                 let event = parse_event(&frame.data)?;
                 match event.kind.as_str() {
-                    "response.output_text.delta" => yield ProviderEvent::Delta { text: event.delta },
+                    "response.output_text.delta" => {
+                        let text = match &event.delta {
+                            None | Some(Value::Null) => String::new(),
+                            Some(Value::String(s)) => s.clone(),
+                            Some(_) => Err(bad())?,
+                        };
+                        yield ProviderEvent::Delta { text };
+                    }
+                    "response.output_item.added" => {
+                        let item = event.item.as_ref();
+                        if item.and_then(|i| i.get("type")).and_then(Value::as_str) == Some("function_call") {
+                            // A call without its id, name or position cannot be answered later: refuse it rather
+                            // than invent one.
+                            let id = tools::text(item.and_then(|i| i.get("call_id"))).ok_or_else(bad)?;
+                            let name = tools::text(item.and_then(|i| i.get("name"))).ok_or_else(bad)?;
+                            let position = tools::safe_index(event.output_index.as_ref()).ok_or_else(bad)?;
+                            if calls.contains_key(&position) {
+                                Err(bad())?;
+                            }
+                            let index = calls.len();
+                            calls.insert(position, Call { index, streamed: false });
+                            yield ProviderEvent::ToolCall { index, id: Some(id), name: Some(name), arguments_delta: String::new() };
+                        }
+                    }
+                    "response.function_call_arguments.delta" => {
+                        let call = tools::safe_index(event.output_index.as_ref()).and_then(|p| calls.get_mut(&p)).ok_or_else(bad)?;
+                        let delta = tools::text(event.delta.as_ref()).ok_or_else(bad)?;
+                        call.streamed = true;
+                        yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, arguments_delta: delta };
+                    }
+                    "response.function_call_arguments.done" => {
+                        let call = tools::safe_index(event.output_index.as_ref()).and_then(|p| calls.get(&p)).ok_or_else(bad)?;
+                        let arguments = match &event.arguments {
+                            None => String::new(),
+                            Some(Value::String(s)) => s.clone(),
+                            Some(_) => Err(bad())?,
+                        };
+                        // Some models send the arguments only here.
+                        if !call.streamed {
+                            yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, arguments_delta: arguments };
+                        }
+                    }
                     "response.completed" | "response.incomplete" => {
                         let response = event.response.unwrap_or_default();
                         let usage = response.usage.ok_or_else(|| perr(false, false, "usage_unknown"))?;

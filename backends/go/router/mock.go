@@ -4,6 +4,8 @@ package router
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -110,4 +112,77 @@ func (m *MockTaskProvider) Invoke(ctx context.Context, in contracts.Invocation, 
 		done.Completion = "partial"
 	}
 	return emit(done)
+}
+
+// MockToolProvider is a scripted model that calls tools without a network, for demos and tests. It calls the tool
+// named by tool_choice (or the first declared tool) with Args, and answers in text once the last message is a tool
+// result. Behavior is "success", "truncated" (the call is cut off by the output limit) or "reject".
+type MockToolProvider struct {
+	Args     map[string]any
+	Behavior string
+	calls    atomic.Int64
+}
+
+var _ contracts.CapableProvider = (*MockToolProvider)(nil)
+
+// Calls is how many times Invoke was called.
+func (m *MockToolProvider) Calls() int64 { return m.calls.Load() }
+
+// Capabilities implements contracts.CapableProvider.
+func (m *MockToolProvider) Capabilities() contracts.ProviderCapabilities {
+	return contracts.ProviderCapabilities{Tools: true, Images: true}
+}
+
+// Invoke implements contracts.Provider.
+func (m *MockToolProvider) Invoke(ctx context.Context, in contracts.Invocation, _ contracts.Offering, emit func(contracts.ProviderEvent) error) error {
+	m.calls.Add(1)
+	if m.Behavior == "reject" {
+		return &contracts.ProviderError{Definitive: true, Retryable: true, Code: "rate_limited"}
+	}
+	if ctx.Err() != nil {
+		return &contracts.ProviderError{Code: "upstream_failed"}
+	}
+	usage := contracts.ProviderEvent{Type: "usage", Usage: contracts.Meters{Input: 10, Output: 5}, UpstreamID: uuid.New()}
+	messages, tools, choice := in.Input.Messages, in.Input.Tools, in.Input.ToolChoice
+	last := contracts.Message{}
+	if len(messages) > 0 {
+		last = messages[len(messages)-1]
+	}
+	if tools == nil || choice != nil && choice.Mode == "none" || last.Role == "tool" {
+		text := "Hello from SuperRouter."
+		if last.Role == "tool" {
+			text = "The tool finished."
+		}
+		if err := emit(contracts.ProviderEvent{Type: "delta", Text: text}); err != nil {
+			return err
+		}
+	} else {
+		name := tools[0].Name
+		if choice != nil && choice.Name != "" {
+			name = choice.Name
+		}
+		args := m.Args
+		if args == nil {
+			args = map[string]any{}
+		}
+		raw, _ := json.Marshal(args)
+		middle := (len(raw) + 1) / 2
+		id := "call_" + strings.ReplaceAll(uuid.New(), "-", "")
+		if err := emit(contracts.ProviderEvent{Type: "tool_call", Index: 0, ID: id, Name: name, ArgumentsDelta: string(raw[:middle])}); err != nil {
+			return err
+		}
+		if m.Behavior == "truncated" {
+			if err := emit(usage); err != nil {
+				return err
+			}
+			return emit(contracts.ProviderEvent{Type: "done", Completion: "partial"})
+		}
+		if err := emit(contracts.ProviderEvent{Type: "tool_call", Index: 0, ArgumentsDelta: string(raw[middle:])}); err != nil {
+			return err
+		}
+	}
+	if err := emit(usage); err != nil {
+		return err
+	}
+	return emit(contracts.ProviderEvent{Type: "done"})
 }

@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/Super-Solution/super-router/backends/go/contracts"
+	"github.com/Super-Solution/super-router/backends/go/internal/providertest"
 	"github.com/Super-Solution/super-router/backends/go/provider/openai"
 )
 
@@ -159,4 +160,10 @@ func TestCancelledContext(t *testing.T) {
 	if d, _, c := code(err); d || c != "transport_unknown" {
 		t.Fatalf("definitive=%v code=%s", d, c)
 	}
+}
+
+func TestToolsConformance(t *testing.T) {
+	providertest.Run(t, "openai", func(base string) contracts.Provider {
+		return openai.New(func() string { return "test-key" }, openai.WithBaseURL(base))
+	})
 }

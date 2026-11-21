@@ -99,6 +99,7 @@ func TestParseRejectsGarbage(t *testing.T) {
 func FuzzParse(f *testing.F) {
 	f.Add([]byte(`{"service":"s","customer_id":"c","input":{},"limits":{}}`))
 	f.Add([]byte(`{"id":"s","version":1}`))
+	f.Add([]byte(`{"service":"s","customer_id":"c","input":{"messages":[{"role":"user","content":[{"type":"image","url":"https://e.example/a"}]},{"role":"assistant","tool_calls":[{"id":"a","name":"a","arguments":"{}"}]},{"role":"tool","tool_call_id":"a","content":""}],"tools":[{"name":"a","input_schema":{"type":"object","x":null}}],"tool_choice":{"name":"a"}},"limits":{}}`))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// Parsing untrusted input must never panic, and an accepted invocation must have a canonical form.
 		if in, err := ParseInvocation(data); err == nil {

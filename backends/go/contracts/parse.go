@@ -44,7 +44,7 @@ func safeNonNeg(n int64) bool { return n >= 0 && n <= maxSafe }
 
 // decodeStrict decodes JSON that must contain no null, no duplicate-free surprises and no unknown fields.
 // defaults runs on the generic tree first so absent keys get the reference's defaults.
-func decodeStrict(data []byte, defaults func(map[string]any) bool, into any) error {
+func decodeStrict(data []byte, nulls func(any) bool, defaults func(map[string]any) bool, into any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	var tree any
@@ -54,7 +54,7 @@ func decodeStrict(data []byte, defaults func(map[string]any) bool, into any) err
 	if _, err := dec.Token(); err != io.EOF {
 		return errInvalid
 	}
-	if hasNull(tree) {
+	if nulls(tree) {
 		return errInvalid
 	}
 	root, ok := tree.(map[string]any)
@@ -90,6 +90,47 @@ func hasNull(v any) bool {
 		for _, e := range x {
 			if hasNull(e) {
 				return true
+			}
+		}
+	}
+	return false
+}
+
+// invocationHasNull is hasNull except inside a tool's input_schema, where JSON Schema may legitimately hold null.
+func invocationHasNull(v any) bool {
+	root, ok := v.(map[string]any)
+	if !ok {
+		return hasNull(v)
+	}
+	for k, e := range root {
+		in, isObject := e.(map[string]any)
+		if k != "input" || !isObject {
+			if hasNull(e) {
+				return true
+			}
+			continue
+		}
+		for ik, ie := range in {
+			tools, isList := ie.([]any)
+			if ik != "tools" || !isList {
+				if hasNull(ie) {
+					return true
+				}
+				continue
+			}
+			for _, t := range tools {
+				tool, isTool := t.(map[string]any)
+				if !isTool {
+					if hasNull(t) {
+						return true
+					}
+					continue
+				}
+				for tk, te := range tool {
+					if tk != "input_schema" && hasNull(te) {
+						return true
+					}
+				}
 			}
 		}
 	}
@@ -235,7 +276,7 @@ func validOffering(o *Offering) bool {
 // mixed supply currencies are all rejected with invalid_request.
 func ParseService(data []byte) (Service, error) {
 	var s Service
-	if err := decodeStrict(data, serviceDefaults, &s); err != nil {
+	if err := decodeStrict(data, hasNull, serviceDefaults, &s); err != nil {
 		return Service{}, InvalidRequest()
 	}
 	if !validService(&s) {
@@ -320,10 +361,6 @@ func invocationDefaults(root map[string]any) bool {
 	ok := need(root, "service", "customer_id", "input", "limits")
 	if in := object(root["input"]); in != nil {
 		setDefault(in, "messages", []any{})
-		messages, _ := in["messages"].([]any)
-		for _, m := range messages {
-			ok = ok && need(m, "role", "content")
-		}
 		ok = ok && need(in["task"], "kind", "prompt")
 	}
 	if l := object(root["limits"]); l != nil {
@@ -338,7 +375,7 @@ func invocationDefaults(root map[string]any) bool {
 // (payer_mode "developer", max_output_tokens 1, timeout_ms 30000, stream false, no messages).
 func ParseInvocation(data []byte) (Invocation, error) {
 	var in Invocation
-	if err := decodeStrict(data, invocationDefaults, &in); err != nil {
+	if err := decodeStrict(data, invocationHasNull, invocationDefaults, &in); err != nil {
 		return Invocation{}, InvalidRequest()
 	}
 	if !validInvocation(&in) {
@@ -354,13 +391,9 @@ func validInvocation(in *Invocation) bool {
 	if in.ServiceVersion != nil && (*in.ServiceVersion < 1 || *in.ServiceVersion > maxSafe) {
 		return false
 	}
-	if in.Input.Messages == nil || len(in.Input.Messages) > 100 {
+	// Each message's own shape is checked as it is decoded (Message.UnmarshalJSON).
+	if in.Input.Messages == nil || len(in.Input.Messages) > 100 || !validToolUse(in) {
 		return false
-	}
-	for _, m := range in.Input.Messages {
-		if m.Role != "system" && m.Role != "user" && m.Role != "assistant" || !validContent(m.Content) {
-			return false
-		}
 	}
 	if t := in.Input.Task; t != nil && (!isTaskKind(t.Kind) || !validContent(t.Prompt)) {
 		return false
@@ -395,7 +428,8 @@ func (m Meters) Valid() bool {
 	return true
 }
 
-// Canonical renders a value as JSON with object keys sorted bytewise and no whitespace. It is the input of the
+// Canonical renders a value as JSON with object keys sorted by code point (bytewise) and numbers written as
+// JSON.stringify writes them, with no whitespace. It is the input of the
 // idempotency digest, so two equal invocations always produce the same bytes in every language.
 func Canonical(v any) (string, error) {
 	raw, err := json.Marshal(v)
@@ -420,7 +454,7 @@ func writeCanonical(b *strings.Builder, v any) {
 	case bool:
 		b.WriteString(strconv.FormatBool(x))
 	case json.Number:
-		b.WriteString(x.String())
+		b.WriteString(jsNumber(x.String()))
 	case string:
 		writeString(b, x)
 	case []any:

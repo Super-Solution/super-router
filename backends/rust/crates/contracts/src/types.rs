@@ -10,6 +10,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Map, Value};
 use super_router_pricing::{valid_unit_name, Price, Usage, MEDIA_KEYS};
 
+pub use crate::tools::{ContentPart, Message, ProviderCapabilities, Tool, ToolCall, ToolChoice};
+
 pub use super_router_pricing::RouterError;
 
 /// Media meter names, in the order the reference iterates them.
@@ -314,13 +316,6 @@ impl Service {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Message {
-    pub role: String,
-    pub content: String,
-}
-
 /// A bounded media or tool task instead of chat messages.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -384,11 +379,17 @@ impl Limits {
     }
 }
 
+/// What an invocation asks for: chat messages (optionally with tools), or a bounded task. `tools` and `tool_choice`
+/// are `None` when absent, so a request without tools keeps its exact canonical form and digest.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Input {
     #[serde(default)]
     pub messages: Vec<Message>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<ToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task: Option<Task>,
 }
@@ -487,11 +488,19 @@ impl Meters {
     }
 }
 
-/// One step of a provider's answer: a text delta, the final usage, or the end.
+/// One step of a provider's answer: a text delta, part of a tool call, the final usage, or the end.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProviderEvent {
     Delta {
         text: String,
+    },
+    /// Part of a tool call. Calls are numbered from zero by `index`; the first event of an index carries `id` and
+    /// `name`, and `arguments_delta` is the next piece of the call's JSON arguments.
+    ToolCall {
+        index: usize,
+        id: Option<String>,
+        name: Option<String>,
+        arguments_delta: String,
     },
     Usage {
         usage: Meters,
@@ -510,6 +519,12 @@ pub type ProviderStream = BoxStream<'static, Result<ProviderEvent, ProviderError
 /// Runs one invocation against an upstream model.
 pub trait Provider: Send + Sync {
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream;
+
+    /// What the provider can carry besides text. The default is text only: a request with tools or images is then
+    /// refused before anything is reserved.
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities::default()
+    }
 }
 
 /// One server-sent event of a streaming inference.
