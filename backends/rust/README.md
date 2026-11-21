@@ -26,7 +26,7 @@ backends/rust
 ├── crates/provider-anthropic/ Messages API
 ├── crates/server/             the HTTP API as an axum Router
 ├── crates/cli/                the `super-router-server` binary
-└── crates/dataplane-test/     runs conformance/dataplane.v1.json against any DataStore
+└── crates/dataplane-test/     runs conformance/dataplane.v1.json against any DataStore, and tools.v1.json against providers
 ```
 
 ## Design notes
@@ -37,6 +37,12 @@ backends/rust
 - **Settlement outlives the caller.** `Router::infer` takes a `CancellationToken` that aborts the provider call only.
   Every storage call after funds are reserved runs to completion; the HTTP layer runs `infer` on its own task so a
   dropped connection cannot skip it.
+- **Tool calling matches the reference.** Tools, tool choice, tool calls, tool results, image parts and several system
+  messages parse and canonicalise as in TypeScript (`conformance/tools.v1.json`). `Provider::capabilities` says
+  whether a provider carries tools and images; an invocation nobody can carry is refused with
+  `422 unsupported_capability` before anything is reserved. A started tool call is output: a later failure is partial
+  and never falls back. `MockToolProvider` (`mock-tools` under `SUPERROUTER_MOCK=1`) scripts a tool call for demos.
+  Inference bodies may be up to 4 MB (`MAX_INFERENCE_BODY_BYTES`), other routes 256 KB.
 - **Time is milliseconds since the epoch** (`i64`) at every port, so no date library is needed in the core.
 - **Money is `BigInt` and decimal strings**, never floats. Scores are `f64` and match the reference bit for bit.
 - Internal failures (`StoreError::Internal`) never reach a customer; they surface as `internal_error` or, once funds

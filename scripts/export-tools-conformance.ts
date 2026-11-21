@@ -163,7 +163,11 @@ invocation("64 tool calls in one message", {
   ],
 });
 invocation("tool name and call id limits", {
-  messages: [user, call("i".repeat(128), "{}", "N".repeat(64)), result("i".repeat(128))],
+  messages: [
+    user,
+    call("i".repeat(128), "{}", "N".repeat(64)),
+    result("i".repeat(128)),
+  ],
   tools: [{ name: "N".repeat(64), input_schema: { type: "object" } }],
 });
 invocation("schema keys sort by code point", {
@@ -179,9 +183,9 @@ invocation("schema keys sort by code point", {
           Zeta: { type: "string" },
           alpha: { type: "string" },
           $ref: { type: "string" },
-          "é": { type: "string" },
+          é: { type: "string" },
           "\u{1F600}": { type: "string" },
-          "Ａ": { type: "string" },
+          Ａ: { type: "string" },
         },
       },
     },
@@ -333,7 +337,10 @@ const refused: Record<string, Json> = {
   "arguments as an object": {
     messages: [
       user,
-      { role: "assistant", tool_calls: [{ id: "a", name: "x", arguments: {} }] },
+      {
+        role: "assistant",
+        tool_calls: [{ id: "a", name: "x", arguments: {} }],
+      },
       result("a"),
     ],
   },
@@ -390,7 +397,11 @@ const refused: Record<string, Json> = {
     messages: [
       user,
       call("a"),
-      { role: "tool", tool_call_id: "a", content: [{ type: "text", text: "x" }] },
+      {
+        role: "tool",
+        tool_call_id: "a",
+        content: [{ type: "text", text: "x" }],
+      },
     ],
   },
   "tool result is_error as string": {
@@ -422,14 +433,20 @@ const refused: Record<string, Json> = {
     ],
   },
   "parts on a system message": {
-    messages: [{ role: "system", content: [{ type: "text", text: "x" }] }, user],
+    messages: [
+      { role: "system", content: [{ type: "text", text: "x" }] },
+      user,
+    ],
   },
   "empty parts": { messages: [{ role: "user", content: [] }] },
   "33 parts": {
     messages: [
       {
         role: "user",
-        content: Array.from({ length: 33 }, () => ({ type: "text", text: "x" })),
+        content: Array.from({ length: 33 }, () => ({
+          type: "text",
+          text: "x",
+        })),
       },
     ],
   },
@@ -443,12 +460,18 @@ const refused: Record<string, Json> = {
   },
   "image over http": {
     messages: [
-      { role: "user", content: [{ type: "image", url: "http://e.example/a.png" }] },
+      {
+        role: "user",
+        content: [{ type: "image", url: "http://e.example/a.png" }],
+      },
     ],
   },
   "https url with a space": {
     messages: [
-      { role: "user", content: [{ type: "image", url: "https://e.example/a b" }] },
+      {
+        role: "user",
+        content: [{ type: "image", url: "https://e.example/a b" }],
+      },
     ],
   },
   "https url with a no-break space": {
@@ -503,7 +526,10 @@ const refused: Record<string, Json> = {
   },
   "data url without base64": {
     messages: [
-      { role: "user", content: [{ type: "image", url: "data:image/png,AAAA" }] },
+      {
+        role: "user",
+        content: [{ type: "image", url: "data:image/png,AAAA" }],
+      },
     ],
   },
   "data url bad padding": {
@@ -516,7 +542,10 @@ const refused: Record<string, Json> = {
   },
   "data url empty payload": {
     messages: [
-      { role: "user", content: [{ type: "image", url: "data:image/png;base64," }] },
+      {
+        role: "user",
+        content: [{ type: "image", url: "data:image/png;base64," }],
+      },
     ],
   },
   "data url with newline": {
@@ -589,7 +618,9 @@ const capture = async (
     body = JSON.parse(String(init.body));
     return new Response(
       (frames ?? [])
-        .map((f) => `data: ${typeof f === "string" ? f : JSON.stringify(f)}\n\n`)
+        .map(
+          (f) => `data: ${typeof f === "string" ? f : JSON.stringify(f)}\n\n`,
+        )
         .join(""),
     );
   }) as typeof fetch;
@@ -619,7 +650,9 @@ const inv = (input: Json, edit?: (v: Json) => void) => {
 };
 
 const requestInputs: Record<string, Json> = {
-  "plain text": inv({ messages: [{ role: "system", content: "Be brief" }, user] }),
+  "plain text": inv({
+    messages: [{ role: "system", content: "Be brief" }, user],
+  }),
   "several system messages": inv({
     messages: [
       { role: "system", content: "One" },
@@ -627,8 +660,16 @@ const requestInputs: Record<string, Json> = {
       user,
     ],
   }),
-  "tools and auto": inv({ messages: [user], tools: [lookup], tool_choice: "auto" }),
-  "tool choice none": inv({ messages: [user], tools: [lookup], tool_choice: "none" }),
+  "tools and auto": inv({
+    messages: [user],
+    tools: [lookup],
+    tool_choice: "auto",
+  }),
+  "tool choice none": inv({
+    messages: [user],
+    tools: [lookup],
+    tool_choice: "none",
+  }),
   "tool choice required": inv({
     messages: [user],
     tools: [lookup],
@@ -674,7 +715,7 @@ const requestInputs: Record<string, Json> = {
     ],
     tools: [lookup],
   }),
-  "images": inv({
+  images: inv({
     messages: [
       {
         role: "user",
@@ -713,7 +754,11 @@ const streamCases: Record<
         type: "message_start",
         message: {
           id: "msg_1",
-          usage: { input_tokens: 7, output_tokens: 1, cache_read_input_tokens: 3 },
+          usage: {
+            input_tokens: 7,
+            output_tokens: 1,
+            cache_read_input_tokens: 3,
+          },
         },
       },
       {
@@ -721,10 +766,22 @@ const streamCases: Record<
         index: 0,
         content_block: { type: "text", text: "" },
       },
-      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hel" } },
-      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "lo" } },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "Hel" },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "lo" },
+      },
       { type: "content_block_stop", index: 0 },
-      { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 2 } },
+      {
+        type: "message_delta",
+        delta: { stop_reason: "end_turn" },
+        usage: { output_tokens: 2 },
+      },
       { type: "message_stop" },
     ],
   },
@@ -736,8 +793,16 @@ const streamCases: Record<
         output_index: 1,
         item: { type: "function_call", call_id: "call_9", name: "lookup" },
       },
-      { type: "response.function_call_arguments.delta", output_index: 1, delta: '{"q"' },
-      { type: "response.function_call_arguments.delta", output_index: 1, delta: ':"a"}' },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 1,
+        delta: '{"q"',
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 1,
+        delta: ':"a"}',
+      },
       {
         type: "response.function_call_arguments.done",
         output_index: 1,
@@ -748,32 +813,69 @@ const streamCases: Record<
         output_index: 2,
         item: { type: "function_call", call_id: "call_10", name: "other" },
       },
-      { type: "response.function_call_arguments.done", output_index: 2, arguments: "{}" },
+      {
+        type: "response.function_call_arguments.done",
+        output_index: 2,
+        arguments: "{}",
+      },
       {
         type: "response.completed",
         response: { id: "r", usage: { input_tokens: 3, output_tokens: 2 } },
       },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 3, output_tokens: 0 } } },
-      { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
-      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hi" } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 3, output_tokens: 0 } },
+      },
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "Hi" },
+      },
       { type: "content_block_stop", index: 0 },
       {
         type: "content_block_start",
         index: 1,
-        content_block: { type: "tool_use", id: "toolu_1", name: "lookup", input: {} },
+        content_block: {
+          type: "tool_use",
+          id: "toolu_1",
+          name: "lookup",
+          input: {},
+        },
       },
-      { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: '{"q"' } },
-      { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: ':"a"}' } },
+      {
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "input_json_delta", partial_json: '{"q"' },
+      },
+      {
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "input_json_delta", partial_json: ':"a"}' },
+      },
       { type: "content_block_stop", index: 1 },
       {
         type: "content_block_start",
         index: 2,
-        content_block: { type: "tool_use", id: "toolu_2", name: "other", input: {} },
+        content_block: {
+          type: "tool_use",
+          id: "toolu_2",
+          name: "other",
+          input: {},
+        },
       },
       { type: "content_block_stop", index: 2 },
-      { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 4 } },
+      {
+        type: "message_delta",
+        delta: { stop_reason: "tool_use" },
+        usage: { output_tokens: 4 },
+      },
       { type: "message_stop" },
     ],
   },
@@ -784,21 +886,37 @@ const streamCases: Record<
         output_index: 0,
         item: { type: "function_call", call_id: "c", name: "lookup" },
       },
-      { type: "response.function_call_arguments.done", output_index: 0, arguments: '{"q":"z"}' },
+      {
+        type: "response.function_call_arguments.done",
+        output_index: 0,
+        arguments: '{"q":"z"}',
+      },
       {
         type: "response.completed",
         response: { id: "r", usage: { input_tokens: 1, output_tokens: 1 } },
       },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } },
+      },
       {
         type: "content_block_start",
         index: 0,
-        content_block: { type: "tool_use", id: "c", name: "lookup", input: { q: "z", n: [1, 2] } },
+        content_block: {
+          type: "tool_use",
+          id: "c",
+          name: "lookup",
+          input: { q: "z", n: [1, 2] },
+        },
       },
       { type: "content_block_stop", index: 0 },
-      { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 1 } },
+      {
+        type: "message_delta",
+        delta: { stop_reason: "tool_use" },
+        usage: { output_tokens: 1 },
+      },
       { type: "message_stop" },
     ],
   },
@@ -809,31 +927,57 @@ const streamCases: Record<
         output_index: 0,
         item: { type: "function_call", call_id: "c", name: "lookup" },
       },
-      { type: "response.function_call_arguments.delta", output_index: 0, delta: '{"q":' },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 0,
+        delta: '{"q":',
+      },
       {
         type: "response.incomplete",
         response: { id: "r", usage: { input_tokens: 1, output_tokens: 32 } },
       },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } },
+      },
       {
         type: "content_block_start",
         index: 0,
         content_block: { type: "tool_use", id: "c", name: "lookup", input: {} },
       },
-      { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"q":' } },
-      { type: "message_delta", delta: { stop_reason: "max_tokens" }, usage: { output_tokens: 32 } },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: '{"q":' },
+      },
+      {
+        type: "message_delta",
+        delta: { stop_reason: "max_tokens" },
+        usage: { output_tokens: 32 },
+      },
       { type: "message_stop" },
     ],
   },
   "arguments for a call that never started": {
     openai: [
-      { type: "response.function_call_arguments.delta", output_index: 4, delta: "{" },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 4,
+        delta: "{",
+      },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } } },
-      { type: "content_block_delta", index: 4, delta: { type: "input_json_delta", partial_json: "{" } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } },
+      },
+      {
+        type: "content_block_delta",
+        index: 4,
+        delta: { type: "input_json_delta", partial_json: "{" },
+      },
     ],
   },
   "a call without an id": {
@@ -845,7 +989,10 @@ const streamCases: Record<
       },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } },
+      },
       {
         type: "content_block_start",
         index: 0,
@@ -862,7 +1009,10 @@ const streamCases: Record<
       },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } },
+      },
       {
         type: "content_block_start",
         index: 0,
@@ -884,7 +1034,10 @@ const streamCases: Record<
       },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } },
+      },
       {
         type: "content_block_start",
         index: 0,
@@ -904,16 +1057,27 @@ const streamCases: Record<
         output_index: 0,
         item: { type: "function_call", call_id: "a", name: "lookup" },
       },
-      { type: "response.function_call_arguments.delta", output_index: 0, delta: 7 },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 0,
+        delta: 7,
+      },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } },
+      },
       {
         type: "content_block_start",
         index: 0,
         content_block: { type: "tool_use", id: "a", name: "lookup", input: {} },
       },
-      { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: 7 } },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: 7 },
+      },
     ],
   },
   "stream ends inside a call": {
@@ -923,21 +1087,35 @@ const streamCases: Record<
         output_index: 0,
         item: { type: "function_call", call_id: "a", name: "lookup" },
       },
-      { type: "response.function_call_arguments.delta", output_index: 0, delta: "{" },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 0,
+        delta: "{",
+      },
     ],
     anthropic: [
-      { type: "message_start", message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } } },
+      {
+        type: "message_start",
+        message: { id: "m", usage: { input_tokens: 1, output_tokens: 0 } },
+      },
       {
         type: "content_block_start",
         index: 0,
         content_block: { type: "tool_use", id: "a", name: "lookup", input: {} },
       },
-      { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{" } },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: "{" },
+      },
     ],
   },
 };
 
-const toolsInput = inv({ messages: [user], tools: [lookup, { name: "other", input_schema: { type: "object" } }] });
+const toolsInput = inv({
+  messages: [user],
+  tools: [lookup, { name: "other", input_schema: { type: "object" } }],
+});
 const providers = { openai, anthropic } as const;
 const out: Json = {
   version: 1,
