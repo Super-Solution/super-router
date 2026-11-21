@@ -47,8 +47,16 @@ type MediaRate struct {
 	Per   int64  `json:"per"`
 }
 
+// UnitRate prices one custom billing unit: Atoms per Per units, shown to people as DisplayUnit.
+type UnitRate struct {
+	Atoms       string `json:"atoms"`
+	Per         int64  `json:"per"`
+	DisplayUnit string `json:"display_unit"`
+}
+
 // Price is the wire price. Token rates are atoms per Per tokens.
 type Price struct {
+	Units      map[string]UnitRate  `json:"units,omitempty"`
 	Asset      string               `json:"asset"`
 	Input      string               `json:"input"`
 	Cached     string               `json:"cached"`
@@ -58,11 +66,34 @@ type Price struct {
 	Media      map[string]MediaRate `json:"media,omitempty"`
 }
 
-// Usage holds meter readings; media meters absent from the map count as zero.
+// Usage holds meter readings; media meters and custom units absent from the maps count as zero.
 type Usage struct {
 	Input, Cached, CacheWrite, Output int64
 	Media                             map[string]int64
+	Units                             map[string]int64
 }
+
+var (
+	unitNameRe        = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+	reservedUnitNames = map[string]bool{"units": true, "__proto__": true, "constructor": true, "prototype": true}
+)
+
+// ValidUnitName reports whether key may name a custom billing unit: `^[a-z][a-z0-9_]{0,63}$`, not a token or
+// media meter, and not a name that is unsafe as a JavaScript object key.
+func ValidUnitName(key string) bool {
+	if !unitNameRe.MatchString(key) || reservedUnitNames[key] {
+		return false
+	}
+	for _, k := range append(append([]string{}, tokenKeys...), mediaKeys...) {
+		if k == key {
+			return false
+		}
+	}
+	return true
+}
+
+// MediaKeys are the media meters, in the order the reference iterates them.
+func MediaKeys() []string { return append([]string{}, mediaKeys...) }
 
 func atoms(s string) *big.Int {
 	n, ok := new(big.Int).SetString(s, 10)
@@ -92,6 +123,16 @@ func Charge(u Usage, p Price) (*big.Int, error) {
 	for _, key := range mediaKeys {
 		units := u.Media[key]
 		rate, priced := p.Media[key]
+		if units != 0 && !priced {
+			return nil, fail("unpriced_meter", 422)
+		}
+		if priced {
+			part := new(big.Int).Mul(big.NewInt(units), atoms(rate.Atoms))
+			total.Add(total, ceilDiv(part, big.NewInt(rate.Per)))
+		}
+	}
+	for key, units := range u.Units {
+		rate, priced := p.Units[key]
 		if units != 0 && !priced {
 			return nil, fail("unpriced_meter", 422)
 		}
@@ -173,7 +214,7 @@ func keysWithin(m map[string]any, allowed []string) bool {
 // raw is a decoded JSON value (use json.Unmarshal into any).
 func CompileCreditPrice(raw any) (Price, error) {
 	cfg, ok := raw.(map[string]any)
-	if !ok || !keysWithin(cfg, []string{"asset", "tokens", "media"}) {
+	if !ok || !keysWithin(cfg, []string{"asset", "tokens", "media", "units"}) {
 		return Price{}, invalid()
 	}
 	asset, ok := cfg["asset"].(string)
@@ -209,7 +250,11 @@ func CompileCreditPrice(raw any) (Price, error) {
 			media[k] = r
 		}
 	}
-	if tokens == nil && len(media) == 0 {
+	rawUnits, hasUnits := cfg["units"]
+	if hasUnits && rawUnits == nil {
+		hasUnits = false
+	}
+	if tokens == nil && len(media) == 0 && !hasUnits {
 		return Price{}, invalid()
 	}
 
@@ -249,6 +294,40 @@ func CompileCreditPrice(raw any) (Price, error) {
 			out.Media = map[string]MediaRate{}
 		}
 		out.Media[k] = MediaRate{Atoms: numerator.String(), Per: denominator.Int64()}
+	}
+	if hasUnits {
+		m, ok := rawUnits.(map[string]any)
+		if !ok {
+			return Price{}, invalid()
+		}
+		for key, item := range m {
+			r, ok := item.(map[string]any)
+			if !ok || !keysWithin(r, []string{"units", "credits", "display_unit"}) || !ValidUnitName(key) {
+				return Price{}, invalid()
+			}
+			display, ok := r["display_unit"].(string)
+			if n := len([]rune(display)); !ok || n < 1 || n > 80 {
+				return Price{}, invalid()
+			}
+			numeric := map[string]any{}
+			for _, k := range []string{"units", "credits"} {
+				if v, present := r[k]; present {
+					numeric[k] = v
+				}
+			}
+			parsed, err := parseRatio(numeric)
+			if err != nil {
+				return Price{}, err
+			}
+			numerator, denominator := reduce(parsed)
+			if denominator.Cmp(limit) > 0 || !atomsRe.MatchString(numerator.String()) {
+				return Price{}, fail("unsupported_rate_precision", 422)
+			}
+			if out.Units == nil {
+				out.Units = map[string]UnitRate{}
+			}
+			out.Units[key] = UnitRate{Atoms: numerator.String(), Per: denominator.Int64(), DisplayUnit: display}
+		}
 	}
 	// The wire Price caps atoms at 30 digits.
 	check := append([]string{}, values...)

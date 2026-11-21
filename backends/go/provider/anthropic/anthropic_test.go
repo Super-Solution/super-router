@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -81,7 +82,7 @@ func TestStreamsTextAndMergesUsage(t *testing.T) {
 	if len(events) != 3 || events[0].Text != "Hi" {
 		t.Fatalf("%+v", events)
 	}
-	if events[1].Usage != (contracts.Meters{Input: 50, Cached: 20, CacheWrite: 5, Output: 9}) || events[1].UpstreamID != "msg_1" || events[2].Completion != "succeeded" {
+	if !reflect.DeepEqual(events[1].Usage, contracts.Meters{Input: 50, Cached: 20, CacheWrite: 5, Output: 9}) || events[1].UpstreamID != "msg_1" || events[2].Completion != "succeeded" {
 		t.Fatalf("%+v", events)
 	}
 }
@@ -151,7 +152,7 @@ func TestDeltaMayCompleteTheCounters(t *testing.T) {
 		frame(`{"type":"message_delta","delta":{},"usage":{"output_tokens":4}}`),
 		frame(`{"type":"message_stop"}`),
 	), "k", invocation())
-	if err != nil || events[0].Usage != (contracts.Meters{Input: 7, Output: 4}) {
+	if err != nil || !reflect.DeepEqual(events[0].Usage, contracts.Meters{Input: 7, Output: 4}) {
 		t.Fatalf("%v %+v", err, events)
 	}
 }

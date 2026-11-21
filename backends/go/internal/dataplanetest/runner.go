@@ -47,7 +47,8 @@ type Harness struct {
 // Run executes every scenario of the file as a subtest. make builds a fresh harness for one scenario.
 func Run(t *testing.T, name string, make func(t *testing.T) *Harness) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "conformance", "dataplane.v1.json"))
+	// The Rust copy holds every shared scenario plus the ones for features the TypeScript reference lacks.
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "rust", "conformance", "dataplane.v1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -26,4 +26,6 @@ npx tsx --test tests/dataplane.test.ts         # data plane scenarios on memory 
 
 `dataplane.v1.json` is edited by hand: change a scenario only when behaviour changes on purpose, and run it on every store.
 If pricing behaviour changes on purpose, regenerate, review the diff, and update every port.
-The Rust backend is closed source and lives in a private repository; it tests against this same file.
+`backends/rust/conformance` holds a copy of these files with the same cases first, followed by cases for features the
+TypeScript reference does not have yet (custom billing units, structured output, downgrade policy, label evidence).
+Rust and Go test against that copy; `tools.v1.json` is the same in both places.

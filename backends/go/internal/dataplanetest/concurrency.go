@@ -22,7 +22,8 @@ import (
 // survive any interleaving: no overspend, no lost update, nothing left held, and every refusal is a 402.
 func Concurrency(t *testing.T, h *Harness) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "conformance", "dataplane.v1.json"))
+	// The Rust copy holds every shared scenario plus the ones for features the TypeScript reference lacks.
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "rust", "conformance", "dataplane.v1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

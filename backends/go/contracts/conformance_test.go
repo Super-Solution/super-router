@@ -35,7 +35,8 @@ func generic(t *testing.T, v any) any {
 }
 
 func TestParseConformance(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "conformance", "contracts.v1.json"))
+	// The Rust copy holds every shared case plus the extensions TypeScript does not have.
+	raw, err := os.ReadFile(filepath.Join("..", "..", "rust", "conformance", "contracts.v1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

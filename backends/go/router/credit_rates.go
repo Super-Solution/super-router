@@ -32,22 +32,24 @@ func PublishCreditRateVersion(ctx context.Context, store DataStore, p contracts.
 	}
 	cfg, _ := config.(map[string]any)
 	_, hasTokens := cfg["tokens"]
+	_, hasMediaKey := cfg["media"]
 	media, _ := cfg["media"].(map[string]any)
-	mismatch := false
-	if current.TaskKind != nil {
+	var mismatch bool
+	switch {
+	case current.TaskKind != nil && len(current.Price.Units) > 0:
+		// A service billed in custom units keeps being billed in custom units.
+		mismatch = len(price.Units) == 0 || hasTokens || hasMediaKey
+	case current.TaskKind != nil:
 		meter := contracts.KindMeter[*current.TaskKind]
 		_, hasMeter := media[meter]
-		mismatch = !hasMeter || hasTokens
+		mismatch = !hasMeter || hasTokens || len(price.Units) > 0
 		for k := range media {
 			if k != meter {
 				mismatch = true
 			}
 		}
-	} else {
-		mismatch = !hasTokens || len(media) > 0
-		if _, present := cfg["media"]; present {
-			mismatch = true
-		}
+	default:
+		mismatch = !hasTokens || len(media) > 0 || len(price.Units) > 0 || hasMediaKey
 	}
 	if mismatch {
 		return contracts.Service{}, fail("credit_rate_kind_mismatch", 422)

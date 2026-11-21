@@ -80,8 +80,15 @@ type BillingReport struct {
 	Charges []Charge `json:"charges"`
 }
 
+// Downgrade reports an actual cross-tier attempt.
+type Downgrade struct {
+	FromTier string `json:"from_tier"`
+	ToTier   string `json:"to_tier"`
+}
+
 // Result is the answer to Infer. A replayed idempotency key returns only the identifiers and statuses.
 type Result struct {
+	Downgrade       *Downgrade     `json:"downgrade,omitempty"`
 	Replayed        bool           `json:"replayed,omitempty"`
 	ID              string         `json:"id"`
 	ExecutionStatus string         `json:"execution_status"`
@@ -115,13 +122,13 @@ func replayed(rec *RequestRecord) *Result {
 // task has no messages and exactly its own meter limited.
 func validateShape(in contracts.Invocation) error {
 	if task := in.Input.Task; task != nil {
-		meter := contracts.KindMeter[task.Kind]
+		meter := task.MeterName()
 		limits := in.Limits.MaxUsage
 		if len(in.Input.Messages) > 0 || limits[meter] == 0 {
 			return fail("invalid_task_limits", 400)
 		}
-		for _, k := range contracts.MediaKeys {
-			if k != meter && limits[k] != 0 {
+		for k, n := range limits {
+			if k != meter && n != 0 {
 				return fail("invalid_task_limits", 400)
 			}
 		}
@@ -184,12 +191,16 @@ func (r *Router) Infer(ctx context.Context, p contracts.Principal, raw []byte, k
 	if in.Limits.MaxOutputTokens > service.MaxOutputTokens {
 		return nil, fail("unsupported_capability", 422)
 	}
-	candidates, excluded, err := routing.Route(service, in)
+	candidates, excluded, err := routing.RouteAt(service, in, r.clock().UnixMilli())
 	if err != nil {
 		return nil, err
 	}
 	if len(candidates) == 0 {
 		return nil, fail("no_eligible_offering", 422)
+	}
+	// Routing already excludes offerings without the capability; no provider adapter writes the schema yet.
+	if in.ResponseFormat != nil {
+		return nil, fail("unsupported_capability", 422)
 	}
 	for _, c := range candidates {
 		if r.providers[c.Offering.Provider] == nil {
@@ -214,7 +225,14 @@ func (r *Router) Infer(ctx context.Context, p contracts.Principal, raw []byte, k
 	decision := Decision{Excluded: excluded, Candidates: make([]DecisionCandidate, 0, len(candidates))}
 	for _, c := range candidates {
 		maxInput = max(maxInput, c.Offering.MaxInputTokens)
-		decision.Candidates = append(decision.Candidates, DecisionCandidate{ID: c.Offering.ID, Score: c.Score, Cost: c.Cost.String()})
+		decision.Candidates = append(decision.Candidates, DecisionCandidate{
+			Downgrade:       downgradeOf(service, c),
+			QualityMetadata: c.Offering.QualityMetadata,
+			LabelEvidence:   c.Offering.LabelEvidence,
+			ID:              c.Offering.ID,
+			Score:           c.Score,
+			Cost:            c.Cost.String(),
+		})
 	}
 	legs, err := r.store.Accounts(ctx, p, service)
 	if err != nil {
@@ -258,6 +276,7 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 		lastModel  string
 		toolBytes  int
 		toolCalls  = map[int]*contracts.ToolCall{}
+		downgrade  *Downgrade
 	)
 	send := func(kind string, data map[string]any) error {
 		seq++
@@ -348,6 +367,11 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 			completion = "succeeded"
 		)
 		lastModel = candidate.Offering.Model
+		if downgrade = downgradeOf(service, candidate); downgrade != nil {
+			if err := send("routing.downgrade", map[string]any{"from_tier": downgrade.FromTier, "to_tier": downgrade.ToTier, "offering": candidate.Offering.ID}); err != nil {
+				return nil, err
+			}
+		}
 		callErr := provider.Invoke(runCtx, in, candidate.Offering, func(ev contracts.ProviderEvent) error {
 			switch ev.Type {
 			case "delta":
@@ -504,18 +528,34 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 	if err := send(kind, data); err != nil {
 		return nil, err
 	}
+	if downgrade != nil {
+		res.Tier = downgrade.ToTier
+	}
+	res.Downgrade = downgrade
 	return res, nil
+}
+
+// downgradeOf is the cross-tier step a candidate takes, or nil for a primary offering.
+func downgradeOf(service contracts.Service, c routing.Candidate) *Downgrade {
+	if !c.Downgrade {
+		return nil
+	}
+	d := &Downgrade{FromTier: service.Tier}
+	if service.DowngradePolicy != nil {
+		d.ToTier = service.DowngradePolicy.Tier
+	}
+	return d
 }
 
 // checkUsage applies the per-kind limits to what a provider reported. It returns an error code, or "".
 func checkUsage(in contracts.Invocation, u contracts.Meters, completion string) string {
 	if task := in.Input.Task; task != nil {
-		meter := contracts.KindMeter[task.Kind]
+		meter := task.MeterName()
 		if u.Input != 0 || u.Cached != 0 || u.CacheWrite != 0 || u.Output != 0 {
 			return "usage_out_of_bounds"
 		}
-		for _, k := range contracts.MediaKeys {
-			if u.Media(k) > in.Limits.MaxUsage[k] {
+		for k, n := range u.Quantities() {
+			if n > in.Limits.MaxUsage[k] {
 				return "usage_out_of_bounds"
 			}
 		}
@@ -530,8 +570,8 @@ func checkUsage(in contracts.Invocation, u contracts.Meters, completion string) 
 		}
 		return ""
 	}
-	for _, k := range contracts.MediaKeys {
-		if u.Media(k) != 0 {
+	for _, n := range u.Quantities() {
+		if n != 0 {
 			return "unexpected_meter"
 		}
 	}

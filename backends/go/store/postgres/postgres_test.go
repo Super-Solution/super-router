@@ -103,3 +103,19 @@ func TestConcurrency(t *testing.T) {
 	store := open(t)
 	dataplanetest.Concurrency(t, &dataplanetest.Harness{Store: store, Clock: time.Now})
 }
+
+func TestCustomUnits(t *testing.T) { dataplanetest.CustomUnits(t, open(t)) }
+
+func TestDowngrade(t *testing.T) {
+	store := open(t)
+	dataplanetest.Downgrade(t, store, func(p contracts.Principal, request string) string {
+		var raw string
+		if err := store.DB().QueryRowContext(context.Background(), "SELECT route_decision::text FROM sr_requests WHERE workspace=$1 AND environment=$2 AND id=$3",
+			p.Workspace, p.Environment, request).Scan(&raw); err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	})
+}
+
+func TestStructuredOutput(t *testing.T) { dataplanetest.StructuredOutput(t, open(t)) }

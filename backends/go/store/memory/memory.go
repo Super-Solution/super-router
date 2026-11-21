@@ -276,7 +276,7 @@ func (s *Store) Publish(_ context.Context, p contracts.Principal, svc contracts.
 		mode = "self-host"
 	}
 	if mode == "cloud" {
-		for _, o := range svc.Offerings {
+		for _, o := range svc.AllOfferings() {
 			if o.Source == "byok" {
 				return contracts.Service{}, fail("byok_not_allowed", 403)
 			}
@@ -294,7 +294,7 @@ func (s *Store) Publish(_ context.Context, p contracts.Principal, svc contracts.
 		return contracts.Service{}, fail("service_version_conflict", 409)
 	}
 	if mode == "cloud" && p.AuthKeyID != "" {
-		if previous == nil || !same(previous.PlatformPrice, svc.PlatformPrice) || !same(previous.Offerings, svc.Offerings) {
+		if previous == nil || !same(previous.PlatformPrice, svc.PlatformPrice) || !same(previous.AllOfferings(), svc.AllOfferings()) {
 			return contracts.Service{}, fail("platform_pricing_protected", 403)
 		}
 	}
@@ -587,9 +587,10 @@ func (s *Store) Begin(_ context.Context, p contracts.Principal, id string, o con
 		return "", fail("connection_disabled", 409)
 	}
 	var snapshot *contracts.Offering
-	for i := range r.record.Service.Offerings {
-		if r.record.Service.Offerings[i].ID == o.ID {
-			snapshot = &r.record.Service.Offerings[i]
+	offerings := r.record.Service.AllOfferings()
+	for i := range offerings {
+		if offerings[i].ID == o.ID {
+			snapshot = &offerings[i]
 		}
 	}
 	if snapshot == nil || !same(*snapshot, o) {

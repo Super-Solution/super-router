@@ -2,7 +2,9 @@
 
 A complete data plane in Go: exact pricing, offering routing, idempotent admission with reserve and settle, a
 `net/http` server, providers, and storage you can swap. The TypeScript packages are the reference, and every
-Go package reproduces the shared data in [`../../conformance`](../../conformance/README.md).
+Go package reproduces the shared data in [`../../conformance`](../../conformance/README.md). Pricing, contracts,
+routing and the data plane scenarios are read from the Rust copy in [`../rust/conformance`](../rust/conformance), which
+holds every shared case plus those for the features below that the TypeScript reference does not have yet.
 
 ```
 backends/go
@@ -59,8 +61,9 @@ implement the interface and run the shared scenarios against it:
 dataplanetest.Run(t, "mydb", func(t *testing.T) *dataplanetest.Harness { ... })
 ```
 
-`conformance/dataplane.v1.json` holds 28 scenarios (settlement, fallback, replay, expiry, bucket order, cancel,
-recovery and more). `dataplanetest.Concurrency` adds the invariants that must hold under contention.
+`rust/conformance/dataplane.v1.json` holds 32 scenarios (the 28 shared ones: settlement, fallback, replay, expiry,
+bucket order, cancel, recovery and more; and 4 for downgrade and label evidence). `dataplanetest.Concurrency` adds the
+invariants that must hold under contention, and `CustomUnits`, `Downgrade` and `StructuredOutput` the features below.
 
 ## Test
 
@@ -87,6 +90,27 @@ started streaming it is output, so a later failure is partial and never falls ba
 dry run accept bodies up to 4 MB (read after authentication); other routes keep 256 KB. `conformance/tools.v1.json`
 pins the parsing, the canonical JSON and the OpenAI and Anthropic mappings, and `SUPERROUTER_MOCK=1` also registers a
 scripted `mock-tools` provider for demos.
+
+## Beyond the TypeScript reference
+
+These match the Rust data plane and are pinned by its conformance copy:
+
+- **Custom billing units.** A price may bill named units (`"units": {"pages": {"atoms": "7", "per": 3,
+  "display_unit": "頁"}}`), a task names its meter (`"meter": "pages"`), and limits put them under
+  `"max_usage": {"units": {...}}`. Unit names match `^[a-z][a-z0-9_]{0,63}$` and may not reuse a token or media name.
+  A credit-rate version keeps a unit-billed service in units.
+- **Structured output.** `response_format` (`json_schema` with a name, a schema object and optional description and
+  `strict`) excludes offerings without the `structured_output` capability as `structured_output_unsupported`. No
+  provider adapter writes the schema yet, so a request that still has a candidate is refused with
+  `422 unsupported_capability` before anything is reserved.
+- **Downgrade policy.** A tier service may name a lower tier and its offerings. They pass the same hard limits, are
+  tried after every primary offering, emit `routing.downgrade` when tried, and the result reports `downgrade`
+  (`from_tier`, `to_tier`) and the lower tier.
+- **Label evidence and quality metadata.** An offering may carry `label_evidence` per label (source, `verified` or
+  `unverified`, `expires_at`) and `quality_metadata`. Expired evidence excludes the offering as `label_expired`; with
+  `require_verified_labels`, missing or unverified evidence excludes it as `label_unverified`. Both are kept in the
+  request's route decision.
+- **Offering capabilities.** `capabilities` lists `tools` and `structured_output`.
 
 Not yet in Go: payments, subscriptions and the control plane (members, keys, plans). The TypeScript server has them.
 
