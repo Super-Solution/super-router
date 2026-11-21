@@ -26,8 +26,9 @@ var KindMeter = map[string]string{"image": "images", "video": "video_ms", "audio
 const maxSafe = 1<<53 - 1
 
 var (
-	idRe    = regexp.MustCompile(`^[a-zA-Z0-9_.:/-]+$`)
-	atomsRe = regexp.MustCompile(`^(0|[1-9][0-9]{0,29})$`)
+	schemaNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+	idRe         = regexp.MustCompile(`^[a-zA-Z0-9_.:/-]+$`)
+	atomsRe      = regexp.MustCompile(`^(0|[1-9][0-9]{0,29})$`)
 )
 
 var errInvalid = errors.New("invalid")
@@ -76,6 +77,8 @@ func decodeStrict(data []byte, nulls func(any) bool, defaults func(map[string]an
 	return nil
 }
 
+// hasNull reports a null anywhere in the tree, except inside a JSON Schema (a tool's input_schema or a
+// response format's schema), which may legitimately hold null.
 func hasNull(v any) bool {
 	switch x := v.(type) {
 	case nil:
@@ -87,50 +90,12 @@ func hasNull(v any) bool {
 			}
 		}
 	case map[string]any:
-		for _, e := range x {
-			if hasNull(e) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// invocationHasNull is hasNull except inside a tool's input_schema, where JSON Schema may legitimately hold null.
-func invocationHasNull(v any) bool {
-	root, ok := v.(map[string]any)
-	if !ok {
-		return hasNull(v)
-	}
-	for k, e := range root {
-		in, isObject := e.(map[string]any)
-		if k != "input" || !isObject {
-			if hasNull(e) {
-				return true
-			}
-			continue
-		}
-		for ik, ie := range in {
-			tools, isList := ie.([]any)
-			if ik != "tools" || !isList {
-				if hasNull(ie) {
-					return true
-				}
+		for k, e := range x {
+			if _, schema := e.(map[string]any); schema && (k == "schema" || k == "input_schema") {
 				continue
 			}
-			for _, t := range tools {
-				tool, isTool := t.(map[string]any)
-				if !isTool {
-					if hasNull(t) {
-						return true
-					}
-					continue
-				}
-				for tk, te := range tool {
-					if tk != "input_schema" && hasNull(te) {
-						return true
-					}
-				}
+			if hasNull(e) {
+				return true
 			}
 		}
 	}
@@ -195,8 +160,16 @@ func validPrice(p pricing.Price) bool {
 			return false
 		}
 	}
+	for key, rate := range p.Units {
+		if !pricing.ValidUnitName(key) || !atomsRe.MatchString(rate.Atoms) || rate.Per < 1 || rate.Per > 1_000_000_000 ||
+			!inRange(rate.DisplayUnit, 1, 80) {
+			return false
+		}
+	}
 	return true
 }
+
+func inRange(s string, min, max int) bool { n := length(s); return n >= min && n <= max }
 
 func isMedia(key string) bool {
 	for _, k := range MediaKeys {
@@ -207,9 +180,9 @@ func isMedia(key string) bool {
 	return false
 }
 
-func validMedia(m map[string]int64) bool {
+func validMeterLimits(m MeterLimits) bool {
 	for key, n := range m {
-		if !isMedia(key) || !safeNonNeg(n) {
+		if !isMedia(key) && !pricing.ValidUnitName(key) || !safeNonNeg(n) {
 			return false
 		}
 	}
@@ -226,6 +199,11 @@ func serviceDefaults(root map[string]any) bool {
 	ok = ok && need(root["weights"], "cost", "latency", "reliability", "quality")
 	ok = ok && priceDefaults(root["price"]) && priceDefaults(root["platform_price"])
 	offerings, _ := root["offerings"].([]any)
+	if d := object(root["downgrade_policy"]); d != nil {
+		ok = ok && need(d, "tier", "offerings")
+		more, _ := d["offerings"].([]any)
+		offerings = append(append([]any{}, offerings...), more...)
+	}
 	for _, o := range offerings {
 		if m := object(o); m != nil {
 			setDefault(m, "labels", []any{})
@@ -243,8 +221,26 @@ func validOffering(o *Offering) bool {
 	if o.TaskKind != nil && !isTaskKind(*o.TaskKind) {
 		return false
 	}
-	if !validMedia(o.MaxUsage) || o.Labels == nil {
+	if !validMeterLimits(o.MaxUsage) || o.Labels == nil {
 		return false
+	}
+	if o.Capabilities != nil {
+		for _, c := range *o.Capabilities {
+			if c != "tools" && c != "structured_output" {
+				return false
+			}
+		}
+	}
+	if q := o.QualityMetadata; q != nil && (!inRange(q.Source, 1, 2048) || !inRange(q.Task, 1, 120) || !ValidDatetime(q.UpdatedAt)) {
+		return false
+	}
+	if o.LabelEvidence != nil {
+		for label, e := range *o.LabelEvidence {
+			if !validID(label) || !inRange(e.Source, 1, 2048) || e.Verification != "verified" && e.Verification != "unverified" ||
+				e.ExpiresAt != nil && !ValidDatetime(*e.ExpiresAt) {
+				return false
+			}
+		}
 	}
 	for _, l := range o.Labels {
 		if !validID(l) {
@@ -311,10 +307,14 @@ func validService(s *Service) bool {
 	if len(s.Offerings) < 1 || len(s.Regions) < 1 || s.RequiredLabels == nil {
 		return false
 	}
+	if d := s.DowngradePolicy; d != nil && (s.Mode != "tier" || !validID(d.Tier) || d.Tier == s.Tier || len(d.Offerings) == 0) {
+		return false
+	}
 	seen := map[string]bool{}
 	assets := map[string]bool{}
-	for i := range s.Offerings {
-		o := &s.Offerings[i]
+	all := s.AllOfferings()
+	for i := range all {
+		o := &all[i]
 		if !validOffering(o) || seen[o.ID] {
 			return false
 		}
@@ -363,6 +363,9 @@ func invocationDefaults(root map[string]any) bool {
 		setDefault(in, "messages", []any{})
 		ok = ok && need(in["task"], "kind", "prompt")
 	}
+	if f := object(root["response_format"]); f != nil {
+		ok = ok && need(f, "type", "json_schema") && need(f["json_schema"], "name", "schema")
+	}
 	if l := object(root["limits"]); l != nil {
 		setDefault(l, "max_output_tokens", json.Number("1"))
 		setDefault(l, "timeout_ms", json.Number("30000"))
@@ -375,7 +378,7 @@ func invocationDefaults(root map[string]any) bool {
 // (payer_mode "developer", max_output_tokens 1, timeout_ms 30000, stream false, no messages).
 func ParseInvocation(data []byte) (Invocation, error) {
 	var in Invocation
-	if err := decodeStrict(data, invocationHasNull, invocationDefaults, &in); err != nil {
+	if err := decodeStrict(data, hasNull, invocationDefaults, &in); err != nil {
 		return Invocation{}, InvalidRequest()
 	}
 	if !validInvocation(&in) {
@@ -395,14 +398,22 @@ func validInvocation(in *Invocation) bool {
 	if in.Input.Messages == nil || len(in.Input.Messages) > 100 || !validToolUse(in) {
 		return false
 	}
-	if t := in.Input.Task; t != nil && (!isTaskKind(t.Kind) || !validContent(t.Prompt)) {
+	if t := in.Input.Task; t != nil && (!isTaskKind(t.Kind) || !validContent(t.Prompt) ||
+		t.Meter != "" && !pricing.ValidUnitName(t.Meter) && !isMedia(t.Meter)) {
 		return false
+	}
+	if f := in.ResponseFormat; f != nil {
+		js := f.JSONSchema
+		if f.Type != "json_schema" || !schemaNameRe.MatchString(js.Name) || js.Schema == nil || js.Strict != nil && !*js.Strict ||
+			js.Description != nil && length(*js.Description) > 1024 || in.Input.Task != nil {
+			return false
+		}
 	}
 	l := in.Limits
 	if l.MaxOutputTokens < 1 || l.MaxOutputTokens > 8192 || l.TimeoutMs < 100 || l.TimeoutMs > 120000 {
 		return false
 	}
-	if l.MaxUsage != nil && !validMedia(l.MaxUsage) {
+	if l.MaxUsage != nil && !validMeterLimits(l.MaxUsage) {
 		return false
 	}
 	if c := l.MaxCharge; c != nil && (!validID(c.Asset) || !atomsRe.MatchString(c.Atoms) || c.Scale != 9) {
@@ -422,6 +433,11 @@ func (m Meters) Valid() bool {
 	}
 	for _, p := range []*int64{m.Images, m.VideoMs, m.AudioMs, m.Tasks} {
 		if p != nil && !safeNonNeg(*p) {
+			return false
+		}
+	}
+	for k, n := range m.Units {
+		if !pricing.ValidUnitName(k) || !safeNonNeg(n) {
 			return false
 		}
 	}

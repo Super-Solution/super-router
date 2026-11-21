@@ -35,3 +35,9 @@ func harness(*testing.T) *dataplanetest.Harness {
 func TestDataplaneConformance(t *testing.T) { dataplanetest.Run(t, "memory", harness) }
 
 func TestConcurrency(t *testing.T) { dataplanetest.Concurrency(t, harness(t)) }
+
+func TestCustomUnits(t *testing.T) { dataplanetest.CustomUnits(t, harness(t).Store) }
+
+func TestDowngrade(t *testing.T) { dataplanetest.Downgrade(t, harness(t).Store, nil) }
+
+func TestStructuredOutput(t *testing.T) { dataplanetest.StructuredOutput(t, harness(t).Store) }

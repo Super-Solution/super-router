@@ -258,7 +258,7 @@ func (s *Store) Publish(ctx context.Context, p contracts.Principal, svc contract
 		mode = "self-host"
 	}
 	if mode == "cloud" {
-		for _, o := range svc.Offerings {
+		for _, o := range svc.AllOfferings() {
 			if o.Source == "byok" {
 				return contracts.Service{}, fail("byok_not_allowed", 403)
 			}
@@ -292,7 +292,7 @@ func (s *Store) Publish(ctx context.Context, p contracts.Principal, svc contract
 		}
 		if mode == "cloud" && p.AuthKeyID != "" {
 			// Database-authenticated developers cannot provision or rewrite platform supply economics.
-			if previous == nil || !same(previous.PlatformPrice, svc.PlatformPrice) || !same(previous.Offerings, svc.Offerings) {
+			if previous == nil || !same(previous.PlatformPrice, svc.PlatformPrice) || !same(previous.AllOfferings(), svc.AllOfferings()) {
 				return fail("platform_pricing_protected", 403)
 			}
 		}
@@ -685,9 +685,10 @@ func (s *Store) Begin(ctx context.Context, p contracts.Principal, id string, o c
 			return err
 		}
 		var snapshot *contracts.Offering
-		for i := range r.Service.Offerings {
-			if r.Service.Offerings[i].ID == o.ID {
-				snapshot = &r.Service.Offerings[i]
+		offerings := r.Service.AllOfferings()
+		for i := range offerings {
+			if offerings[i].ID == o.ID {
+				snapshot = &offerings[i]
 			}
 		}
 		if snapshot == nil || !same(*snapshot, o) {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -16,11 +17,39 @@ type expect struct {
 	Error string `json:"error"`
 }
 
+// usage is a usage record as the file writes it: meters at the top level, custom units under "units".
+type usage struct {
+	meters map[string]int64
+	units  map[string]int64
+}
+
+func (u *usage) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	u.meters = map[string]int64{}
+	for k, v := range raw {
+		if k == "units" {
+			if err := json.Unmarshal(v, &u.units); err != nil {
+				return err
+			}
+			continue
+		}
+		var n int64
+		if err := json.Unmarshal(v, &n); err != nil {
+			return err
+		}
+		u.meters[k] = n
+	}
+	return nil
+}
+
 type fixtures struct {
 	Charge []struct {
-		Price  Price            `json:"price"`
-		Usage  map[string]int64 `json:"usage"`
-		Expect expect           `json:"expect"`
+		Price  Price  `json:"price"`
+		Usage  usage  `json:"usage"`
+		Expect expect `json:"expect"`
 	} `json:"charge"`
 	Bound []struct {
 		Price  Price  `json:"price"`
@@ -36,7 +65,8 @@ type fixtures struct {
 
 func load(t *testing.T) fixtures {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "conformance", "pricing.v1.json"))
+	// The Rust copy holds every shared case plus the custom-unit and downgrade cases TypeScript does not have.
+	data, err := os.ReadFile(filepath.Join("..", "..", "rust", "conformance", "pricing.v1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,9 +91,10 @@ func TestCharge(t *testing.T) {
 		t.Fatalf("only %d charge cases", len(f.Charge))
 	}
 	for i, c := range f.Charge {
-		u := Usage{Input: c.Usage["input"], Cached: c.Usage["cached"], CacheWrite: c.Usage["cache_write"], Output: c.Usage["output"], Media: map[string]int64{}}
+		m := c.Usage.meters
+		u := Usage{Input: m["input"], Cached: m["cached"], CacheWrite: m["cache_write"], Output: m["output"], Media: map[string]int64{}, Units: c.Usage.units}
 		for _, k := range mediaKeys {
-			u.Media[k] = c.Usage[k]
+			u.Media[k] = m[k]
 		}
 		got, err := Charge(u, c.Price)
 		switch {
@@ -125,4 +156,17 @@ func normalise(v any) any {
 	var out any
 	_ = json.Unmarshal(data, &out)
 	return out
+}
+
+func TestValidUnitName(t *testing.T) {
+	for _, good := range []string{"tool_calls", "pages", strings.Repeat("a", 64)} {
+		if !ValidUnitName(good) {
+			t.Errorf("%q refused", good)
+		}
+	}
+	for _, bad := range []string{"", "Units", "units", "input", "images", "__proto__", "1a", "a-b", "constructor", strings.Repeat("a", 65)} {
+		if ValidUnitName(bad) {
+			t.Errorf("%q accepted", bad)
+		}
+	}
 }

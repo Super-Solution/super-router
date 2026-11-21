@@ -9,6 +9,7 @@ package routing
 import (
 	"math/big"
 	"sort"
+	"time"
 
 	"github.com/Super-Solution/super-router/backends/go/contracts"
 	"github.com/Super-Solution/super-router/backends/go/pricing"
@@ -32,6 +33,8 @@ type Candidate struct {
 	Offering Offering
 	Cost     *big.Int
 	Score    float64
+	// Downgrade marks an offering of the service's downgrade policy: a lower tier, tried only after the primary ones.
+	Downgrade bool
 }
 
 // Excluded names an offering that was dropped and the first reason that applied.
@@ -68,9 +71,13 @@ func invocationBound(in Invocation, maxInput int64, price pricing.Price) (*big.I
 	if in.Input.Task == nil {
 		return pricing.Bound(maxInput, in.Limits.MaxOutputTokens, price), nil
 	}
-	usage := pricing.Usage{Media: map[string]int64{}}
-	for _, k := range MediaKeys {
-		usage.Media[k] = in.Limits.MaxUsage[k]
+	usage := pricing.Usage{Media: map[string]int64{}, Units: map[string]int64{}}
+	for k, n := range in.Limits.MaxUsage {
+		if pricing.ValidUnitName(k) {
+			usage.Units[k] = n
+		} else {
+			usage.Media[k] = n
+		}
 	}
 	return pricing.Charge(usage, price)
 }
@@ -89,9 +96,35 @@ func minOne(x float64) float64 {
 	return 1
 }
 
-// Route applies the hard limits and then scores what is left. A pricing error from a task
-// bound (an unpriced meter) aborts the whole call, as in the reference.
+// labelReason applies label evidence: an expired label always excludes, and an unverified (or undocumented)
+// one does when the service requires verified labels.
+func labelReason(s Service, o Offering, nowMs int64) string {
+	for _, label := range s.RequiredLabels {
+		if e := o.Evidence(label); e != nil && e.ExpiresAt != nil {
+			if expiry, ok := contracts.ParseUTCMillis(*e.ExpiresAt); ok && expiry <= nowMs {
+				return "label_expired"
+			}
+		}
+	}
+	if s.RequireVerifiedLabels != nil && *s.RequireVerifiedLabels {
+		for _, label := range s.RequiredLabels {
+			if e := o.Evidence(label); e == nil || e.Verification != "verified" {
+				return "label_unverified"
+			}
+		}
+	}
+	return ""
+}
+
+// Route applies the hard limits and then scores what is left, using the wall clock for label expiry. A pricing
+// error from a task bound (an unpriced meter) aborts the whole call, as in the reference.
 func Route(service Service, in Invocation) ([]Candidate, []Excluded, error) {
+	return RouteAt(service, in, time.Now().UnixMilli())
+}
+
+// RouteAt is Route at an injected time, in milliseconds since the epoch. Downgrade offerings face the same hard
+// limits and always sort after every primary offering.
+func RouteAt(service Service, in Invocation, nowMs int64) ([]Candidate, []Excluded, error) {
 	var candidates []Candidate
 	excluded := []Excluded{}
 	var taskKind *string
@@ -100,7 +133,13 @@ func Route(service Service, in Invocation) ([]Candidate, []Excluded, error) {
 	}
 	maxProviderCost := atoms(service.MaxProviderCost)
 	costScale := atoms(service.CostScale)
-	for _, o := range service.Offerings {
+	lower := map[string]bool{}
+	if d := service.DowngradePolicy; d != nil && service.Mode == "tier" {
+		for _, o := range d.Offerings {
+			lower[o.ID] = true
+		}
+	}
+	for _, o := range service.AllOfferings() {
 		reason := ""
 		switch {
 		case !sameKind(o.TaskKind, taskKind) || !sameKind(service.TaskKind, taskKind):
@@ -113,14 +152,22 @@ func Route(service Service, in Invocation) ([]Candidate, []Excluded, error) {
 			reason = "region_mismatch"
 		case missingLabel(service.RequiredLabels, o.Labels):
 			reason = "label_mismatch"
+		default:
+			reason = labelReason(service, o, nowMs)
+		}
+		switch {
+		case reason != "":
 		case in.Limits.MaxOutputTokens > o.MaxOutputTokens:
 			reason = "output_limit"
+		case in.ResponseFormat != nil && !o.HasCapability("structured_output"):
+			reason = "structured_output_unsupported"
 		}
 		if reason == "" && in.Input.Task != nil {
-			key := kindMeter[in.Input.Task.Kind]
+			key := in.Input.Task.MeterName()
 			units := in.Limits.MaxUsage[key]
-			_, priced := o.Price.Media[key]
-			if units == 0 || units > o.MaxUsage[key] || !priced {
+			_, pricedMedia := o.Price.Media[key]
+			_, pricedUnit := o.Price.Units[key]
+			if units == 0 || units > o.MaxUsage[key] || !pricedMedia && !pricedUnit {
 				reason = "meter_limit"
 			}
 		}
@@ -160,9 +207,12 @@ func Route(service Service, in Invocation) ([]Candidate, []Excluded, error) {
 		score := float64(w.Cost*(1-minOne(ratio))) + float64(w.Latency*latency)
 		score += float64(w.Reliability * reliability)
 		score += float64(w.Quality * quality)
-		candidates = append(candidates, Candidate{Offering: o, Cost: cost, Score: score})
+		candidates = append(candidates, Candidate{Offering: o, Cost: cost, Score: score, Downgrade: lower[o.ID]})
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].Downgrade != candidates[j].Downgrade {
+			return !candidates[i].Downgrade
+		}
 		if candidates[i].Score != candidates[j].Score {
 			return candidates[i].Score > candidates[j].Score
 		}

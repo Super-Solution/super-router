@@ -15,9 +15,10 @@ import (
 type expected struct {
 	Ok *struct {
 		Candidates []struct {
-			ID    string  `json:"id"`
-			Cost  string  `json:"cost"`
-			Score float64 `json:"score"`
+			ID        string  `json:"id"`
+			Cost      string  `json:"cost"`
+			Score     float64 `json:"score"`
+			Downgrade bool    `json:"downgrade"`
 		} `json:"candidates"`
 		Excluded []Excluded `json:"excluded"`
 	} `json:"ok"`
@@ -28,12 +29,14 @@ type fixtures struct {
 	Route []struct {
 		Service    Service    `json:"service"`
 		Invocation Invocation `json:"invocation"`
+		Now        *int64     `json:"now"`
 		Expect     expected   `json:"expect"`
 	} `json:"route"`
 }
 
 func TestRouteConformance(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "conformance", "routing.v1.json"))
+	// The Rust copy holds every shared case plus the structured-output, downgrade and label-evidence ones.
+	data, err := os.ReadFile(filepath.Join("..", "..", "rust", "conformance", "routing.v1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +49,11 @@ func TestRouteConformance(t *testing.T) {
 	}
 	withCandidates, errorCases := 0, 0
 	for i, c := range f.Route {
-		got, excluded, err := Route(c.Service, c.Invocation)
+		now := int64(1_700_000_000_000)
+		if c.Now != nil {
+			now = *c.Now
+		}
+		got, excluded, err := RouteAt(c.Service, c.Invocation, now)
 		if c.Expect.Error != "" {
 			errorCases++
 			var re *pricing.RouterError
@@ -69,7 +76,7 @@ func TestRouteConformance(t *testing.T) {
 		}
 		for j, cand := range got {
 			w := want.Candidates[j]
-			if cand.Offering.ID != w.ID || cand.Cost.String() != w.Cost || cand.Score != w.Score {
+			if cand.Offering.ID != w.ID || cand.Cost.String() != w.Cost || cand.Score != w.Score || cand.Downgrade != w.Downgrade {
 				t.Errorf("route[%d][%d]: got %s %s %v, want %s %s %v", i, j, cand.Offering.ID, cand.Cost, cand.Score, w.ID, w.Cost, w.Score)
 			}
 		}

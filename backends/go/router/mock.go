@@ -77,7 +77,7 @@ func (m *MockTaskProvider) Invoke(ctx context.Context, in contracts.Invocation, 
 	if ctx.Err() != nil || m.Behavior == "unknown" {
 		return &contracts.ProviderError{Code: "usage_unknown"}
 	}
-	meter := contracts.KindMeter[task.Kind]
+	meter := task.MeterName()
 	units := in.Limits.MaxUsage[meter]
 	if units == 0 || units > o.MaxUsage[meter] {
 		return &contracts.ProviderError{Definitive: true, Code: "meter_limit"}
@@ -101,8 +101,10 @@ func (m *MockTaskProvider) Invoke(ctx context.Context, in contracts.Invocation, 
 		usage.VideoMs = &completed
 	case "audio_ms":
 		usage.AudioMs = &completed
-	default:
+	case "tasks":
 		usage.Tasks = &completed
+	default:
+		usage.Units = map[string]int64{meter: completed}
 	}
 	if err := emit(contracts.ProviderEvent{Type: "usage", Usage: usage, UpstreamID: uuid.New()}); err != nil {
 		return err

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestStreamsTextAndNormalisesUsage(t *testing.T) {
 		t.Fatalf("%+v", events)
 	}
 	u := events[2]
-	if u.Type != "usage" || u.UpstreamID != "resp_1" || u.Usage != (contracts.Meters{Input: 60, Cached: 30, CacheWrite: 10, Output: 7}) {
+	if u.Type != "usage" || u.UpstreamID != "resp_1" || !reflect.DeepEqual(u.Usage, contracts.Meters{Input: 60, Cached: 30, CacheWrite: 10, Output: 7}) {
 		t.Fatalf("usage %+v", u)
 	}
 	if events[3].Type != "done" || events[3].Completion != "succeeded" {

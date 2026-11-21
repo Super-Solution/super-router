@@ -49,9 +49,12 @@ type Decision struct {
 
 // DecisionCandidate is one routable offering with its bound cost and score.
 type DecisionCandidate struct {
-	ID    string  `json:"id"`
-	Score float64 `json:"score"`
-	Cost  string  `json:"cost"`
+	Downgrade       *Downgrade                          `json:"downgrade,omitempty"`
+	QualityMetadata *contracts.QualityMetadata          `json:"quality_metadata,omitempty"`
+	LabelEvidence   *map[string]contracts.LabelEvidence `json:"label_evidence,omitempty"`
+	ID              string                              `json:"id"`
+	Score           float64                             `json:"score"`
+	Cost            string                              `json:"cost"`
 }
 
 // Store is the storage port of the router. Every method must be atomic and safe for concurrent use.
