@@ -254,3 +254,29 @@ async fn a_replayed_signature_the_backend_refuses_is_told_apart_from_other_bad_r
         assert_eq!(shape(&error.unwrap_or_else(|| panic!("{name}: no error"))), want, "{name}");
     }
 }
+
+#[tokio::test]
+async fn a_retry_after_on_a_refusal_is_carried_in_milliseconds() {
+    // A rate limit and a server error both carry it; a date form and a missing header carry nothing.
+    for (status, header, want) in [
+        (429, Some("12"), Some(12_000)),
+        (429, Some("1.5"), Some(1_500)),
+        (503, Some("30"), Some(30_000)),
+        (429, Some("Wed, 21 Oct 2026 07:28:00 GMT"), None),
+        (429, None, None),
+    ] {
+        let base = serve(Router::new().fallback(move || async move {
+            let mut r = Response::builder().status(status);
+            if let Some(h) = header {
+                r = r.header("retry-after", h);
+            }
+            r.body(Body::empty()).unwrap()
+        }))
+        .await;
+        let provider = Gemini::builder("k").base_url(&base).build().unwrap();
+        let (events, error) = collect(&provider, &invocation(), "gemini-test").await;
+        let error = error.expect("a refusal");
+        assert!(events.is_empty());
+        assert_eq!(error.retry_after_ms, want, "{status} {header:?}");
+    }
+}

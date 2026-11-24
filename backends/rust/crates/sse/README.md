@@ -4,7 +4,7 @@ Bounded server-sent-events reader for Super Router provider adapters.
 
 ```toml
 [dependencies]
-super-router-sse = "0.2"
+super-router-sse = "0.3"
 ```
 
 Reads server-sent events across arbitrary chunk and CRLF boundaries. A hostile upstream cannot exhaust memory: one

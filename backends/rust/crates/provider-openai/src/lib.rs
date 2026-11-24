@@ -19,7 +19,9 @@ use reqwest::header::{HeaderValue, AUTHORIZATION};
 use reqwest::{redirect, Client, ClientBuilder};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
-use super_router_contracts::{Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream};
+use super_router_contracts::{
+    parse_retry_after, Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream,
+};
 
 pub use tools::input;
 
@@ -29,7 +31,7 @@ const DEFAULT_BASE: &str = "https://api.openai.com";
 pub type KeySource = Arc<dyn Fn() -> String + Send + Sync>;
 
 fn perr(definitive: bool, retryable: bool, code: &str) -> ProviderError {
-    ProviderError { definitive, retryable, code: code.to_string() }
+    ProviderError { definitive, retryable, code: code.to_string(), retry_after_ms: None }
 }
 
 /// Calls the OpenAI Responses API.
@@ -170,13 +172,19 @@ fn parse_event(data: &str) -> Result<Event, ProviderError> {
     serde_json::from_value(value).map_err(|_| invalid())
 }
 
-fn classify_status(status: u16) -> ProviderError {
+fn classify_status(status: u16, retry_after: Option<u64>) -> ProviderError {
     let code = format!("upstream_http_{status}");
     match status {
         400 | 401 | 403 | 404 | 422 => perr(true, false, &code),
         429 => perr(true, true, &code),
         _ => perr(false, false, &code),
     }
+    .with_retry_after(retry_after)
+}
+
+/// The wait the provider asked for in its `Retry-After` header, in milliseconds.
+fn retry_after_of(response: &reqwest::Response) -> Option<u64> {
+    response.headers().get(reqwest::header::RETRY_AFTER).and_then(|v| v.to_str().ok()).and_then(parse_retry_after)
 }
 
 impl Provider for OpenAi {
@@ -215,7 +223,7 @@ impl Provider for OpenAi {
             let response = request.send().await.map_err(|_| perr(false, false, "transport_unknown"))?;
             let status = response.status().as_u16();
             if !(200..=299).contains(&status) {
-                Err(classify_status(status))?;
+                Err(classify_status(status, retry_after_of(&response)))?;
             }
             let mut frames = Box::pin(super_router_sse::frames(response.bytes_stream()));
             let mut terminal = false;

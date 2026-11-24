@@ -98,7 +98,7 @@ func (r *Router) noteHealth(o contracts.Offering, failure *contracts.ProviderErr
 	if failure == nil {
 		r.health.Succeeded(healthKey(o))
 	} else if class, ok := contracts.ParseFailureClass(failure.Code); ok {
-		r.health.Failed(healthKey(o), class, r.clock().UnixMilli())
+		r.health.FailedAfter(healthKey(o), class, r.clock().UnixMilli(), failure.RetryAfterMs)
 	}
 }
 

@@ -36,13 +36,14 @@ function model(policy) {
       r.probe = at + p.probe_lease_ms;
       return { result: "probe" };
     },
-    fail(id, cls, at) {
+    fail(id, cls, at, hint) {
       if (!scoped.includes(cls)) return;
       const base = p[`${cls}_ms`];
       const r = records.get(id);
       if (r && at < r.until) return;
       const streak = r ? r.streak + 1 : 1;
-      const length = Math.min(base * 2 ** (streak - 1), Math.max(p.max_ms, base));
+      // The provider's own Retry-After can lengthen the wait, never shorten it, and never past the ceiling.
+      const length = Math.min(Math.max(base * 2 ** (streak - 1), hint ?? 0), Math.max(p.max_ms, base));
       records.set(id, { class: cls, streak, until: at + length, probe: null });
     },
     succeed(id) {
@@ -53,7 +54,7 @@ function model(policy) {
 }
 
 const A = (id, at) => ({ op: "admit", id, at });
-const F = (id, at, cls) => ({ op: "fail", id, at, class: cls });
+const F = (id, at, cls, retryAfterMs) => ({ op: "fail", id, at, class: cls, ...(retryAfterMs === undefined ? {} : { retry_after_ms: retryAfterMs }) });
 const S = (id, at) => ({ op: "succeed", id, at });
 
 const scenarios = [
@@ -88,6 +89,18 @@ const scenarios = [
     F("a", 110, "rate_limited"), A("a", 309), A("a", 310), F("a", 310, "rate_limited"), A("a", 559), A("a", 560),
   ]],
   ["a ceiling below a class's base never shortens it", { max_ms: 1000 }, [F("a", 0, "credentials_rejected"), A("a", 299999), A("a", 300000)]],
+  ["a longer Retry-After than the class base is honoured", {}, [F("a", 0, "rate_limited", 20000), A("a", 19999), A("a", 20000)]],
+  ["a shorter Retry-After never shortens the base", {}, [F("a", 0, "rate_limited", 1000), A("a", 4999), A("a", 5000)]],
+  ["a Retry-After of zero changes nothing", {}, [F("a", 0, "rate_limited", 0), A("a", 4999), A("a", 5000)]],
+  ["a Retry-After above the ceiling is cut to it", {}, [F("a", 0, "rate_limited", 86400000), A("a", 1799999), A("a", 1800000)]],
+  ["the hint does not carry to the next failure", {}, [
+    F("a", 0, "rate_limited", 20000), A("a", 20000), F("a", 20000, "rate_limited"), A("a", 29999), A("a", 30000),
+  ]],
+  ["a hint is compared with the doubled length", {}, [
+    F("a", 0, "rate_limited"), A("a", 5000), F("a", 5000, "rate_limited", 8000), A("a", 14999), A("a", 15000),
+  ]],
+  ["a hint on a failure that is already ignored is ignored too", {}, [F("a", 0, "rate_limited"), F("a", 100, "rate_limited", 60000), A("a", 4999), A("a", 5000)]],
+  ["a hint on a class that cools nothing does nothing", {}, [F("a", 0, "request_rejected", 60000), F("a", 1, "unknown", 60000), A("a", 2)]],
   ["a very long streak stays at the ceiling", {}, Array.from({ length: 40 }, (_, i) => i).flatMap((i) => [F("a", i * 2000000, "rate_limited"), A("a", i * 2000000 + 1)])],
 ];
 
@@ -95,7 +108,7 @@ const cases = scenarios.map(([name, policy, steps]) => {
   const m = model(policy);
   const out = steps.map((s) => {
     if (s.op === "admit") return { ...s, expect: m.admit(s.id, s.at) };
-    if (s.op === "fail") m.fail(s.id, s.class, s.at);
+    if (s.op === "fail") m.fail(s.id, s.class, s.at, s.retry_after_ms);
     else m.succeed(s.id);
     return s;
   });

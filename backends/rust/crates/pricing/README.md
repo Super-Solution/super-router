@@ -4,7 +4,7 @@ Exact big-integer pricing for [Super Router](https://github.com/Super-Solution/s
 
 ```toml
 [dependencies]
-super-router-pricing = "0.2"
+super-router-pricing = "0.3"
 ```
 
 Money is integer atoms held in `BigInt` and decimal strings, never floats, so every result matches the TypeScript

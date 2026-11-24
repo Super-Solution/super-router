@@ -325,6 +325,25 @@ async fn an_offering_that_refuses_for_its_own_reasons_hands_the_request_on_and_i
 }
 
 #[tokio::test]
+async fn the_wait_a_provider_asked_for_keeps_the_offering_out_that_long() {
+    use std::sync::atomic::{AtomicI64, Ordering};
+    // A rate limit that says "come back in 20 s": the default would reopen the offering after 5 s.
+    let limited = ProviderError::definitive("rate_limited", true).with_retry_after(Some(20_000));
+    let (first, second) = (Counting::new(vec![Err(limited)]), Counting::new(healthy()));
+    let now = Arc::new(AtomicI64::new(now_ms()));
+    let book = Arc::new(Mutex::new(HealthBook::new(HealthPolicy::default())));
+    let w = two_offerings(first.clone(), second.clone(), Some(book), now.clone()).await;
+    w.infer("k1", None, CancellationToken::new()).await.unwrap();
+    assert_eq!((first.calls(), second.calls()), (1, 1));
+    now.fetch_add(19_999, Ordering::SeqCst);
+    w.infer("k2", None, CancellationToken::new()).await.unwrap();
+    assert_eq!((first.calls(), second.calls()), (1, 2), "still skipped one millisecond before the asked wait ends");
+    now.fetch_add(1, Ordering::SeqCst);
+    w.infer("k3", None, CancellationToken::new()).await.unwrap();
+    assert_eq!(first.calls(), 2, "probed once the asked wait is over");
+}
+
+#[tokio::test]
 async fn without_a_health_book_every_request_pays_the_failed_attempt() {
     let (first, second) = (Counting::new(vec![Err(ProviderError::definitive("credentials_rejected", true))]), Counting::new(healthy()));
     let w = two_offerings(first.clone(), second.clone(), None, Arc::new(std::sync::atomic::AtomicI64::new(now_ms()))).await;

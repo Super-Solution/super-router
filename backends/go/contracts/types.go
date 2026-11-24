@@ -43,6 +43,10 @@ type ProviderError struct {
 	Definitive bool
 	Retryable  bool
 	Code       string
+	// RetryAfterMs is how long the provider asked callers to wait before trying again (its Retry-After), in
+	// milliseconds; 0 means it asked for nothing. Only a hint: a health book that cools the offering treats it as a
+	// minimum, never as a promise.
+	RetryAfterMs int64
 }
 
 // Error returns the code.

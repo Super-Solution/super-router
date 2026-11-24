@@ -11,7 +11,8 @@
 //! - Only an offering-scoped [`FailureClass`] is recorded. A refused request says nothing about the offering, and a
 //!   server error leaves the outcome unknown, so neither cools anything.
 //! - A failure starts a cooldown whose base length depends on the class (a rate limit clears in seconds, a rejected
-//!   key only when someone fixes it) and doubles with each consecutive failure, up to a ceiling.
+//!   key only when someone fixes it) and doubles with each consecutive failure, up to a ceiling. A provider's own
+//!   `Retry-After` can make one cooldown longer, never shorter.
 //! - A failure reported while the offering is already cooling is ignored: it belongs to a request that was in flight
 //!   before the cooldown began, and counting it would stretch the cooldown for one incident.
 //! - When a cooldown ends the offering is not simply reopened. The first caller is admitted as a **probe**; everyone
@@ -113,6 +114,13 @@ impl HealthBook {
 
     /// Records that an attempt on `key` failed with `class`. Classes that do not belong to the offering are ignored.
     pub fn failed(&mut self, key: &str, class: FailureClass, now_ms: i64) {
+        self.failed_after(key, class, now_ms, None);
+    }
+
+    /// Like [`failed`](Self::failed), for a provider that said how long to wait (its `Retry-After`, in milliseconds).
+    /// The hint can only lengthen this cooldown, never shorten it, and never past the ceiling; it is not remembered
+    /// for the next failure.
+    pub fn failed_after(&mut self, key: &str, class: FailureClass, now_ms: i64, retry_after_ms: Option<u64>) {
         if !class.is_offering_scoped() {
             return;
         }
@@ -124,7 +132,8 @@ impl HealthBook {
         };
         // base * 2^(streak-1), saturating, never above the ceiling.
         let grown = base.saturating_mul(1_i64 << streak.saturating_sub(1).min(32));
-        let length = grown.min(self.policy.max_ms.max(base));
+        let hint = retry_after_ms.map_or(0, |ms| i64::try_from(ms).unwrap_or(i64::MAX));
+        let length = grown.max(hint).min(self.policy.max_ms.max(base));
         self.records.insert(key.to_string(), Record { class, streak, until_ms: now_ms.saturating_add(length), probe_until_ms: None });
     }
 

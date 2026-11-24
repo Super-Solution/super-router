@@ -49,7 +49,7 @@ fn incidents_match_the_shared_cases() {
                 }
                 "fail" => {
                     let class = FailureClass::from_name(s["class"].as_str().unwrap()).expect("a class name");
-                    book.failed(id, class, at);
+                    book.failed_after(id, class, at, s.get("retry_after_ms").and_then(Value::as_u64));
                 }
                 "succeed" => book.succeeded(id),
                 other => panic!("unknown op {other}"),

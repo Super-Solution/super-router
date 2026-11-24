@@ -199,6 +199,7 @@ copied, and nothing from a commercial or AGPL directory.
 | LiteLLM, Bifrost | Cool an offering down after such a failure instead of paying a failed attempt per request; Envoy and LiteLLM probe a recovering backend with one request | `routing::HealthBook`: pure state machine with an injected clock, class-based cooldowns doubling to a ceiling, in-flight failures ignored, one half-open probe; `Router::with_health` skips cooling offerings (`cooling_down`) and fails open when all are cooling. Off by default. 15 shared incident cases |
 | Vercel AI SDK | Unified finish reasons: a content filter is not a length limit | `finish_reason: content_filter` via `completion: "filtered"`; Gemini maps its policy reasons to it |
 | genai-prices | Long-context prices are cliffs by prompt size | `RateTiers` (earlier commit) |
+| LiteLLM, Bifrost | Honour what the provider says about when to come back | `ProviderError.retry_after_ms` (Go `RetryAfterMs`), read from `Retry-After` by all three providers (`contracts::parse_retry_after`: seconds, whole or fractional, capped at one day; the HTTP-date form is not read). `HealthBook::failed_after` uses it as a **minimum** for that one cooldown: it can lengthen it, never shorten it or pass the ceiling, and it is not remembered for the next failure. Only the classes that already cool an offering are affected, so OpenAI and Anthropic, which do not classify yet, carry the hint without using it. 8 more shared health cases and 33 header cases |
 | Portkey | Structured output needs the provider's own support, not a router-wide switch | `ProviderCapabilities.structured_output`; Gemini writes `responseJsonSchema` |
 
 **Deliberately not adopted**
@@ -208,10 +209,20 @@ copied, and nothing from a commercial or AGPL directory.
   reservation for work that may have been charged. They stay uncertain, so they neither fall through nor cool.
 - **A failure-rate trip** (Portkey, Bifrost: open the circuit after N failures in a window). It needs request
   outcomes the router cannot classify as the offering's fault; the class-based cooldown covers the cases that are.
-- **`Retry-After` driven cooldowns.** `ProviderError` has no field for it. A rate limit cools for 5 s, doubling on
-  repeat, which is what a missing header gets in the other gateways too. Adding the field is a contract change.
-- **Per-attempt and first-token timeouts** (Portkey, Envoy). Also a contract field; today one timeout covers the
-  request.
+- **Per-attempt and first-token timeouts** (Portkey, Envoy). A timeout that only ends the request sooner adds
+  little: `limits.timeout_ms` already does. Their value is that the request moves on to the next offering, and that is
+  a billing decision, not a plumbing one. An attempt abandoned before its first event is an *unknown* outcome (the
+  provider may have started, and may charge for input); the router holds one reservation per request and settles the
+  usage of the attempt that answered, so falling through would leave the abandoned attempt's cost unpaid, or paid
+  twice if both bill. Until a policy for that is chosen (hold both, settle both, or fall through only for providers
+  known to bill nothing before the first token) the contract keeps one timeout per request.
+- **The classification in the OpenAI and Anthropic providers (not yet).** They answer `upstream_http_401/403/404`
+  as a request the other offerings would also refuse, so a rejected key stops the request instead of trying the
+  next offering, and nothing cools it. The TypeScript reference adapters (`packages/adapters/provider-*`) give the
+  same codes and the Rust and Go providers follow them, so changing only the Rust and Go ones would make the
+  backends disagree with the reference. Adopting it is one change across all three languages (the adapters, the
+  `classify` table and the health book in TypeScript, then the providers' tests); until then `retry_after_ms` is
+  carried by these two providers but nothing reads it.
 - **Weighted random load balancing and sticky sessions.** Offering choice is deterministic by score and id so that a
   decision can be replayed and explained; the health book removes offerings, it does not randomise.
 - **A prompt-token rate limit enforced in the proxy** (Envoy). Window limits already count tokens.

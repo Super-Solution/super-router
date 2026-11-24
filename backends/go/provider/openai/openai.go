@@ -86,6 +86,16 @@ func perr(definitive, retryable bool, code string) error {
 	return &contracts.ProviderError{Definitive: definitive, Retryable: retryable, Code: code}
 }
 
+// withRetryAfter adds the wait the provider asked for in its Retry-After header, in milliseconds, to a refusal.
+func withRetryAfter(err error, res *http.Response) error {
+	if pe, ok := err.(*contracts.ProviderError); ok {
+		if ms, ok := contracts.ParseRetryAfter(res.Header.Get("Retry-After")); ok {
+			pe.RetryAfterMs = ms
+		}
+	}
+	return err
+}
+
 // Invoke implements contracts.Provider.
 func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering contracts.Offering, emit func(contracts.ProviderEvent) error) error {
 	if in.Input.Task != nil {
@@ -115,11 +125,11 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		switch res.StatusCode {
 		case 400, 401, 403, 404, 422:
-			return perr(true, false, "upstream_http_"+strconv.Itoa(res.StatusCode))
+			return withRetryAfter(perr(true, false, "upstream_http_"+strconv.Itoa(res.StatusCode)), res)
 		case 429:
-			return perr(true, true, "upstream_http_429")
+			return withRetryAfter(perr(true, true, "upstream_http_429"), res)
 		}
-		return perr(false, false, "upstream_http_"+strconv.Itoa(res.StatusCode))
+		return withRetryAfter(perr(false, false, "upstream_http_"+strconv.Itoa(res.StatusCode)), res)
 	}
 	terminal := false
 	// Upstream numbers every output item; tool calls are numbered from zero among themselves.

@@ -279,7 +279,7 @@ impl Router {
             Ok(()) => book.succeeded(&key),
             Err(e) => {
                 if let Some(class) = FailureClass::from_name(&e.code) {
-                    book.failed(&key, class, now);
+                    book.failed_after(&key, class, now, e.retry_after_ms);
                 }
             }
         }

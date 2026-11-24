@@ -130,6 +130,30 @@ pub fn classify(status: u16, message: &str) -> FailureClass {
     }
 }
 
+/// The longest wait a `Retry-After` can ask for, in milliseconds. A header that asks for more is read as this much,
+/// so a hostile or broken value cannot park an offering for days (a health book also has its own ceiling).
+pub const RETRY_AFTER_MAX_MS: u64 = 86_400_000;
+
+/// Reads the value of a `Retry-After` header as milliseconds. Only the delta-seconds form is read: a non-negative
+/// number of seconds, whole or with a fraction (`"30"`, `"1.5"`), surrounding spaces ignored, milliseconds rounded
+/// down, anything above [`RETRY_AFTER_MAX_MS`] capped. The HTTP-date form is not read (`None`): it needs a clock the
+/// provider crate does not have, and the APIs this router talks to send seconds.
+pub fn parse_retry_after(value: &str) -> Option<u64> {
+    let v = value.trim();
+    let (whole, fraction) = match v.split_once('.') {
+        Some((w, f)) => (w, f),
+        None => (v, ""),
+    };
+    let digits = |t: &str| t.bytes().all(|b| b.is_ascii_digit());
+    if whole.is_empty() || !digits(whole) || !digits(fraction) || (v.contains('.') && fraction.is_empty()) {
+        return None;
+    }
+    // Leading zeros and absurd lengths cannot overflow: anything of 10 or more digits is far above the cap.
+    let seconds: u64 = if whole.len() > 9 { u64::MAX / 1000 } else { whole.parse().ok()? };
+    let millis: u64 = format!("{:0<3}", &fraction[..fraction.len().min(3)]).parse().ok()?;
+    Some(seconds.saturating_mul(1000).saturating_add(millis).min(RETRY_AFTER_MAX_MS))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

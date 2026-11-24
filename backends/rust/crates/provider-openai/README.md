@@ -4,7 +4,7 @@ OpenAI Responses API provider for Super Router.
 
 ```toml
 [dependencies]
-super-router-provider-openai = "0.2"
+super-router-provider-openai = "0.3"
 ```
 
 `OpenAi` implements `super_router_contracts::Provider`: it streams text, normalises usage into router meters and
