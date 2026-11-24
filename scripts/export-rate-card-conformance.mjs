@@ -1,4 +1,5 @@
-// Writes the `rate_card_charge` and `rate_card_bound` cases of backends/rust/conformance/pricing.v1.json.
+// Writes the `rate_card_charge`, `rate_card_bound`, `rate_schedule_charge`, `rate_schedule_bound` and `rate_card_defaulted`
+// cases of backends/rust/conformance/pricing.v1.json.
 //
 // The rate card (Rust and Go only, like custom billing units) is not in the TypeScript reference, so these cases are
 // not generated from it. This script is the independent oracle instead: it states the rule once with plain BigInt
@@ -120,8 +121,69 @@ boundError({ per: 1, input: "01", output: "1" }, 1, 1, "invalid_rate_card");
 boundError({ per: 1, input: "1", output: "1" }, -1, 1, "invalid_usage");
 boundError({ per: 1, input: "1", output: "1" }, 1, -1, "invalid_usage");
 
+// Schedule: the card in effect is the last step whose from_ms is not after the instant; before the first step there
+// is none. A hold for a call that spans instants is the dearest bound of the card at the start and every card that
+// starts inside (start, end]. A schedule needs a step, strictly increasing from_ms and valid cards.
+const scheduleCharges = [];
+const scheduleBounds = [];
+const cardAt = (schedule, t) => schedule.steps.reduce((found, s) => (s.from_ms <= t ? s.card : found), null);
+const step = (from_ms, card) => ({ from_ms, card });
+const doubling = { steps: [step(0, { per: 1000, input: "10", output: "20" }), step(1000, { per: 1000, input: "20", output: "40", per_call: "3" }), step(5000, { per: 1000, input: "5", output: "10", cached: "1" })] };
+function scheduleCharge(schedule, at_ms, usage) {
+  const card = cardAt(schedule, at_ms);
+  if (card === null) return void scheduleCharges.push({ schedule, at_ms, usage, expect: { error: "rate_card_not_in_effect" } });
+  const e = effective(card);
+  const sum = KINDS.reduce((acc, k) => acc + BigInt(usage[k] ?? 0) * rateOf(e, k), 0n);
+  scheduleCharges.push({ schedule, at_ms, usage, expect: { ok: (ceilDiv(sum, e.per) + e.perCall).toString() } });
+}
+function scheduleBound(schedule, start_ms, end_ms, input, output) {
+  const cards = [cardAt(schedule, start_ms), ...schedule.steps.filter((s) => s.from_ms > start_ms && s.from_ms <= end_ms).map((s) => s.card)];
+  if (end_ms < start_ms) return void scheduleBounds.push({ schedule, start_ms, end_ms, input, output, expect: { error: "invalid_usage" } });
+  if (cards[0] === null) return void scheduleBounds.push({ schedule, start_ms, end_ms, input, output, expect: { error: "rate_card_not_in_effect" } });
+  const holds = cards.map((card) => {
+    const e = effective(card);
+    const maxIn = [e.input, e.cached, e.cacheWrite, e.cacheWrite1h].reduce((a, b) => (a > b ? a : b));
+    const maxOut = e.output > e.reasoning ? e.output : e.reasoning;
+    return ceilDiv(BigInt(input) * maxIn + BigInt(output) * maxOut, e.per) + e.perCall;
+  });
+  scheduleBounds.push({ schedule, start_ms, end_ms, input, output, expect: { ok: holds.reduce((a, b) => (a > b ? a : b)).toString() } });
+}
+const used = { input: 70, output: 30, cached: 40 };
+for (const t of [0, 999, 1000, 4999, 5000, 9007199254740991]) scheduleCharge(doubling, t, used);
+scheduleCharge(doubling, -1, used);
+scheduleCharge({ steps: [step(500, { per: 1, input: "1", output: "1" })] }, 499, {});
+scheduleCharge({ steps: [step(500, { per: 1, input: "1", output: "1" })] }, 500, { input: 2, output: 3 });
+for (const [a, b] of [[0, 999], [1000, 4999], [900, 1100], [4000, 6000], [5000, 6000], [0, 9007199254740991], [7, 7]]) scheduleBound(doubling, a, b, 100, 50);
+scheduleBound(doubling, 4000, 6000, 0, 0);
+scheduleBound(doubling, -5, 0, 1, 1);
+scheduleBound(doubling, 10, 9, 1, 1);
+const scheduleErrors = [
+  { steps: [] },
+  { steps: [step(5, { per: 1, input: "1", output: "1" }), step(5, { per: 1, input: "2", output: "2" })] },
+  { steps: [step(5, { per: 1, input: "1", output: "1" }), step(4, { per: 1, input: "2", output: "2" })] },
+  { steps: [step(0, { per: 0, input: "1", output: "1" })] },
+  { steps: [step(0, { per: 1, input: "01", output: "1" })] },
+];
+for (const schedule of scheduleErrors) scheduleCharges.push({ schedule, at_ms: 10, usage: {}, expect: { error: "invalid_rate_schedule" } });
+
+// Defaulted: the kinds a card does not give (cached, cache_write, cache_write_1h, reasoning, in that order), and of
+// those the ones the usage counted.
+const defaulted = [];
+function defaultedCase(card, usage) {
+  const missing = ["cached", "cache_write", "cache_write_1h", "reasoning"].filter((k) => card[k] === undefined);
+  defaulted.push({ card, usage, expect: { all: missing, used: missing.filter((k) => (usage[k] ?? 0) > 0) } });
+}
+defaultedCase({ per: 1, input: "1", output: "1" }, { input: 5, cached: 4 });
+defaultedCase({ per: 1, input: "1", output: "1", cached: "0" }, { cached: 4, reasoning: 2 });
+defaultedCase(all, { cached: 4, reasoning: 2, cache_write: 1, cache_write_1h: 1 });
+defaultedCase({ per: 1, input: "1", output: "1", cache_write: "2" }, { cache_write: 3, cache_write_1h: 3, input: 1, output: 1 });
+defaultedCase({ per: 1, input: "1", output: "1" }, {});
+
 const data = JSON.parse(readFileSync(file, "utf8"));
 data.rate_card_charge = charges;
 data.rate_card_bound = bounds;
+data.rate_schedule_charge = scheduleCharges;
+data.rate_schedule_bound = scheduleBounds;
+data.rate_card_defaulted = defaulted;
 writeFileSync(file, JSON.stringify(data, null, 1) + "\n");
-console.log(`rate_card_charge: ${charges.length} cases, rate_card_bound: ${bounds.length} cases`);
+console.log(`rate_card_charge: ${charges.length}, rate_card_bound: ${bounds.length}, rate_schedule_charge: ${scheduleCharges.length}, rate_schedule_bound: ${scheduleBounds.length}, rate_card_defaulted: ${defaulted.length}`);

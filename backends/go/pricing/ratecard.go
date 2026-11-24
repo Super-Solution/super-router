@@ -172,3 +172,47 @@ func (c RateCard) Bound(maxInput, maxOutput int64) (*big.Int, error) {
 	total := ceilDiv(sum, e.Per)
 	return total.Add(total, e.PerCall), nil
 }
+
+// TokenKind names one of the six kinds of token a card prices, by its field name.
+type TokenKind string
+
+// The kinds of token a RateCard prices.
+const (
+	KindInput        TokenKind = "input"
+	KindCached       TokenKind = "cached"
+	KindCacheWrite   TokenKind = "cache_write"
+	KindCacheWrite1h TokenKind = "cache_write_1h"
+	KindOutput       TokenKind = "output"
+	KindReasoning    TokenKind = "reasoning"
+)
+
+// Defaulted lists the kinds whose rate the card does not give, so that they are priced by fallback (cached,
+// cache_write, cache_write_1h, reasoning, in that order). Input and Output are required and never appear. A fallback
+// is often the right price (a provider that charges cache reads like input) and sometimes a forgotten one (a cache
+// read billed at the full input rate), and the card cannot tell which; this lets an application ask. It changes no
+// price.
+func (c RateCard) Defaulted() []TokenKind {
+	out := []TokenKind{}
+	for _, k := range []struct {
+		kind  TokenKind
+		given *string
+	}{{KindCached, c.Cached}, {KindCacheWrite, c.CacheWrite}, {KindCacheWrite1h, c.CacheWrite1h}, {KindReasoning, c.Reasoning}} {
+		if k.given == nil {
+			out = append(out, k.kind)
+		}
+	}
+	return out
+}
+
+// DefaultedIn lists the kinds that counts used and that are priced by fallback: the ones worth a look when a bill
+// seems high. A call that read cached tokens from a card with no Cached rate gives [KindCached].
+func (c RateCard) DefaultedIn(counts TokenCounts) []TokenKind {
+	used := map[TokenKind]int64{KindCached: counts.Cached, KindCacheWrite: counts.CacheWrite, KindCacheWrite1h: counts.CacheWrite1h, KindReasoning: counts.Reasoning}
+	out := []TokenKind{}
+	for _, kind := range c.Defaulted() {
+		if used[kind] > 0 {
+			out = append(out, kind)
+		}
+	}
+	return out
+}

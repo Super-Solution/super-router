@@ -103,7 +103,10 @@ These match the Rust data plane and are pinned by its conformance copy:
 - **Rate card.** `pricing.RateCard` prices the kinds of token the wire `Price` has no field for (one-hour cache writes,
   reasoning tokens) and a fixed fee per call, from one value with the usual fallbacks: `Effective`, `Charge` (exact
   sum, rounded up once, plus the fee) and `Bound` (what to hold before the call). No wire format, contract or store
-  changes; its cases are `rate_card_charge` and `rate_card_bound` in the Rust conformance copy.
+  changes; its cases are `rate_card_charge` and `rate_card_bound` in the Rust conformance copy. `Defaulted` and
+  `DefaultedIn` list the kinds priced by fallback (a cache read billed at the full input rate is often a forgotten
+  rate, not a decision). `pricing.RateSchedule` picks the card in effect at an instant (`CardAt`, `NextChangeAfter`) and
+  `BoundBetween` holds enough for a call that may settle after a price change.
 - **Structured output.** `response_format` (`json_schema` with a name, a schema object and optional description and
   `strict`) excludes offerings without the `structured_output` capability as `structured_output_unsupported`. No
   provider adapter writes the schema yet, so a request that still has a candidate is refused with

@@ -5,7 +5,8 @@
 //! reference's `BigInt` exactly. `conformance/pricing.v1.json` is the shared test data.
 //!
 //! Beyond the reference, [`RateCard`] prices the kinds of token the wire [`Price`] has no field for (one-hour cache
-//! writes, reasoning tokens) and a per-call fee, from one value with the usual fallbacks.
+//! writes, reasoning tokens) and a per-call fee, from one value with the usual fallbacks. A [`RateSchedule`] picks the
+//! card in effect at an instant, for prices that change on a date.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -17,7 +18,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 mod rate_card;
-pub use rate_card::{EffectiveRates, RateCard, TokenCounts};
+mod rate_schedule;
+pub use rate_card::{EffectiveRates, RateCard, TokenCounts, TokenKind};
+pub use rate_schedule::{RateSchedule, RateStep};
 
 /// The fixed accounting scale of one credit.
 pub const CREDIT_ATOMS: i64 = 1_000_000_000;

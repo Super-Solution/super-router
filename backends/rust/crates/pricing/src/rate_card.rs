@@ -79,6 +79,31 @@ pub struct TokenCounts {
     pub reasoning: i64,
 }
 
+/// The six kinds of token a card prices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TokenKind {
+    Input,
+    Cached,
+    CacheWrite,
+    CacheWrite1h,
+    Output,
+    Reasoning,
+}
+
+impl TokenKind {
+    /// The field name, as in [`RateCard`] and [`TokenCounts`].
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Input => "input",
+            Self::Cached => "cached",
+            Self::CacheWrite => "cache_write",
+            Self::CacheWrite1h => "cache_write_1h",
+            Self::Output => "output",
+            Self::Reasoning => "reasoning",
+        }
+    }
+}
+
 /// The rate of every kind after the fallbacks, in atoms per [`EffectiveRates::per`] tokens.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectiveRates {
@@ -127,6 +152,36 @@ impl RateCard {
         let reasoning = or(&self.reasoning, &output)?;
         let per_call = or(&self.per_call, &BigInt::zero())?;
         Ok(EffectiveRates { per: BigInt::from(self.per), input, cached, cache_write, cache_write_1h, output, reasoning, per_call })
+    }
+
+    /// The kinds whose rate the card does not give, so that they are priced by fallback. `input` and `output` are
+    /// required and never appear. A fallback is often the right price (a provider that charges cache reads like input)
+    /// and sometimes a forgotten one (a cache read billed at the full input rate), and the card cannot tell which;
+    /// this lets an application ask. It changes no price.
+    pub fn defaulted(&self) -> Vec<TokenKind> {
+        [
+            (TokenKind::Cached, &self.cached),
+            (TokenKind::CacheWrite, &self.cache_write),
+            (TokenKind::CacheWrite1h, &self.cache_write_1h),
+            (TokenKind::Reasoning, &self.reasoning),
+        ]
+        .into_iter()
+        .filter_map(|(kind, rate)| rate.is_none().then_some(kind))
+        .collect()
+    }
+
+    /// The kinds that `counts` used and that are priced by fallback: the ones worth a look when a bill seems high.
+    /// A call that read cached tokens from a card with no `cached` rate is `[Cached]`.
+    pub fn defaulted_in(&self, counts: &TokenCounts) -> Vec<TokenKind> {
+        let used = |kind| match kind {
+            TokenKind::Cached => counts.cached,
+            TokenKind::CacheWrite => counts.cache_write,
+            TokenKind::CacheWrite1h => counts.cache_write_1h,
+            TokenKind::Reasoning => counts.reasoning,
+            TokenKind::Input => counts.input,
+            TokenKind::Output => counts.output,
+        } > 0;
+        self.defaulted().into_iter().filter(|kind| used(*kind)).collect()
     }
 
     /// The price of a call that used `counts`. Fails with `invalid_usage` when a count is negative.
@@ -263,6 +318,22 @@ mod tests {
         // a rate of zero is a rate, not a missing one
         let e = RateCard { cached: Some("0".into()), ..card(1, "5", "11") }.effective().unwrap();
         assert_eq!(e.cached.to_string(), "0");
+    }
+
+    #[test]
+    fn defaulted_names_the_kinds_priced_by_fallback() {
+        assert_eq!(
+            card(1, "5", "11").defaulted(),
+            [TokenKind::Cached, TokenKind::CacheWrite, TokenKind::CacheWrite1h, TokenKind::Reasoning]
+        );
+        // A rate of zero is a rate, so it is not defaulted.
+        let c = RateCard { cached: Some("0".into()), cache_write: Some("8".into()), ..card(1, "5", "11") };
+        assert_eq!(c.defaulted(), [TokenKind::CacheWrite1h, TokenKind::Reasoning]);
+        let counts = TokenCounts { input: 9, cached: 4, output: 2, ..TokenCounts::default() };
+        assert_eq!(card(1, "5", "11").defaulted_in(&counts), [TokenKind::Cached]);
+        assert_eq!(c.defaulted_in(&counts), []);
+        // Required kinds are never reported, whatever the counts.
+        assert_eq!(card(1, "5", "11").defaulted_in(&TokenCounts { input: 1, output: 1, ..TokenCounts::default() }), []);
     }
 
     #[test]

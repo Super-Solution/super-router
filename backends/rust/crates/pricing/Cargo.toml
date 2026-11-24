@@ -1,6 +1,6 @@
 [package]
 name = "super-router-pricing"
-description = "Exact big-integer pricing for Super Router: Charge, Bound, CompileCreditPrice and RateCard."
+description = "Exact big-integer pricing for Super Router: Charge, Bound, CompileCreditPrice, RateCard and RateSchedule."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
