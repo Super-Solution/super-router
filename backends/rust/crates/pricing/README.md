@@ -1,6 +1,6 @@
 # super-router-pricing
 
-Exact big-integer pricing for [Super Router](https://github.com/Super-Solution/super-router): `charge`, `bound`, `compile_credit_price`, `RateCard` and `RateSchedule`.
+Exact big-integer pricing for [Super Router](https://github.com/Super-Solution/super-router): `charge`, `bound`, `compile_credit_price`, `RateCard`, `RateSchedule` (the card in effect at an instant) and `RateTiers` (the card a prompt's length selects, for long-context pricing).
 
 ```toml
 [dependencies]

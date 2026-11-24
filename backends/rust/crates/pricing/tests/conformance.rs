@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde_json::Value;
-use super_router_pricing::{bound, charge, compile_credit_price, Price, RateCard, RateSchedule, TokenCounts, Usage, MEDIA_KEYS};
+use super_router_pricing::{bound, charge, compile_credit_price, Price, RateCard, RateSchedule, RateTiers, TokenCounts, Usage, MEDIA_KEYS};
 
 fn load() -> Value {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/pricing.v1.json");
@@ -180,4 +180,43 @@ fn rate_card_defaulted_matches_the_oracle() {
         assert_eq!(names(card.defaulted()), list(&c["expect"]["all"]), "rate_card_defaulted[{i}] all");
         assert_eq!(names(card.defaulted_in(&counts)), list(&c["expect"]["used"]), "rate_card_defaulted[{i}] used");
     }
+}
+
+#[test]
+fn rate_tiers_charge_matches_the_oracle() {
+    let data = load();
+    let cases = data["rate_tiers_charge"].as_array().unwrap();
+    let mut errors = 0;
+    for (i, c) in cases.iter().enumerate() {
+        let counts: TokenCounts = serde_json::from_value(c["usage"].clone()).expect("counts");
+        let got = RateTiers::from_json(&c["tiers"].to_string()).and_then(|t| t.charge(&counts));
+        match (c["expect"].get("error"), c["expect"].get("ok")) {
+            (Some(code), _) => {
+                errors += 1;
+                assert_eq!(got.unwrap_err().code, code.as_str().unwrap(), "rate_tiers_charge[{i}]");
+            }
+            (None, Some(ok)) => assert_eq!(got.unwrap().to_string(), ok.as_str().unwrap(), "rate_tiers_charge[{i}]"),
+            _ => panic!("rate_tiers_charge[{i}]: no expectation"),
+        }
+    }
+    assert!(cases.len() >= 15 && errors >= 8, "{} cases, {errors} errors", cases.len());
+}
+
+#[test]
+fn rate_tiers_bound_matches_the_oracle() {
+    let data = load();
+    let cases = data["rate_tiers_bound"].as_array().unwrap();
+    let mut errors = 0;
+    for (i, c) in cases.iter().enumerate() {
+        let got = RateTiers::from_json(&c["tiers"].to_string()).unwrap().bound(int(c, "input"), int(c, "output"));
+        match (c["expect"].get("error"), c["expect"].get("ok")) {
+            (Some(code), _) => {
+                errors += 1;
+                assert_eq!(got.unwrap_err().code, code.as_str().unwrap(), "rate_tiers_bound[{i}]");
+            }
+            (None, Some(ok)) => assert_eq!(got.unwrap().to_string(), ok.as_str().unwrap(), "rate_tiers_bound[{i}]"),
+            _ => panic!("rate_tiers_bound[{i}]: no expectation"),
+        }
+    }
+    assert!(cases.len() >= 10 && errors >= 2, "{} cases, {errors} errors", cases.len());
 }

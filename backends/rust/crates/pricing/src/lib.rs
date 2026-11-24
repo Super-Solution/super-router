@@ -19,8 +19,10 @@ use serde_json::{Map, Value};
 
 mod rate_card;
 mod rate_schedule;
+mod rate_tiers;
 pub use rate_card::{EffectiveRates, RateCard, TokenCounts, TokenKind};
 pub use rate_schedule::{RateSchedule, RateStep};
+pub use rate_tiers::{RateTier, RateTiers};
 
 /// The fixed accounting scale of one credit.
 pub const CREDIT_ATOMS: i64 = 1_000_000_000;

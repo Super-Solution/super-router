@@ -1,4 +1,5 @@
-// Writes the `rate_card_charge`, `rate_card_bound`, `rate_schedule_charge`, `rate_schedule_bound` and `rate_card_defaulted`
+// Writes the `rate_card_charge`, `rate_card_bound`, `rate_schedule_charge`, `rate_schedule_bound`, `rate_card_defaulted`,
+// `rate_tiers_charge` and `rate_tiers_bound`
 // cases of backends/rust/conformance/pricing.v1.json.
 //
 // The rate card (Rust and Go only, like custom billing units) is not in the TypeScript reference, so these cases are
@@ -166,6 +167,70 @@ const scheduleErrors = [
 ];
 for (const schedule of scheduleErrors) scheduleCharges.push({ schedule, at_ms: 10, usage: {}, expect: { error: "invalid_rate_schedule" } });
 
+// Tiers: the whole call is priced by the last tier whose `above` is less than the prompt (input + cached +
+// cache_write + cache_write_1h), the first tier for an empty prompt. A hold is the dearest bound of the first tier and
+// every tier with `above` less than the largest prompt. Tiers need a first `above` of 0, strictly increasing `above`
+// and valid cards.
+const tierCharges = [];
+const tierBounds = [];
+const tier = (above, card) => ({ above, card });
+const promptOf = (usage) => ["input", "cached", "cache_write", "cache_write_1h"].reduce((n, k) => n + BigInt(usage[k] ?? 0), 0n);
+const tierCardFor = (tiers, prompt) => tiers.tiers.reduce((found, t, i) => (i === 0 || BigInt(t.above) < prompt ? t.card : found), tiers.tiers[0].card);
+function tierCharge(tiers, usage) {
+  const negative = KINDS.some((k) => (usage[k] ?? 0) < 0);
+  if (negative) return void tierCharges.push({ tiers, usage, expect: { error: "invalid_usage" } });
+  const e = effective(tierCardFor(tiers, promptOf(usage)));
+  const sum = KINDS.reduce((acc, k) => acc + BigInt(usage[k] ?? 0) * rateOf(e, k), 0n);
+  tierCharges.push({ tiers, usage, expect: { ok: (ceilDiv(sum, e.per) + e.perCall).toString() } });
+}
+function tierBound(tiers, input, output) {
+  if (input < 0 || output < 0) return void tierBounds.push({ tiers, input, output, expect: { error: "invalid_usage" } });
+  const cards = [tiers.tiers[0].card, ...tiers.tiers.slice(1).filter((t) => BigInt(t.above) < BigInt(input)).map((t) => t.card)];
+  const holds = cards.map((card) => {
+    const e = effective(card);
+    const maxIn = [e.input, e.cached, e.cacheWrite, e.cacheWrite1h].reduce((a, b) => (a > b ? a : b));
+    const maxOut = e.output > e.reasoning ? e.output : e.reasoning;
+    return ceilDiv(BigInt(input) * maxIn + BigInt(output) * maxOut, e.per) + e.perCall;
+  });
+  tierBounds.push({ tiers, input, output, expect: { ok: holds.reduce((a, b) => (a > b ? a : b)).toString() } });
+}
+const longContext = {
+  tiers: [
+    tier(0, { per: 1000000, input: "1250000", output: "10000000", cached: "125000" }),
+    tier(200000, { per: 1000000, input: "2500000", output: "15000000", cached: "250000", per_call: "7" }),
+    tier(1000000, { per: 1000000, input: "5000000", output: "30000000", cached: "500000", reasoning: "40000000" }),
+  ],
+};
+for (const usage of [
+  {},
+  { input: 1, output: 1 },
+  { input: 150000, cached: 50000, output: 10000 },
+  { input: 150001, cached: 50000, output: 10000 },
+  { input: 200000 },
+  { input: 200001 },
+  { cached: 200001 },
+  { cache_write: 100000, cache_write_1h: 100001 },
+  { input: 1000000, output: 5, reasoning: 5 },
+  { input: 1000001, output: 5, reasoning: 5 },
+  { input: 9007199254740991, cached: 9007199254740991, output: 9007199254740991 },
+]) tierCharge(longContext, usage);
+tierCharge(longContext, { input: -1 });
+tierCharge(longContext, { cached: -1, output: 5 });
+tierCharge({ tiers: [tier(0, { per: 1, input: "3", output: "4" })] }, { input: 1000000, output: 2 });
+for (const input of [0, 1, 199999, 200000, 200001, 999999, 1000000, 1000001, 9007199254740991]) tierBound(longContext, input, 8192);
+tierBound(longContext, 500000, 0);
+tierBound(longContext, -1, 1);
+tierBound(longContext, 1, -1);
+const tierErrors = [
+  { tiers: [] },
+  { tiers: [tier(1, { per: 1, input: "1", output: "1" })] },
+  { tiers: [tier(0, { per: 1, input: "1", output: "1" }), tier(0, { per: 1, input: "2", output: "2" })] },
+  { tiers: [tier(0, { per: 1, input: "1", output: "1" }), tier(9, { per: 1, input: "2", output: "2" }), tier(5, { per: 1, input: "3", output: "3" })] },
+  { tiers: [tier(0, { per: 0, input: "1", output: "1" })] },
+  { tiers: [tier(0, { per: 1, input: "1", output: "1" }), tier(-5, { per: 1, input: "2", output: "2" })] },
+];
+for (const tiers of tierErrors) tierCharges.push({ tiers, usage: {}, expect: { error: "invalid_rate_tiers" } });
+
 // Defaulted: the kinds a card does not give (cached, cache_write, cache_write_1h, reasoning, in that order), and of
 // those the ones the usage counted.
 const defaulted = [];
@@ -185,5 +250,7 @@ data.rate_card_bound = bounds;
 data.rate_schedule_charge = scheduleCharges;
 data.rate_schedule_bound = scheduleBounds;
 data.rate_card_defaulted = defaulted;
+data.rate_tiers_charge = tierCharges;
+data.rate_tiers_bound = tierBounds;
 writeFileSync(file, JSON.stringify(data, null, 1) + "\n");
-console.log(`rate_card_charge: ${charges.length}, rate_card_bound: ${bounds.length}, rate_schedule_charge: ${scheduleCharges.length}, rate_schedule_bound: ${scheduleBounds.length}, rate_card_defaulted: ${defaulted.length}`);
+console.log(`rate_card_charge: ${charges.length}, rate_card_bound: ${bounds.length}, rate_schedule_charge: ${scheduleCharges.length}, rate_schedule_bound: ${scheduleBounds.length}, rate_card_defaulted: ${defaulted.length}, rate_tiers_charge: ${tierCharges.length}, rate_tiers_bound: ${tierBounds.length}`);

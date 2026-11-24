@@ -8782,5 +8782,1185 @@
     "used": []
    }
   }
+ ],
+ "rate_tiers_charge": [
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {},
+   "expect": {
+    "ok": "0"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 1,
+    "output": 1
+   },
+   "expect": {
+    "ok": "12"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 150000,
+    "cached": 50000,
+    "output": 10000
+   },
+   "expect": {
+    "ok": "293750"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 150001,
+    "cached": 50000,
+    "output": 10000
+   },
+   "expect": {
+    "ok": "537510"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 200000
+   },
+   "expect": {
+    "ok": "250000"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 200001
+   },
+   "expect": {
+    "ok": "500010"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "cached": 200001
+   },
+   "expect": {
+    "ok": "50008"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "cache_write": 100000,
+    "cache_write_1h": 100001
+   },
+   "expect": {
+    "ok": "500010"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 1000000,
+    "output": 5,
+    "reasoning": 5
+   },
+   "expect": {
+    "ok": "2500157"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 1000001,
+    "output": 5,
+    "reasoning": 5
+   },
+   "expect": {
+    "ok": "5000355"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 9007199254740991,
+    "cached": 9007199254740991,
+    "output": 9007199254740991
+   },
+   "expect": {
+    "ok": "319755573543305181"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": -1
+   },
+   "expect": {
+    "error": "invalid_usage"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "cached": -1,
+    "output": 5
+   },
+   "expect": {
+    "error": "invalid_usage"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1,
+       "input": "3",
+       "output": "4"
+      }
+     }
+    ]
+   },
+   "usage": {
+    "input": 1000000,
+    "output": 2
+   },
+   "expect": {
+    "ok": "3000008"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": []
+   },
+   "usage": {},
+   "expect": {
+    "error": "invalid_rate_tiers"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 1,
+      "card": {
+       "per": 1,
+       "input": "1",
+       "output": "1"
+      }
+     }
+    ]
+   },
+   "usage": {},
+   "expect": {
+    "error": "invalid_rate_tiers"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1,
+       "input": "1",
+       "output": "1"
+      }
+     },
+     {
+      "above": 0,
+      "card": {
+       "per": 1,
+       "input": "2",
+       "output": "2"
+      }
+     }
+    ]
+   },
+   "usage": {},
+   "expect": {
+    "error": "invalid_rate_tiers"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1,
+       "input": "1",
+       "output": "1"
+      }
+     },
+     {
+      "above": 9,
+      "card": {
+       "per": 1,
+       "input": "2",
+       "output": "2"
+      }
+     },
+     {
+      "above": 5,
+      "card": {
+       "per": 1,
+       "input": "3",
+       "output": "3"
+      }
+     }
+    ]
+   },
+   "usage": {},
+   "expect": {
+    "error": "invalid_rate_tiers"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 0,
+       "input": "1",
+       "output": "1"
+      }
+     }
+    ]
+   },
+   "usage": {},
+   "expect": {
+    "error": "invalid_rate_tiers"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1,
+       "input": "1",
+       "output": "1"
+      }
+     },
+     {
+      "above": -5,
+      "card": {
+       "per": 1,
+       "input": "2",
+       "output": "2"
+      }
+     }
+    ]
+   },
+   "usage": {},
+   "expect": {
+    "error": "invalid_rate_tiers"
+   }
+  }
+ ],
+ "rate_tiers_bound": [
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 0,
+   "output": 8192,
+   "expect": {
+    "ok": "81920"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 1,
+   "output": 8192,
+   "expect": {
+    "ok": "81922"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 199999,
+   "output": 8192,
+   "expect": {
+    "ok": "331919"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 200000,
+   "output": 8192,
+   "expect": {
+    "ok": "331920"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 200001,
+   "output": 8192,
+   "expect": {
+    "ok": "622890"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 999999,
+   "output": 8192,
+   "expect": {
+    "ok": "2622885"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 1000000,
+   "output": 8192,
+   "expect": {
+    "ok": "2622887"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 1000001,
+   "output": 8192,
+   "expect": {
+    "ok": "5327685"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 9007199254740991,
+   "output": 8192,
+   "expect": {
+    "ok": "45035996274032635"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 500000,
+   "output": 0,
+   "expect": {
+    "ok": "1250007"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": -1,
+   "output": 1,
+   "expect": {
+    "error": "invalid_usage"
+   }
+  },
+  {
+   "tiers": {
+    "tiers": [
+     {
+      "above": 0,
+      "card": {
+       "per": 1000000,
+       "input": "1250000",
+       "output": "10000000",
+       "cached": "125000"
+      }
+     },
+     {
+      "above": 200000,
+      "card": {
+       "per": 1000000,
+       "input": "2500000",
+       "output": "15000000",
+       "cached": "250000",
+       "per_call": "7"
+      }
+     },
+     {
+      "above": 1000000,
+      "card": {
+       "per": 1000000,
+       "input": "5000000",
+       "output": "30000000",
+       "cached": "500000",
+       "reasoning": "40000000"
+      }
+     }
+    ]
+   },
+   "input": 1,
+   "output": -1,
+   "expect": {
+    "error": "invalid_usage"
+   }
+  }
  ]
 }

@@ -106,7 +106,9 @@ These match the Rust data plane and are pinned by its conformance copy:
   changes; its cases are `rate_card_charge` and `rate_card_bound` in the Rust conformance copy. `Defaulted` and
   `DefaultedIn` list the kinds priced by fallback (a cache read billed at the full input rate is often a forgotten
   rate, not a decision). `pricing.RateSchedule` picks the card in effect at an instant (`CardAt`, `NextChangeAfter`) and
-  `BoundBetween` holds enough for a call that may settle after a price change.
+  `BoundBetween` holds enough for a call that may settle after a price change. `pricing.RateTiers` is long-context
+  pricing: the whole call is priced by the card of the tier its prompt reaches (`CardFor`, `Charge`), and `Bound` holds
+  the dearest tier a prompt of up to `maxInput` tokens can reach (cases `rate_tiers_charge`, `rate_tiers_bound`).
 - **Structured output.** `response_format` (`json_schema` with a name, a schema object and optional description and
   `strict`) excludes offerings without the `structured_output` capability as `structured_output_unsupported`. No
   provider adapter writes the schema yet, so a request that still has a candidate is refused with

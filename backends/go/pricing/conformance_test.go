@@ -87,6 +87,17 @@ type fixtures struct {
 		Output   int64           `json:"output"`
 		Expect   expect          `json:"expect"`
 	} `json:"rate_schedule_bound"`
+	RateTiersCharge []struct {
+		Tiers  json.RawMessage `json:"tiers"`
+		Usage  json.RawMessage `json:"usage"`
+		Expect expect          `json:"expect"`
+	} `json:"rate_tiers_charge"`
+	RateTiersBound []struct {
+		Tiers  json.RawMessage `json:"tiers"`
+		Input  int64           `json:"input"`
+		Output int64           `json:"output"`
+		Expect expect          `json:"expect"`
+	} `json:"rate_tiers_bound"`
 	RateCardDefaulted []struct {
 		Card   json.RawMessage `json:"card"`
 		Usage  json.RawMessage `json:"usage"`
@@ -304,6 +315,48 @@ func TestRateScheduleBound(t *testing.T) {
 	}
 	if len(f.RateScheduleBound) < 8 || errorsSeen < 2 {
 		t.Fatalf("%d cases, %d errors", len(f.RateScheduleBound), errorsSeen)
+	}
+}
+
+func TestRateTiersCharge(t *testing.T) {
+	f := load(t)
+	errorsSeen := 0
+	for i, c := range f.RateTiersCharge {
+		var counts TokenCounts
+		if err := json.Unmarshal(c.Usage, &counts); err != nil {
+			t.Fatal(err)
+		}
+		var got *big.Int
+		tiers, err := DecodeRateTiers(c.Tiers)
+		if err == nil {
+			got, err = tiers.Charge(counts)
+		}
+		if c.Expect.Error != "" {
+			errorsSeen++
+		}
+		checkExpect(t, "rate_tiers_charge", i, got, err, c.Expect)
+	}
+	if len(f.RateTiersCharge) < 15 || errorsSeen < 8 {
+		t.Fatalf("%d cases, %d errors", len(f.RateTiersCharge), errorsSeen)
+	}
+}
+
+func TestRateTiersBound(t *testing.T) {
+	f := load(t)
+	errorsSeen := 0
+	for i, c := range f.RateTiersBound {
+		tiers, err := DecodeRateTiers(c.Tiers)
+		if err != nil {
+			t.Fatalf("rate_tiers_bound[%d]: %v", i, err)
+		}
+		got, err := tiers.Bound(c.Input, c.Output)
+		if c.Expect.Error != "" {
+			errorsSeen++
+		}
+		checkExpect(t, "rate_tiers_bound", i, got, err, c.Expect)
+	}
+	if len(f.RateTiersBound) < 10 || errorsSeen < 2 {
+		t.Fatalf("%d cases, %d errors", len(f.RateTiersBound), errorsSeen)
 	}
 }
 
