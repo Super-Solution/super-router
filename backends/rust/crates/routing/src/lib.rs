@@ -3,6 +3,10 @@
 //! `conformance/routing.v1.json`, including the exact IEEE-754 scores. Offering ids must sort the same
 //! bytewise as in TypeScript (use `[a-z0-9]`).
 
+mod health;
+
+pub use health::{Admit, HealthBook, HealthPolicy};
+
 use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 

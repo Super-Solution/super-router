@@ -1,0 +1,1331 @@
+{
+ "version": 1,
+ "description": "Offering health book: scripted incidents of admit / fail / succeed with the expected answers. Written by scripts/export-health-conformance.mjs; Rust and Go only.",
+ "cases": [
+  {
+   "name": "an unknown offering is open",
+   "steps": [
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 0,
+     "expect": {
+      "result": "open"
+     }
+    }
+   ],
+   "final_size": 0
+  },
+  {
+   "name": "a rejected key cools the offering for five minutes",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 1000,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 1001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 301000,
+      "class": "credentials_rejected"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 300999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 301000,
+      "class": "credentials_rejected"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 301000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a rate limit clears in seconds",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 4999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 5000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "each class has its own length",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "q",
+     "at": 0,
+     "class": "quota_exhausted"
+    },
+    {
+     "op": "fail",
+     "id": "m",
+     "at": 0,
+     "class": "model_unavailable"
+    },
+    {
+     "op": "fail",
+     "id": "r",
+     "at": 0,
+     "class": "region_blocked"
+    },
+    {
+     "op": "admit",
+     "id": "q",
+     "at": 299999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 300000,
+      "class": "quota_exhausted"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "q",
+     "at": 300000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "m",
+     "at": 599999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 600000,
+      "class": "model_unavailable"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "m",
+     "at": 600000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "r",
+     "at": 599999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 600000,
+      "class": "region_blocked"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "r",
+     "at": 600000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 3
+  },
+  {
+   "name": "a refused request and an unknown outcome cool nothing",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "request_rejected"
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 1,
+     "class": "unknown"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 2,
+     "expect": {
+      "result": "open"
+     }
+    }
+   ],
+   "final_size": 0
+  },
+  {
+   "name": "after the cooldown only one caller probes",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 35000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 20000,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 35000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 34999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 35000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 35000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a successful probe clears the record",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "succeed",
+     "id": "a",
+     "at": 5100
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5101,
+     "expect": {
+      "result": "open"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5102,
+     "expect": {
+      "result": "open"
+     }
+    }
+   ],
+   "final_size": 0
+  },
+  {
+   "name": "a failed probe cools twice as long",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 5100,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5101,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 15100,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 15099,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 15100,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 15100,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "the cooldown keeps doubling up to the ceiling",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 300000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 300000,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 900000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 900000,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 2699999,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 2700000,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 2729999,
+      "class": "credentials_rejected"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 2700000,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 4499999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 4500000,
+      "class": "credentials_rejected"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 4500000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a failure while already cooling is ignored",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 100,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 200000,
+     "class": "quota_exhausted"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 299999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 300000,
+      "class": "credentials_rejected"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 300000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 300001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 330000,
+      "class": "credentials_rejected"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a success from an in-flight request clears a cooldown",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "succeed",
+     "id": "a",
+     "at": 10
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 11,
+     "expect": {
+      "result": "open"
+     }
+    }
+   ],
+   "final_size": 0
+  },
+  {
+   "name": "offerings are independent",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "admit",
+     "id": "b",
+     "at": 1,
+     "expect": {
+      "result": "open"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 1,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 300000,
+      "class": "credentials_rejected"
+     }
+    },
+    {
+     "op": "succeed",
+     "id": "b",
+     "at": 2
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 3,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 300000,
+      "class": "credentials_rejected"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a custom policy changes lengths, lease and ceiling",
+   "policy": {
+    "rate_limited_ms": 100,
+    "max_ms": 250,
+    "probe_lease_ms": 10
+   },
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 99,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 100,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 100,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 109,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 110,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 110,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 110,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 309,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 310,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 310,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 310,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 559,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 560,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 560,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a ceiling below a class's base never shortens it",
+   "policy": {
+    "max_ms": 1000
+   },
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "credentials_rejected"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 299999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 300000,
+      "class": "credentials_rejected"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 300000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a very long streak stays at the ceiling",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 1,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 5000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 2000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 2000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 2010000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 4000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 4000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 4020000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 6000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 6000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 6040000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 8000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 8000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 8080000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 10000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 10000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 10160000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 12000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 12000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 12320000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 14000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 14000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 14640000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 16000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 16000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 17280000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 18000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 18000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 19800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 20000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 20000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 21800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 22000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 22000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 23800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 24000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 24000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 25800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 26000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 26000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 27800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 28000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 28000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 29800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 30000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 30000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 31800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 32000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 32000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 33800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 34000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 34000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 35800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 36000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 36000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 37800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 38000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 38000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 39800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 40000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 40000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 41800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 42000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 42000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 43800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 44000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 44000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 45800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 46000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 46000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 47800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 48000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 48000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 49800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 50000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 50000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 51800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 52000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 52000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 53800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 54000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 54000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 55800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 56000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 56000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 57800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 58000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 58000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 59800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 60000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 60000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 61800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 62000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 62000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 63800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 64000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 64000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 65800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 66000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 66000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 67800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 68000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 68000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 69800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 70000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 70000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 71800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 72000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 72000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 73800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 74000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 74000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 75800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 76000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 76000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 77800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 78000000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 78000001,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 79800000,
+      "class": "rate_limited"
+     }
+    }
+   ],
+   "final_size": 1
+  }
+ ]
+}

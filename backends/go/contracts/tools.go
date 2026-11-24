@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // ToolCall is one call a model made: arguments are the JSON object the model produced, as a string.
@@ -18,6 +20,24 @@ type ToolCall struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Arguments string `json:"arguments"`
+	// Signature is an opaque token the upstream attached to the call and wants back when the call is replayed in a
+	// later request (Gemini 3's thoughtSignature). It is never interpreted: a caller stores it with the call and
+	// sends it again unchanged, and a provider that has no such token ignores it.
+	Signature string `json:"signature,omitempty"`
+}
+
+// ValidSignature reports whether s can be a call signature: 1 to 16384 characters, no whitespace or control
+// characters (providers send base64 or similar).
+func ValidSignature(s string) bool {
+	if n := utf8.RuneCountInString(s); n < 1 || n > 16384 {
+		return false
+	}
+	for _, r := range s {
+		if unicode.IsSpace(r) || unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
 }
 
 // Tool declares a function the model may call. InputSchema is a JSON Schema whose type is "object".
@@ -207,8 +227,16 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 			if dec.Decode(&out.ToolCalls) != nil || len(out.ToolCalls) < 1 || len(out.ToolCalls) > 64 {
 				return errInvalid
 			}
-			for _, c := range out.ToolCalls {
+			// A signature must be a string when it is present: null or an empty string is not "no signature".
+			var rawCalls []map[string]json.RawMessage
+			if json.Unmarshal(fields["tool_calls"], &rawCalls) != nil || len(rawCalls) != len(out.ToolCalls) {
+				return errInvalid
+			}
+			for i, c := range out.ToolCalls {
 				if !toolCallIDRe.MatchString(c.ID) || !toolNameRe.MatchString(c.Name) || length(c.Arguments) > 256000 || !isJSONObject(c.Arguments) {
+					return errInvalid
+				}
+				if _, present := rawCalls[i]["signature"]; present && !ValidSignature(c.Signature) {
 					return errInvalid
 				}
 			}
@@ -258,11 +286,14 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 type Needs struct {
 	Tools  bool
 	Images bool
+	// StructuredOutput: the request carries a response_format, so the answer must follow a JSON Schema.
+	StructuredOutput bool
 }
 
-// InvocationNeeds reports whether a request declares tools or carries tool history, and whether it carries images.
+// InvocationNeeds reports whether a request declares tools or carries tool history, whether it carries images, and
+// whether it asks for structured output.
 func InvocationNeeds(in Invocation) Needs {
-	n := Needs{Tools: in.Input.Tools != nil}
+	n := Needs{Tools: in.Input.Tools != nil, StructuredOutput: in.ResponseFormat != nil}
 	for _, m := range in.Input.Messages {
 		if m.Role == "tool" || m.ToolCalls != nil {
 			n.Tools = true
@@ -281,6 +312,9 @@ func InvocationNeeds(in Invocation) Needs {
 type ProviderCapabilities struct {
 	Tools  bool
 	Images bool
+	// StructuredOutput: the provider writes a request's response_format schema into its call. A provider that does
+	// not say so is never sent one: the answer would silently ignore the schema.
+	StructuredOutput bool
 }
 
 // CapableProvider is a Provider that declares its capabilities. A provider that does not implement it carries text
@@ -300,7 +334,7 @@ func CapabilitiesOf(p Provider) ProviderCapabilities {
 
 // Can reports whether capabilities cover a request's needs.
 func (c ProviderCapabilities) Can(n Needs) bool {
-	return (!n.Tools || c.Tools) && (!n.Images || c.Images)
+	return (!n.Tools || c.Tools) && (!n.Images || c.Images) && (!n.StructuredOutput || c.StructuredOutput)
 }
 
 var (

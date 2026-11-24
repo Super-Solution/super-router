@@ -166,6 +166,31 @@ async fn a_tool_call_streams_in_order_and_settles_once() {
 }
 
 #[tokio::test]
+async fn a_call_signature_travels_with_the_call_and_comes_back_on_the_next_turn() {
+    let signature = "c2lnLUE9";
+    let f = setup(vec![("mock", Arc::new(MockToolProvider::new("success").with_args(args("a")).with_signature(signature)))], &[]).await;
+    let list = f.post(streaming(&with_tools()), "").await.events();
+    assert_eq!((list[1]["signature"].as_str(), list[3]["signature"].as_str()), (Some(signature), Some(signature)), "{list:?}");
+    assert!(list[2].get("signature").is_none(), "only the first event of a call carries it: {}", list[2]);
+
+    let first = f.ok(with_tools()).await;
+    let call = &first["output"]["tool_calls"][0];
+    assert_eq!(call["signature"], signature);
+    // The next turn replays the call with its signature and is accepted as it stands.
+    let replay = json!({
+        "service": "chat", "customer_id": "c1",
+        "input": { "messages": [
+            { "role": "user", "content": "Find it" },
+            { "role": "assistant", "tool_calls": [call] },
+            { "role": "tool", "tool_call_id": call["id"], "content": "found" },
+        ], "tools": [serde_json::from_str::<Value>(LOOKUP).unwrap()] },
+        "limits": { "max_output_tokens": 32 },
+    });
+    let done = f.ok(replay.to_string()).await;
+    assert_eq!(done["finish_reason"], "stop");
+}
+
+#[tokio::test]
 async fn a_tool_call_answers_without_streaming_and_the_next_turn_finishes() {
     let f = setup(vec![("mock", Arc::new(MockToolProvider::new("success").with_args(args("a"))))], &[]).await;
     let first = f.ok(with_tools()).await;
@@ -244,12 +269,18 @@ struct Rogue;
 
 impl Provider for Rogue {
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities { tools: true, images: false }
+        ProviderCapabilities { tools: true, images: false, ..ProviderCapabilities::default() }
     }
 
     fn invoke(&self, _input: &Invocation, _offering: &Offering) -> ProviderStream {
         Box::pin(futures_util::stream::iter([
-            Ok(ProviderEvent::ToolCall { index: 0, id: Some("x".into()), name: Some("rogue".into()), arguments_delta: "{}".into() }),
+            Ok(ProviderEvent::ToolCall {
+                index: 0,
+                id: Some("x".into()),
+                name: Some("rogue".into()),
+                signature: None,
+                arguments_delta: "{}".into(),
+            }),
             Ok(ProviderEvent::Usage { usage: Meters { input: 1, output: 1, ..Meters::default() }, upstream_id: String::new() }),
             Ok(ProviderEvent::Done { completion: None }),
         ]))

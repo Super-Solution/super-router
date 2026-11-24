@@ -122,7 +122,9 @@ func (m *MockTaskProvider) Invoke(ctx context.Context, in contracts.Invocation, 
 type MockToolProvider struct {
 	Args     map[string]any
 	Behavior string
-	calls    atomic.Int64
+	// Signature, when set, is attached to every call, as an upstream that signs its calls would.
+	Signature string
+	calls     atomic.Int64
 }
 
 var _ contracts.CapableProvider = (*MockToolProvider)(nil)
@@ -170,7 +172,7 @@ func (m *MockToolProvider) Invoke(ctx context.Context, in contracts.Invocation, 
 		raw, _ := json.Marshal(args)
 		middle := (len(raw) + 1) / 2
 		id := "call_" + strings.ReplaceAll(uuid.New(), "-", "")
-		if err := emit(contracts.ProviderEvent{Type: "tool_call", Index: 0, ID: id, Name: name, ArgumentsDelta: string(raw[:middle])}); err != nil {
+		if err := emit(contracts.ProviderEvent{Type: "tool_call", Index: 0, ID: id, Name: name, Signature: m.Signature, ArgumentsDelta: string(raw[:middle])}); err != nil {
 			return err
 		}
 		if m.Behavior == "truncated" {

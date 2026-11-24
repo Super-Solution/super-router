@@ -495,18 +495,22 @@ pub enum ProviderEvent {
         text: String,
     },
     /// Part of a tool call. Calls are numbered from zero by `index`; the first event of an index carries `id` and
-    /// `name`, and `arguments_delta` is the next piece of the call's JSON arguments.
+    /// `name` (and `signature`, when the upstream attached one), and `arguments_delta` is the next piece of the
+    /// call's JSON arguments.
     ToolCall {
         index: usize,
         id: Option<String>,
         name: Option<String>,
+        signature: Option<String>,
         arguments_delta: String,
     },
     Usage {
         usage: Meters,
         upstream_id: String,
     },
-    /// `completion` is `"succeeded"` (the default when `None`) or `"partial"`.
+    /// `completion` is `"succeeded"` (the default when `None`), `"partial"` (cut short) or `"filtered"` (cut short by
+    /// the provider's content policy: recorded as partial, reported to the caller as the finish reason
+    /// `content_filter` rather than `length`).
     Done {
         completion: Option<String>,
     },

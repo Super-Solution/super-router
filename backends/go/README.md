@@ -17,7 +17,8 @@ backends/go
 │   └── postgres/     PostgreSQL DataStore on database/sql, shared schema and migrations
 ├── provider/
 │   ├── openai/       Responses API
-│   └── anthropic/    Messages API
+│   ├── anthropic/    Messages API
+│   └── gemini/       generateContent (Gemini API, Vertex AI)
 ├── server/           the HTTP API as an http.Handler
 └── cmd/super-router-server   a ready-to-run binary
 ```
@@ -27,7 +28,7 @@ backends/go
 ```bash
 export SUPERROUTER_API_KEY=sr_$(openssl rand -hex 32)
 export SUPERROUTER_DIGEST_KEY=$(openssl rand -hex 32)
-export SUPERROUTER_MOCK=1                 # or OPENAI_API_KEY / ANTHROPIC_API_KEY
+export SUPERROUTER_MOCK=1                 # or OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY
 export DATABASE_URL=postgres://...        # optional: unset means the in-memory store
 go run ./cmd/super-router-server
 ```
@@ -83,7 +84,7 @@ The Postgres tests use `postgresql://superrouter:local-development-only@127.0.0.
 
 The Go data plane speaks the same tool-calling wire as the TypeScript reference: `input.tools`, `input.tool_choice`,
 assistant `tool_calls`, `role: "tool"` results, image parts and several system messages; the stream adds
-`output.tool_call.delta` and `output.tool_call.completed`, and the terminal event carries `finish_reason` and `usage`.
+`output.tool_call.delta` and `output.tool_call.completed`, and the terminal event carries `finish_reason` and `usage`. A call may carry an opaque `signature` (Gemini 3's `thoughtSignature`): it is on the first delta and the completed event, in the result's `tool_calls`, and goes back unchanged when the call is replayed.
 A provider says what it can carry through `contracts.CapableProvider`; an invocation that needs tools or images and
 finds no capable offering is refused with `422 unsupported_capability` before anything is reserved. Once a call has
 started streaming it is output, so a later failure is partial and never falls back. `/v1/inferences` and the routing
@@ -99,10 +100,27 @@ These match the Rust data plane and are pinned by its conformance copy:
   "display_unit": "頁"}}`), a task names its meter (`"meter": "pages"`), and limits put them under
   `"max_usage": {"units": {...}}`. Unit names match `^[a-z][a-z0-9_]{0,63}$` and may not reuse a token or media name.
   A credit-rate version keeps a unit-billed service in units.
+- **Rate card.** `pricing.RateCard` prices the kinds of token the wire `Price` has no field for (one-hour cache writes,
+  reasoning tokens) and a fixed fee per call, from one value with the usual fallbacks: `Effective`, `Charge` (exact
+  sum, rounded up once, plus the fee) and `Bound` (what to hold before the call). No wire format, contract or store
+  changes; its cases are `rate_card_charge` and `rate_card_bound` in the Rust conformance copy. `Defaulted` and
+  `DefaultedIn` list the kinds priced by fallback (a cache read billed at the full input rate is often a forgotten
+  rate, not a decision). `pricing.RateSchedule` picks the card in effect at an instant (`CardAt`, `NextChangeAfter`) and
+  `BoundBetween` holds enough for a call that may settle after a price change. `pricing.RateTiers` is long-context
+  pricing: the whole call is priced by the card of the tier its prompt reaches (`CardFor`, `Charge`), and `Bound` holds
+  the dearest tier a prompt of up to `maxInput` tokens can reach (cases `rate_tiers_charge`, `rate_tiers_bound`).
 - **Structured output.** `response_format` (`json_schema` with a name, a schema object and optional description and
   `strict`) excludes offerings without the `structured_output` capability as `structured_output_unsupported`. No
-  provider adapter writes the schema yet, so a request that still has a candidate is refused with
-  `422 unsupported_capability` before anything is reserved.
+  provider whose `Capabilities()` says `StructuredOutput` receives it (the Gemini provider does and writes
+  `responseJsonSchema`); a request with no such candidate is refused with `422 unsupported_capability` before anything
+  is reserved.
+- **Failure classes and the health book.** `contracts.ClassifyFailure` reads an upstream refusal's status and message and
+  returns a `FailureClass`; a failure that belongs to the offering (credentials, model, quota, region, rate limit) is
+  definitive and retryable, so the router tries the next offering. `routing.HealthBook` (with `router.WithHealth`)
+  skips offerings whose own failure is repeating, with class-based cooldowns and one half-open probe, and fails open
+  when every candidate is cooling. Off by default. Cases: `failure.v1.json`, `health.v1.json`.
+- **Finish reasons.** A provider that ends an answer by content policy emits completion `filtered`: stored as partial,
+  reported as `finish_reason: content_filter`.
 - **Downgrade policy.** A tier service may name a lower tier and its offerings. They pass the same hard limits, are
   tried after every primary offering, emit `routing.downgrade` when tried, and the result reports `downgrade`
   (`from_tier`, `to_tier`) and the lower tier.

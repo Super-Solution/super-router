@@ -5,6 +5,7 @@ package pricing
 import (
 	"encoding/json"
 	"errors"
+	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -61,6 +62,50 @@ type fixtures struct {
 		Config json.RawMessage `json:"config"`
 		Expect expect          `json:"expect"`
 	} `json:"compile_credit_price"`
+	RateCardCharge []struct {
+		Card   json.RawMessage `json:"card"`
+		Usage  json.RawMessage `json:"usage"`
+		Expect expect          `json:"expect"`
+	} `json:"rate_card_charge"`
+	RateCardBound []struct {
+		Card   json.RawMessage `json:"card"`
+		Input  int64           `json:"input"`
+		Output int64           `json:"output"`
+		Expect expect          `json:"expect"`
+	} `json:"rate_card_bound"`
+	RateScheduleCharge []struct {
+		Schedule json.RawMessage `json:"schedule"`
+		AtMs     int64           `json:"at_ms"`
+		Usage    json.RawMessage `json:"usage"`
+		Expect   expect          `json:"expect"`
+	} `json:"rate_schedule_charge"`
+	RateScheduleBound []struct {
+		Schedule json.RawMessage `json:"schedule"`
+		StartMs  int64           `json:"start_ms"`
+		EndMs    int64           `json:"end_ms"`
+		Input    int64           `json:"input"`
+		Output   int64           `json:"output"`
+		Expect   expect          `json:"expect"`
+	} `json:"rate_schedule_bound"`
+	RateTiersCharge []struct {
+		Tiers  json.RawMessage `json:"tiers"`
+		Usage  json.RawMessage `json:"usage"`
+		Expect expect          `json:"expect"`
+	} `json:"rate_tiers_charge"`
+	RateTiersBound []struct {
+		Tiers  json.RawMessage `json:"tiers"`
+		Input  int64           `json:"input"`
+		Output int64           `json:"output"`
+		Expect expect          `json:"expect"`
+	} `json:"rate_tiers_bound"`
+	RateCardDefaulted []struct {
+		Card   json.RawMessage `json:"card"`
+		Usage  json.RawMessage `json:"usage"`
+		Expect struct {
+			All  []TokenKind `json:"all"`
+			Used []TokenKind `json:"used"`
+		} `json:"expect"`
+	} `json:"rate_card_defaulted"`
 }
 
 func load(t *testing.T) fixtures {
@@ -167,6 +212,173 @@ func TestValidUnitName(t *testing.T) {
 	for _, bad := range []string{"", "Units", "units", "input", "images", "__proto__", "1a", "a-b", "constructor", strings.Repeat("a", 65)} {
 		if ValidUnitName(bad) {
 			t.Errorf("%q accepted", bad)
+		}
+	}
+}
+
+// checkExpect compares a result with a rate card case: an error code, or the amount as a decimal string.
+func checkExpect(t *testing.T, name string, i int, got *big.Int, err error, want expect) {
+	t.Helper()
+	switch {
+	case want.Error != "":
+		if code(err) != want.Error {
+			t.Errorf("%s[%d]: error %v, want %s", name, i, err, want.Error)
+		}
+	case err != nil:
+		t.Errorf("%s[%d]: %v", name, i, err)
+	case got.String() != want.Ok:
+		t.Errorf("%s[%d]: %s, want %v", name, i, got, want.Ok)
+	}
+}
+
+func TestRateCardCharge(t *testing.T) {
+	f := load(t)
+	errorsSeen := 0
+	for i, c := range f.RateCardCharge {
+		card, err := DecodeRateCard(c.Card)
+		if err != nil {
+			t.Fatalf("rate_card_charge[%d]: %v", i, err)
+		}
+		var counts TokenCounts
+		if err := json.Unmarshal(c.Usage, &counts); err != nil {
+			t.Fatal(err)
+		}
+		got, err := card.Charge(counts)
+		if c.Expect.Error != "" {
+			errorsSeen++
+		}
+		checkExpect(t, "rate_card_charge", i, got, err, c.Expect)
+	}
+	if len(f.RateCardCharge) < 30 || errorsSeen < 10 {
+		t.Fatalf("%d cases, %d errors", len(f.RateCardCharge), errorsSeen)
+	}
+}
+
+func TestRateCardBound(t *testing.T) {
+	f := load(t)
+	errorsSeen := 0
+	for i, c := range f.RateCardBound {
+		card, err := DecodeRateCard(c.Card)
+		if err != nil {
+			t.Fatalf("rate_card_bound[%d]: %v", i, err)
+		}
+		got, err := card.Bound(c.Input, c.Output)
+		if c.Expect.Error != "" {
+			errorsSeen++
+		}
+		checkExpect(t, "rate_card_bound", i, got, err, c.Expect)
+	}
+	if len(f.RateCardBound) < 10 || errorsSeen < 4 {
+		t.Fatalf("%d cases, %d errors", len(f.RateCardBound), errorsSeen)
+	}
+}
+
+func TestRateScheduleCharge(t *testing.T) {
+	f := load(t)
+	errorsSeen := 0
+	for i, c := range f.RateScheduleCharge {
+		var counts TokenCounts
+		if err := json.Unmarshal(c.Usage, &counts); err != nil {
+			t.Fatal(err)
+		}
+		var got *big.Int
+		schedule, err := DecodeRateSchedule(c.Schedule)
+		if err == nil {
+			var card RateCard
+			if card, err = schedule.CardAt(c.AtMs); err == nil {
+				got, err = card.Charge(counts)
+			}
+		}
+		if c.Expect.Error != "" {
+			errorsSeen++
+		}
+		checkExpect(t, "rate_schedule_charge", i, got, err, c.Expect)
+	}
+	if len(f.RateScheduleCharge) < 12 || errorsSeen < 6 {
+		t.Fatalf("%d cases, %d errors", len(f.RateScheduleCharge), errorsSeen)
+	}
+}
+
+func TestRateScheduleBound(t *testing.T) {
+	f := load(t)
+	errorsSeen := 0
+	for i, c := range f.RateScheduleBound {
+		schedule, err := DecodeRateSchedule(c.Schedule)
+		if err != nil {
+			t.Fatalf("rate_schedule_bound[%d]: %v", i, err)
+		}
+		got, err := schedule.BoundBetween(c.StartMs, c.EndMs, c.Input, c.Output)
+		if c.Expect.Error != "" {
+			errorsSeen++
+		}
+		checkExpect(t, "rate_schedule_bound", i, got, err, c.Expect)
+	}
+	if len(f.RateScheduleBound) < 8 || errorsSeen < 2 {
+		t.Fatalf("%d cases, %d errors", len(f.RateScheduleBound), errorsSeen)
+	}
+}
+
+func TestRateTiersCharge(t *testing.T) {
+	f := load(t)
+	errorsSeen := 0
+	for i, c := range f.RateTiersCharge {
+		var counts TokenCounts
+		if err := json.Unmarshal(c.Usage, &counts); err != nil {
+			t.Fatal(err)
+		}
+		var got *big.Int
+		tiers, err := DecodeRateTiers(c.Tiers)
+		if err == nil {
+			got, err = tiers.Charge(counts)
+		}
+		if c.Expect.Error != "" {
+			errorsSeen++
+		}
+		checkExpect(t, "rate_tiers_charge", i, got, err, c.Expect)
+	}
+	if len(f.RateTiersCharge) < 15 || errorsSeen < 8 {
+		t.Fatalf("%d cases, %d errors", len(f.RateTiersCharge), errorsSeen)
+	}
+}
+
+func TestRateTiersBound(t *testing.T) {
+	f := load(t)
+	errorsSeen := 0
+	for i, c := range f.RateTiersBound {
+		tiers, err := DecodeRateTiers(c.Tiers)
+		if err != nil {
+			t.Fatalf("rate_tiers_bound[%d]: %v", i, err)
+		}
+		got, err := tiers.Bound(c.Input, c.Output)
+		if c.Expect.Error != "" {
+			errorsSeen++
+		}
+		checkExpect(t, "rate_tiers_bound", i, got, err, c.Expect)
+	}
+	if len(f.RateTiersBound) < 10 || errorsSeen < 2 {
+		t.Fatalf("%d cases, %d errors", len(f.RateTiersBound), errorsSeen)
+	}
+}
+
+func TestRateCardDefaulted(t *testing.T) {
+	f := load(t)
+	if len(f.RateCardDefaulted) < 4 {
+		t.Fatalf("%d cases", len(f.RateCardDefaulted))
+	}
+	for i, c := range f.RateCardDefaulted {
+		card, err := DecodeRateCard(c.Card)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var counts TokenCounts
+		if err := json.Unmarshal(c.Usage, &counts); err != nil {
+			t.Fatal(err)
+		}
+		if got := card.Defaulted(); !reflect.DeepEqual(got, c.Expect.All) {
+			t.Errorf("rate_card_defaulted[%d] all: %v, want %v", i, got, c.Expect.All)
+		}
+		if got := card.DefaultedIn(counts); !reflect.DeepEqual(got, c.Expect.Used) {
+			t.Errorf("rate_card_defaulted[%d] used: %v, want %v", i, got, c.Expect.Used)
 		}
 	}
 }

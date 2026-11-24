@@ -39,7 +39,14 @@ type streamCase struct {
 // test server's base URL.
 func Run(t *testing.T, section string, make func(baseURL string) contracts.Provider) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "conformance", "tools.v1.json"))
+	RunFile(t, filepath.Join("..", "..", "..", "..", "conformance", "tools.v1.json"), section, make)
+}
+
+// RunFile is Run for a file of the same shape at path. Providers the TypeScript reference does not have (Gemini)
+// keep their cases in a file of their own, because tools.v1.json is generated from the reference.
+func RunFile(t *testing.T, path, section string, make func(baseURL string) contracts.Provider) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,6 +129,9 @@ func wire(e contracts.ProviderEvent) map[string]any {
 		out := map[string]any{"type": "tool_call", "index": e.Index, "arguments_delta": e.ArgumentsDelta}
 		if e.ID != "" {
 			out["id"], out["name"] = e.ID, e.Name
+		}
+		if e.Signature != "" {
+			out["signature"] = e.Signature
 		}
 		return out
 	case "usage":

@@ -1,4 +1,4 @@
-//! Runs the provider sections of `conformance/tools.v1.json` against a [`Provider`]: the exact upstream request
+//! Runs the provider sections of `conformance/tools.v1.json` (and files of the same shape) against a [`Provider`]: the exact upstream request
 //! body built from an invocation, and the events produced from a recorded upstream stream.
 
 use std::path::Path;
@@ -13,9 +13,9 @@ use serde_json::value::RawValue;
 use serde_json::{json, Number, Value};
 use super_router_contracts::{parse_invocation, Offering, Provider, ProviderError, ProviderEvent};
 
-fn read() -> String {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/tools.v1.json");
-    std::fs::read_to_string(path).expect("read tools.v1.json")
+fn read(file: &str) -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance").join(file);
+    std::fs::read_to_string(path).unwrap_or_else(|e| panic!("read {file}: {e}"))
 }
 
 /// The recorded frames of every stream case, as written in the file: key order matters to a tool call's input.
@@ -28,7 +28,7 @@ fn raw_frames(text: &str, section: &str) -> Vec<Vec<String>> {
     struct Section {
         streams: Vec<Stream>,
     }
-    let mut file: std::collections::HashMap<String, Box<RawValue>> = serde_json::from_str(text).expect("parse tools.v1.json");
+    let mut file: std::collections::HashMap<String, Box<RawValue>> = serde_json::from_str(text).expect("parse conformance file");
     let section: Section = serde_json::from_str(file.remove(section).expect("section").get()).expect("section");
     section.streams.into_iter().map(|s| s.frames.into_iter().map(|f| f.get().to_string()).collect()).collect()
 }
@@ -47,11 +47,14 @@ fn normalise(v: Value) -> Value {
 fn wire(e: &ProviderEvent) -> Value {
     match e {
         ProviderEvent::Delta { text } => json!({ "type": "delta", "text": text }),
-        ProviderEvent::ToolCall { index, id, name, arguments_delta } => {
+        ProviderEvent::ToolCall { index, id, name, signature, arguments_delta } => {
             let mut out = json!({ "type": "tool_call", "index": index, "arguments_delta": arguments_delta });
             if let Some(id) = id {
                 out["id"] = json!(id);
                 out["name"] = json!(name);
+            }
+            if let Some(signature) = signature {
+                out["signature"] = json!(signature);
             }
             out
         }
@@ -139,8 +142,15 @@ async fn invoke(
 /// Checks a provider against the named section (`openai` or `anthropic`) and returns every difference found.
 /// `make` builds the provider pointed at a test server's base URL.
 pub async fn run_tool_cases(section: &str, make: &dyn Fn(&str) -> Arc<dyn Provider>) -> Vec<String> {
-    let text = read();
-    let data: Value = serde_json::from_str(&text).expect("parse tools.v1.json");
+    run_tool_cases_in("tools.v1.json", section, make).await
+}
+
+/// Like [`run_tool_cases`] for a file of the same shape in `backends/rust/conformance`. Providers the TypeScript
+/// reference does not have (Gemini) keep their cases in a file of their own, because `tools.v1.json` is generated
+/// from the reference.
+pub async fn run_tool_cases_in(file: &str, section: &str, make: &dyn Fn(&str) -> Arc<dyn Provider>) -> Vec<String> {
+    let text = read(file);
+    let data: Value = serde_json::from_str(&text).expect("parse conformance file");
     let recorded = raw_frames(&text, section);
     let offering: Offering = serde_json::from_value(data["offering"].clone()).expect("offering");
     let requests = data[section]["requests"].as_array().expect("requests");

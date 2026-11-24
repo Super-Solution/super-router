@@ -9,7 +9,7 @@
 //! | `DATABASE_URL` | PostgreSQL URL. Unset means the in-memory store: state is lost on restart |
 //! | `ADDR` | listen address, default `127.0.0.1:3410` |
 //! | `SUPERROUTER_WORKSPACE`, `SUPERROUTER_ENVIRONMENT`, `SUPERROUTER_CUSTOMER` | tenant of the owner key, default `default`, `prod`, `default` |
-//! | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | enable the `openai` and `anthropic` providers (`offering.provider` names them) |
+//! | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` | enable the `openai`, `anthropic` and `gemini` providers (`offering.provider` names them) |
 //! | `SUPERROUTER_MOCK` | `1` enables the deterministic `mock` provider and the scripted `mock-tools` one |
 
 use std::collections::HashMap;
@@ -19,6 +19,7 @@ use std::time::Duration;
 
 use super_router_contracts::{Principal, Provider};
 use super_router_provider_anthropic::Anthropic;
+use super_router_provider_gemini::Gemini;
 use super_router_provider_openai::OpenAi;
 use super_router_router::{Authenticator, DataStore, MockProvider, MockToolProvider, Router};
 use super_router_server::{handler, Key, Options, StaticKeys};
@@ -75,6 +76,7 @@ pub struct Config {
     pub customer: String,
     pub openai_key: Option<String>,
     pub anthropic_key: Option<String>,
+    pub gemini_key: Option<String>,
     pub mock: bool,
 }
 
@@ -107,6 +109,7 @@ impl Config {
             customer: or("SUPERROUTER_CUSTOMER", "default"),
             openai_key: get("OPENAI_API_KEY"),
             anthropic_key: get("ANTHROPIC_API_KEY"),
+            gemini_key: get("GEMINI_API_KEY"),
             mock: get("SUPERROUTER_MOCK").as_deref() == Some("1"),
         })
     }
@@ -141,12 +144,15 @@ pub async fn run(cfg: Config, shutdown: CancellationToken, ready: Option<oneshot
         providers
             .insert("anthropic".into(), Arc::new(Anthropic::builder(key.clone()).build().map_err(|e| format!("anthropic provider: {e}"))?));
     }
+    if let Some(key) = &cfg.gemini_key {
+        providers.insert("gemini".into(), Arc::new(Gemini::builder(key.clone()).build().map_err(|e| format!("gemini provider: {e}"))?));
+    }
     if cfg.mock {
         providers.insert("mock".into(), Arc::new(MockProvider::new("success")));
         providers.insert("mock-tools".into(), Arc::new(MockToolProvider::new("success")));
     }
     if providers.is_empty() {
-        tracing::warn!("no provider is configured: set OPENAI_API_KEY, ANTHROPIC_API_KEY or SUPERROUTER_MOCK=1");
+        tracing::warn!("no provider is configured: set OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or SUPERROUTER_MOCK=1");
     }
     let provider_count = providers.len();
     let router = Arc::new(Router::new(store.clone(), providers, &cfg.digest_key).map_err(str::to_string)?);

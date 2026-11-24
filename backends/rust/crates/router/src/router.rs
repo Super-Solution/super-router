@@ -6,7 +6,7 @@
 //! reservation stays pending for reconciliation.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -16,11 +16,11 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::Sha256;
 use super_router_contracts::{
-    canonical, invocation_needs, js_trim, parse_invocation, Invocation, Meters, Principal, Provider, ProviderError, ProviderEvent,
-    RouterError, Service, StreamEvent, ToolCall, ToolCalls,
+    canonical, invocation_needs, js_trim, parse_invocation, valid_signature, FailureClass, Invocation, Meters, Offering, Principal,
+    Provider, ProviderError, ProviderEvent, RouterError, Service, StreamEvent, ToolCall, ToolCalls,
 };
 use super_router_pricing::{atoms, charge};
-use super_router_routing::{invocation_bound, route_at, Candidate, Excluded};
+use super_router_routing::{invocation_bound, route_at, Admit, Candidate, Excluded, HealthBook};
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
 use tokio_util::sync::CancellationToken;
 
@@ -147,6 +147,7 @@ pub struct Router {
     providers: HashMap<String, Arc<dyn Provider>>,
     digest_key: Vec<u8>,
     clock: Clock,
+    health: Option<Arc<Mutex<HealthBook>>>,
 }
 
 fn fail(code: &str, status: u16) -> RouterError {
@@ -239,19 +240,72 @@ impl Run {
     }
 }
 
+/// The key a health book remembers an offering under: offering ids are only unique within a provider.
+fn health_key(o: &Offering) -> String {
+    format!("{}/{}", o.provider, o.id)
+}
+
 impl Router {
+    /// Drops the candidates the health book says to leave alone, recording each as excluded with the reason
+    /// `cooling_down`. If that would leave nothing, every candidate is kept: a request that might fail is better
+    /// than one that certainly does, and the attempts will refresh the book.
+    fn without_cooling(&self, candidates: Vec<Candidate>, excluded: &mut Vec<Excluded>) -> Vec<Candidate> {
+        let Some(health) = &self.health else { return candidates };
+        let now = (self.clock)();
+        let mut book = health.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let answers: Vec<Admit> = candidates.iter().map(|c| book.admit(&health_key(&c.offering), now)).collect();
+        if answers.iter().all(|a| matches!(a, Admit::Cooling { .. })) {
+            return candidates;
+        }
+        let mut kept = Vec::with_capacity(candidates.len());
+        for (c, a) in candidates.into_iter().zip(answers) {
+            if matches!(a, Admit::Cooling { .. }) {
+                excluded.push(Excluded { id: c.offering.id.clone(), reason: "cooling_down".into() });
+            } else {
+                kept.push(c);
+            }
+        }
+        kept
+    }
+
+    /// Tells the health book how an attempt ended. Only a clean success and a failure that belongs to the offering
+    /// count; everything else (a refused request, an unknown outcome) says nothing about it.
+    fn note_health(&self, offering: &Offering, outcome: Result<(), &ProviderError>) {
+        let Some(health) = &self.health else { return };
+        let now = (self.clock)();
+        let mut book = health.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let key = health_key(offering);
+        match outcome {
+            Ok(()) => book.succeeded(&key),
+            Err(e) => {
+                if let Some(class) = FailureClass::from_name(&e.code) {
+                    book.failed(&key, class, now);
+                }
+            }
+        }
+    }
+
     /// Creates a router. `digest_key` keys the idempotency digest and must be at least 32 bytes.
     pub fn new(store: Arc<dyn Store>, providers: HashMap<String, Arc<dyn Provider>>, digest_key: &str) -> Result<Self, &'static str> {
         if digest_key.len() < 32 {
             return Err("router: digest key must be at least 32 characters");
         }
-        Ok(Self { store, providers, digest_key: digest_key.as_bytes().to_vec(), clock: system_clock() })
+        Ok(Self { store, providers, digest_key: digest_key.as_bytes().to_vec(), clock: system_clock(), health: None })
     }
 
     /// Replaces the wall clock, for tests.
     #[must_use]
     pub fn with_clock(mut self, clock: Clock) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// Lets the router skip offerings whose own failure is repeating (a rejected key, an empty account, a retired
+    /// model, a rate limit) until the book says they are worth trying again, instead of paying one failed attempt per
+    /// request. Without a book nothing is skipped. The book is shared, so hosts can give one to several routers.
+    #[must_use]
+    pub fn with_health(mut self, health: Arc<Mutex<HealthBook>>) -> Self {
+        self.health = Some(health);
         self
     }
 
@@ -316,9 +370,6 @@ impl Router {
         if candidates.is_empty() {
             return Err(fail("no_eligible_offering", 422).into());
         }
-        if input.response_format.is_some() {
-            return Err(fail("unsupported_capability", 422).into());
-        }
         let mut providers = Vec::with_capacity(candidates.len());
         for c in &candidates {
             providers.push(self.providers.get(&c.offering.provider).ok_or_else(|| fail("provider_unavailable", 503))?.capabilities());
@@ -333,7 +384,7 @@ impl Router {
                 excluded.push(Excluded { id: c.offering.id.clone(), reason: "capability_unsupported".into() });
             }
         }
-        let candidates = capable;
+        let candidates = self.without_cooling(capable, &mut excluded);
         if candidates.is_empty() {
             return Err(fail("unsupported_capability", 422).into());
         }
@@ -415,6 +466,7 @@ impl Router {
         let mut pending = false;
         let mut last_model = String::new();
         let mut downgrade: Option<Downgrade> = None;
+        let mut content_filtered = false;
 
         run.send(id, "request.started", json!({ "service_version": service.version }))?;
         let max_attempts = usize::try_from(service.max_attempts).unwrap_or(0);
@@ -451,6 +503,7 @@ impl Router {
             let mut upstream = String::new();
             let mut done = false;
             let mut completion = "succeeded".to_string();
+            let mut filtered = false;
             let mut stream = provider.invoke(input, &candidate.offering);
             let mut call_err: Option<ProviderError> = loop {
                 tokio::select! {
@@ -481,7 +534,7 @@ impl Router {
                                 break Some(ProviderError::unknown(format!("emit: {e}")));
                             }
                         }
-                        Some(Ok(ProviderEvent::ToolCall { index, id: call_id, name, arguments_delta })) => {
+                        Some(Ok(ProviderEvent::ToolCall { index, id: call_id, name, signature, arguments_delta })) => {
                             let known = tool_calls.contains_key(&index);
                             let new_ok = tool_calls.len() < MAX_TOOL_CALLS
                                 && call_id.as_deref().is_some_and(|s| !s.is_empty())
@@ -506,8 +559,12 @@ impl Router {
                                 json!({ "index": index, "arguments_delta": arguments_delta })
                             } else {
                                 let (call_id, name) = (call_id.unwrap_or_default(), name.unwrap_or_default());
-                                let data = json!({ "index": index, "id": call_id, "name": name, "arguments_delta": arguments_delta });
-                                tool_calls.insert(index, ToolCall { id: call_id, name, arguments: arguments_delta });
+                                let signature = signature.filter(|s| valid_signature(s));
+                                let mut data = json!({ "index": index, "id": call_id, "name": name, "arguments_delta": arguments_delta });
+                                if let Some(signature) = &signature {
+                                    data["signature"] = json!(signature);
+                                }
+                                tool_calls.insert(index, ToolCall { id: call_id, name, arguments: arguments_delta, signature });
                                 data
                             };
                             if let Err(e) = run.send(id, "output.tool_call.delta", data) {
@@ -523,7 +580,11 @@ impl Router {
                         }
                         Some(Ok(ProviderEvent::Done { completion: c })) => {
                             done = true;
-                            if let Some(c) = c { completion = c; }
+                            if let Some(c) = c {
+                                // "filtered" is a partial completion with a reason: it is stored as partial.
+                                filtered = c == "filtered";
+                                completion = if filtered { "partial".to_string() } else { c };
+                            }
                             break None;
                         }
                     }
@@ -549,7 +610,11 @@ impl Router {
                             let cost_text = cost.to_string();
                             match self.store.attempt_result(p, id, &attempt, &completion, Some(u), Some(&cost_text), &upstream).await {
                                 Ok(()) => {
+                                    if completion == "succeeded" {
+                                        self.note_health(&candidate.offering, Ok(()));
+                                    }
                                     final_usage = usage.clone();
+                                    content_filtered = filtered;
                                     execution.clone_from(&completion);
                                     pending = cost > candidate.cost;
                                     break;
@@ -570,6 +635,9 @@ impl Router {
             } else {
                 None
             };
+            if definitive {
+                self.note_health(&candidate.offering, Err(&failure));
+            }
             let status = if definitive { "failed" } else { "unknown" };
             self.store.attempt_result(p, id, &attempt, status, usage.as_ref(), cost.as_deref(), &upstream).await?;
             if !definitive {
@@ -591,15 +659,16 @@ impl Router {
                     "" => "{}".to_string(),
                     trimmed => trimmed.to_string(),
                 };
-                run.send(
-                    id,
-                    "output.tool_call.completed",
-                    json!({ "index": index, "id": call.id, "name": call.name, "arguments": call.arguments }),
-                )?;
+                let mut data = json!({ "index": index, "id": call.id, "name": call.name, "arguments": call.arguments });
+                if let Some(signature) = &call.signature {
+                    data["signature"] = json!(signature);
+                }
+                run.send(id, "output.tool_call.completed", data)?;
                 calls.push(call);
             }
         }
         let finish_reason = match execution.as_str() {
+            "partial" if final_usage.is_some() && content_filtered => Some("content_filter"),
             "partial" if final_usage.is_some() => Some("length"),
             "succeeded" if !calls.is_empty() => Some("tool_calls"),
             "succeeded" => Some("stop"),
