@@ -99,10 +99,6 @@ These match the Rust data plane and are pinned by its conformance copy:
   "display_unit": "頁"}}`), a task names its meter (`"meter": "pages"`), and limits put them under
   `"max_usage": {"units": {...}}`. Unit names match `^[a-z][a-z0-9_]{0,63}$` and may not reuse a token or media name.
   A credit-rate version keeps a unit-billed service in units.
-- **Rate card.** `pricing.RateCard` prices the kinds of token the wire `Price` has no field for (one-hour cache writes,
-  reasoning tokens) and a fixed fee per call, from one value with the usual fallbacks: `Effective`, `Charge` (exact
-  sum, rounded up once, plus the fee) and `Bound` (what to hold before the call). No wire format, contract or store
-  changes; its cases are `rate_card_charge` and `rate_card_bound` in the Rust conformance copy.
 - **Structured output.** `response_format` (`json_schema` with a name, a schema object and optional description and
   `strict`) excludes offerings without the `structured_output` capability as `structured_output_unsupported`. No
   provider adapter writes the schema yet, so a request that still has a candidate is refused with
