@@ -1994,6 +1994,7 @@ dependencies = [
  "super-router-dataplane-test",
  "super-router-pricing",
  "super-router-router",
+ "super-router-routing",
  "tokio",
  "tokio-util",
  "uuid",

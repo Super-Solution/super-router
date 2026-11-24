@@ -31,6 +31,17 @@ const (
 // Name is the stable lower-case name, usable as an error code or a metric label.
 func (c FailureClass) Name() string { return string(c) }
 
+// ParseFailureClass returns the class a stable name stands for, and false for any other text (an error code that is
+// not a class, such as "upstream_http_422").
+func ParseFailureClass(name string) (FailureClass, bool) {
+	for _, c := range []FailureClass{FailureRateLimited, FailureQuotaExhausted, FailureCredentialsRejected, FailureModelUnavailable, FailureRegionBlocked, FailureRequestRejected, FailureUnknown} {
+		if c.Name() == name {
+			return c, true
+		}
+	}
+	return "", false
+}
+
 // IsOfferingScoped reports whether the failure belongs to the offering, so that another offering may be tried and
 // this one should be avoided for a while.
 func (c FailureClass) IsOfferingScoped() bool {

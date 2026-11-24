@@ -51,6 +51,22 @@ impl FailureClass {
         }
     }
 
+    /// The class a stable [`name`](Self::name) stands for, or `None` for any other text (an error code that is not a
+    /// class, such as `upstream_http_422`).
+    pub fn from_name(name: &str) -> Option<Self> {
+        [
+            Self::RateLimited,
+            Self::QuotaExhausted,
+            Self::CredentialsRejected,
+            Self::ModelUnavailable,
+            Self::RegionBlocked,
+            Self::RequestRejected,
+            Self::Unknown,
+        ]
+        .into_iter()
+        .find(|c| c.name() == name)
+    }
+
     /// Whether the failure belongs to the offering, so that another offering may be tried and this one should be
     /// avoided for a while.
     pub fn is_offering_scoped(self) -> bool {
@@ -179,5 +195,7 @@ mod tests {
         let unknown = FailureClass::Unknown.provider_error(503);
         assert_eq!((unknown.definitive, unknown.retryable, unknown.code.as_str()), (false, false, "upstream_http_503"));
         assert!(!FailureClass::RequestRejected.is_offering_scoped() && !FailureClass::Unknown.is_offering_scoped());
+        assert_eq!(FailureClass::from_name("quota_exhausted"), Some(FailureClass::QuotaExhausted));
+        assert_eq!(FailureClass::from_name("upstream_http_422"), None);
     }
 }

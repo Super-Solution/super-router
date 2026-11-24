@@ -30,6 +30,7 @@ type Router struct {
 	providers map[string]contracts.Provider
 	digestKey []byte
 	clock     Clock
+	health    *routing.HealthBook
 }
 
 // Option configures New.
@@ -37,6 +38,11 @@ type Option func(*Router)
 
 // WithClock replaces the wall clock, for tests.
 func WithClock(c Clock) Option { return func(r *Router) { r.clock = c } }
+
+// WithHealth lets the router skip offerings whose own failure is repeating (a rejected key, an empty account, a
+// retired model, a rate limit) until the book says they are worth trying again, instead of paying one failed attempt
+// per request. Without a book nothing is skipped. The book is safe to share between routers.
+func WithHealth(b *routing.HealthBook) Option { return func(r *Router) { r.health = b } }
 
 // New creates a router. digestKey keys the idempotency digest and must be at least 32 bytes.
 func New(store Store, providers map[string]contracts.Provider, digestKey string, opts ...Option) (*Router, error) {
@@ -48,6 +54,52 @@ func New(store Store, providers map[string]contracts.Provider, digestKey string,
 		o(r)
 	}
 	return r, nil
+}
+
+// healthKey is how a health book remembers an offering: offering ids are only unique within a provider.
+func healthKey(o contracts.Offering) string { return o.Provider + "/" + o.ID }
+
+// withoutCooling drops the candidates the health book says to leave alone, recording each as excluded with the reason
+// "cooling_down". If that would leave nothing, every candidate is kept: a request that might fail is better than one
+// that certainly does, and the attempts will refresh the book.
+func (r *Router) withoutCooling(candidates []routing.Candidate, excluded *[]routing.Excluded) []routing.Candidate {
+	if r.health == nil {
+		return candidates
+	}
+	now := r.clock().UnixMilli()
+	answers := make([]routing.Admit, len(candidates))
+	allCooling := true
+	for i, c := range candidates {
+		answers[i] = r.health.Admit(healthKey(c.Offering), now)
+		if answers[i].Kind != routing.AdmitCooling {
+			allCooling = false
+		}
+	}
+	if allCooling {
+		return candidates
+	}
+	kept := candidates[:0:0]
+	for i, c := range candidates {
+		if answers[i].Kind == routing.AdmitCooling {
+			*excluded = append(*excluded, routing.Excluded{ID: c.Offering.ID, Reason: "cooling_down"})
+		} else {
+			kept = append(kept, c)
+		}
+	}
+	return kept
+}
+
+// noteHealth tells the health book how an attempt ended. Only a clean success and a failure that belongs to the
+// offering count; everything else (a refused request, an unknown outcome) says nothing about it.
+func (r *Router) noteHealth(o contracts.Offering, failure *contracts.ProviderError) {
+	if r.health == nil {
+		return
+	}
+	if failure == nil {
+		r.health.Succeeded(healthKey(o))
+	} else if class, ok := contracts.ParseFailureClass(failure.Code); ok {
+		r.health.Failed(healthKey(o), class, r.clock().UnixMilli())
+	}
 }
 
 // Store returns the router's storage, for hosts that expose balances or cancellation next to inference.
@@ -217,7 +269,7 @@ func (r *Router) Infer(ctx context.Context, p contracts.Principal, raw []byte, k
 			excluded = append(excluded, routing.Excluded{ID: c.Offering.ID, Reason: "capability_unsupported"})
 		}
 	}
-	candidates = capable
+	candidates = r.withoutCooling(capable, &excluded)
 	if len(candidates) == 0 {
 		return nil, fail("unsupported_capability", 422)
 	}
@@ -446,6 +498,9 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 				err = r.store.AttemptResult(bg, p, request.ID, attempt, completion, usage, &costText, upstream)
 			}
 			if err == nil {
+				if completion == "succeeded" {
+					r.noteHealth(candidate.Offering, nil)
+				}
 				finalUsage = usage
 				execution = completion
 				pending = cost.Cmp(candidate.Cost) > 0
@@ -468,6 +523,7 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 		}
 		if definitive {
 			status = "failed"
+			r.noteHealth(candidate.Offering, pe)
 		}
 		if err := r.store.AttemptResult(bg, p, request.ID, attempt, status, usage, cost, upstream); err != nil {
 			return nil, err

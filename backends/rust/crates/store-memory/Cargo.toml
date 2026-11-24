@@ -24,6 +24,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 super-router-dataplane-test = { path = "../dataplane-test" }
+super-router-routing.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 futures-util.workspace = true
