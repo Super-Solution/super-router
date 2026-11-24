@@ -63,6 +63,16 @@ export function checkRelease(root, version, metadata) {
     if (pkg.categories.length === 0) errors.push(`${name} has no categories`);
     if (!pkg.readme || !fs.existsSync(path.join(dir, pkg.readme))) errors.push(`${name} has no README file`);
     if (!pkg.rust_version) errors.push(`${name} has no rust-version`);
+    // The README's install line must follow the release: "0.2" in a 0.3 README sends readers to the old line.
+    const readme = pkg.readme ? path.join(dir, pkg.readme) : null;
+    if (readme && fs.existsSync(readme)) {
+      const [major, minor] = version.split(/[.-]/);
+      const line = fs.readFileSync(readme, "utf8").match(new RegExp(`^${name} = "([^"]+)"`, "m"));
+      const expected = major === "0" ? `${major}.${minor}` : major;
+      if (line && line[1] !== expected && line[1] !== version) {
+        errors.push(`${name} README installs "${line[1]}", expected "${expected}" for ${version}`);
+      }
+    }
     for (const [file, expected] of [["LICENSE", license], ["NOTICE", notice]]) {
       const target = path.join(dir, file);
       if (!fs.existsSync(target)) errors.push(`${name} has no ${file} (copy it from the repository root)`);

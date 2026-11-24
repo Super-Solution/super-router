@@ -23,7 +23,7 @@ use reqwest::{redirect, Client, ClientBuilder};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use super_router_contracts::{
-    classify_failure, Invocation, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream,
+    classify_failure, parse_retry_after, Invocation, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream,
 };
 
 pub use usage::normalize;
@@ -36,7 +36,7 @@ const DEFAULT_PREFIX: &str = "/v1beta";
 pub type KeySource = Arc<dyn Fn() -> String + Send + Sync>;
 
 fn perr(definitive: bool, retryable: bool, code: &str) -> ProviderError {
-    ProviderError { definitive, retryable, code: code.to_string() }
+    ProviderError { definitive, retryable, code: code.to_string(), retry_after_ms: None }
 }
 
 #[derive(Clone, Copy)]
@@ -251,6 +251,7 @@ fn names_rejected_signature(message: &str) -> bool {
 async fn refusal(response: &mut reqwest::Response) -> ProviderError {
     const LIMIT: usize = 16_384;
     let status = response.status().as_u16();
+    let retry_after = retry_after_of(response);
     let mut message = String::new();
     if (400..500).contains(&status) {
         let mut body = Vec::new();
@@ -267,9 +268,14 @@ async fn refusal(response: &mut reqwest::Response) -> ProviderError {
             .unwrap_or_default();
     }
     if status == 400 && names_rejected_signature(&message) {
-        return perr(true, true, "thought_signature_rejected");
+        return perr(true, true, "thought_signature_rejected").with_retry_after(retry_after);
     }
-    classify_failure(status, &message).provider_error(status)
+    classify_failure(status, &message).provider_error(status).with_retry_after(retry_after)
+}
+
+/// The wait the provider asked for in its `Retry-After` header, in milliseconds.
+fn retry_after_of(response: &reqwest::Response) -> Option<u64> {
+    response.headers().get(reqwest::header::RETRY_AFTER).and_then(|v| v.to_str().ok()).and_then(parse_retry_after)
 }
 
 impl Provider for Gemini {

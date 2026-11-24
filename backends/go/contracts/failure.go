@@ -66,6 +66,40 @@ func (c FailureClass) ProviderError(status int) *ProviderError {
 	}
 }
 
+// RetryAfterMaxMs is the longest wait a Retry-After can ask for, in milliseconds. A header that asks for more is read
+// as this much, so a hostile or broken value cannot park an offering for days (a health book also has its own ceiling).
+const RetryAfterMaxMs int64 = 86_400_000
+
+// ParseRetryAfter reads the value of a Retry-After header as milliseconds. Only the delta-seconds form is read: a
+// non-negative number of seconds, whole or with a fraction ("30", "1.5"), surrounding spaces ignored, milliseconds
+// rounded down, anything above RetryAfterMaxMs capped. The HTTP-date form is not read (false): it needs a clock the
+// provider package does not have, and the APIs this router talks to send seconds.
+func ParseRetryAfter(value string) (int64, bool) {
+	v := strings.TrimSpace(value)
+	whole, fraction, hasDot := strings.Cut(v, ".")
+	digits := func(t string) bool {
+		for i := 0; i < len(t); i++ {
+			if t[i] < '0' || t[i] > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	if whole == "" || !digits(whole) || !digits(fraction) || (hasDot && fraction == "") {
+		return 0, false
+	}
+	// Anything of 10 or more digits is far above the cap, and cannot overflow below.
+	var seconds int64 = RetryAfterMaxMs / 1000
+	if len(whole) <= 9 {
+		seconds, _ = strconv.ParseInt(whole, 10, 64)
+	}
+	if len(fraction) > 3 {
+		fraction = fraction[:3]
+	}
+	millis, _ := strconv.ParseInt((fraction + "000")[:3], 10, 64)
+	return min(seconds*1000+millis, RetryAfterMaxMs), true
+}
+
 // Phrases are written with spaces: the message is lower-cased and its underscores and hyphens read as spaces first.
 var (
 	credentialPhrases = []string{"api key not valid", "api key expired", "api key invalid", "invalid api key", "incorrect api key", "invalid x api key"}

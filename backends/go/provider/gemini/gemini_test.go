@@ -247,3 +247,32 @@ func TestTheKeyIsNeverInAnError(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 }
+
+func TestARetryAfterOnARefusalIsCarriedInMilliseconds(t *testing.T) {
+	for _, c := range []struct {
+		status int
+		header string
+		want   int64
+	}{
+		{429, "12", 12_000},
+		{429, "1.5", 1_500},
+		{503, "30", 30_000},
+		{429, "Wed, 21 Oct 2026 07:28:00 GMT", 0},
+		{429, "", 0},
+	} {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			if c.header != "" {
+				w.Header().Set("Retry-After", c.header)
+			}
+			w.WriteHeader(c.status)
+		}
+		_, err := run(t, handler, "k", "gemini-test", invocation())
+		pe, ok := err.(*contracts.ProviderError)
+		if !ok {
+			t.Fatalf("%d %q: not a provider error: %v", c.status, c.header, err)
+		}
+		if pe.RetryAfterMs != c.want {
+			t.Errorf("%d %q: RetryAfterMs %d, want %d", c.status, c.header, pe.RetryAfterMs, c.want)
+		}
+	}
+}

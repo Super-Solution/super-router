@@ -119,6 +119,13 @@ func (b *HealthBook) Admit(key string, nowMs int64) Admit {
 
 // Failed records that an attempt on key failed with class. Classes that do not belong to the offering are ignored.
 func (b *HealthBook) Failed(key string, class contracts.FailureClass, nowMs int64) {
+	b.FailedAfter(key, class, nowMs, 0)
+}
+
+// FailedAfter is Failed for a provider that said how long to wait (its Retry-After, in milliseconds; 0 for none).
+// The hint can only lengthen this cooldown, never shorten it, and never past the ceiling; it is not remembered for
+// the next failure.
+func (b *HealthBook) FailedAfter(key string, class contracts.FailureClass, nowMs int64, retryAfterMs int64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if !class.IsOfferingScoped() {
@@ -140,7 +147,7 @@ func (b *HealthBook) Failed(key string, class contracts.FailureClass, nowMs int6
 	} else {
 		grown = base << shift
 	}
-	length := min(grown, max(b.policy.MaxMs, base))
+	length := min(max(grown, retryAfterMs), max(b.policy.MaxMs, base))
 	b.records[key] = &healthRecord{class: class, streak: streak, untilMs: addSat(nowMs, length)}
 }
 

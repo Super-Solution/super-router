@@ -547,3 +547,23 @@ async fn a_trailing_slash_on_the_base_url_is_harmless() {
     let provider = OpenAi::builder("k").base_url(format!("{base}/")).build().unwrap();
     assert_eq!(collect(&provider, &invocation()).await.1, None);
 }
+
+#[tokio::test]
+async fn a_retry_after_on_a_refusal_is_carried_in_milliseconds() {
+    for (header, want) in
+        [(Some("12"), Some(12_000)), (Some("1.5"), Some(1_500)), (Some("Wed, 21 Oct 2026 07:28:00 GMT"), None), (None, None)]
+    {
+        let base = upstream(move || {
+            let mut r = Response::builder().status(429);
+            if let Some(h) = header {
+                r = r.header("retry-after", h);
+            }
+            r.body(Body::empty()).unwrap()
+        })
+        .await;
+        let (events, error) = collect(&provider(&base, "k"), &invocation()).await;
+        let error = error.expect("a refusal");
+        assert!(events.is_empty());
+        assert_eq!((shape(&error), error.retry_after_ms), ((true, true, "upstream_http_429"), want), "{header:?}");
+    }
+}

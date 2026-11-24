@@ -682,6 +682,285 @@
    "final_size": 1
   },
   {
+   "name": "a longer Retry-After than the class base is honoured",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited",
+     "retry_after_ms": 20000
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 19999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 20000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 20000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a shorter Retry-After never shortens the base",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited",
+     "retry_after_ms": 1000
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 4999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 5000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a Retry-After of zero changes nothing",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited",
+     "retry_after_ms": 0
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 4999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 5000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a Retry-After above the ceiling is cut to it",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited",
+     "retry_after_ms": 86400000
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 1799999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 1800000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 1800000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "the hint does not carry to the next failure",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited",
+     "retry_after_ms": 20000
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 20000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 20000,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 29999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 30000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 30000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a hint is compared with the doubled length",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5000,
+     "expect": {
+      "result": "probe"
+     }
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 5000,
+     "class": "rate_limited",
+     "retry_after_ms": 8000
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 14999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 15000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 15000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a hint on a failure that is already ignored is ignored too",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "rate_limited"
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 100,
+     "class": "rate_limited",
+     "retry_after_ms": 60000
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 4999,
+     "expect": {
+      "result": "cooling",
+      "until_ms": 5000,
+      "class": "rate_limited"
+     }
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 5000,
+     "expect": {
+      "result": "probe"
+     }
+    }
+   ],
+   "final_size": 1
+  },
+  {
+   "name": "a hint on a class that cools nothing does nothing",
+   "steps": [
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 0,
+     "class": "request_rejected",
+     "retry_after_ms": 60000
+    },
+    {
+     "op": "fail",
+     "id": "a",
+     "at": 1,
+     "class": "unknown",
+     "retry_after_ms": 60000
+    },
+    {
+     "op": "admit",
+     "id": "a",
+     "at": 2,
+     "expect": {
+      "result": "open"
+     }
+    }
+   ],
+   "final_size": 0
+  },
+  {
    "name": "a very long streak stays at the ceiling",
    "steps": [
     {

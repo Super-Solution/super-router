@@ -133,6 +133,29 @@ func TestAnOfferingThatRefusesForItsOwnReasonsHandsTheRequestOnAndIsThenSkipped(
 	}
 }
 
+func TestTheWaitAProviderAskedForKeepsTheOfferingOutThatLong(t *testing.T) {
+	// A rate limit that says "come back in 20 s": the default would reopen the offering after 5 s.
+	first := &scripted{err: &contracts.ProviderError{Definitive: true, Retryable: true, Code: "rate_limited", RetryAfterMs: 20_000}}
+	second := &scripted{}
+	p, rt, advance := twoOfferings(t, first, second, routing.NewHealthBook(routing.DefaultHealthPolicy()))
+	steps := []struct {
+		key   string
+		after time.Duration
+		want  [2]int64
+		why   string
+	}{
+		{"k1", 0, [2]int64{1, 1}, "the first request pays one failed attempt on a, then b answers"},
+		{"k2", 19_999 * time.Millisecond, [2]int64{1, 2}, "still skipped one millisecond before the asked wait ends"},
+		{"k3", time.Millisecond, [2]int64{2, 3}, "probed once the asked wait is over"},
+	}
+	for _, s := range steps {
+		advance(s.after)
+		if got := infer(t, rt, p, s.key); got != "succeeded" || calls(first, second) != s.want {
+			t.Fatalf("%s: %s, calls %v, want %v (%s)", s.key, got, calls(first, second), s.want, s.why)
+		}
+	}
+}
+
 func TestWithoutAHealthBookEveryRequestPaysTheFailedAttempt(t *testing.T) {
 	first := &scripted{err: &contracts.ProviderError{Definitive: true, Retryable: true, Code: "credentials_rejected"}}
 	second := &scripted{}

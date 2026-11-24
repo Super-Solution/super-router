@@ -80,6 +80,16 @@ func perr(definitive, retryable bool, code string) error {
 	return &contracts.ProviderError{Definitive: definitive, Retryable: retryable, Code: code}
 }
 
+// withRetryAfter adds the wait the provider asked for in its Retry-After header, in milliseconds, to a refusal.
+func withRetryAfter(err error, res *http.Response) error {
+	if pe, ok := err.(*contracts.ProviderError); ok {
+		if ms, ok := contracts.ParseRetryAfter(res.Header.Get("Retry-After")); ok {
+			pe.RetryAfterMs = ms
+		}
+	}
+	return err
+}
+
 // modelSegment is the model name as it goes into the path: without a `models/` prefix, and only characters that
 // cannot change the path or the query.
 func modelSegment(upstreamModel string) (string, bool) {
@@ -342,7 +352,7 @@ func refusal(res *http.Response) error {
 		}
 	}
 	if res.StatusCode == 400 && namesRejectedSignature(message) {
-		return perr(true, true, "thought_signature_rejected")
+		return withRetryAfter(perr(true, true, "thought_signature_rejected"), res)
 	}
-	return contracts.ClassifyFailure(res.StatusCode, message).ProviderError(res.StatusCode)
+	return withRetryAfter(contracts.ClassifyFailure(res.StatusCode, message).ProviderError(res.StatusCode), res)
 }

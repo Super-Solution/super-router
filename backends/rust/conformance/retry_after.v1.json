@@ -1,0 +1,138 @@
+{
+ "version": 1,
+ "description": "Retry-After header (delta-seconds form) to milliseconds, or null. Written by scripts/export-retry-after-conformance.mjs; Rust and Go only.",
+ "cases": [
+  {
+   "header": "30",
+   "expect_ms": 30000
+  },
+  {
+   "header": "0",
+   "expect_ms": 0
+  },
+  {
+   "header": "1",
+   "expect_ms": 1000
+  },
+  {
+   "header": "120",
+   "expect_ms": 120000
+  },
+  {
+   "header": "1.5",
+   "expect_ms": 1500
+  },
+  {
+   "header": "0.25",
+   "expect_ms": 250
+  },
+  {
+   "header": "2.0005",
+   "expect_ms": 2000
+  },
+  {
+   "header": "0.001",
+   "expect_ms": 1
+  },
+  {
+   "header": "0.0009",
+   "expect_ms": 0
+  },
+  {
+   "header": " 7 ",
+   "expect_ms": 7000
+  },
+  {
+   "header": "\t12\t",
+   "expect_ms": 12000
+  },
+  {
+   "header": "007",
+   "expect_ms": 7000
+  },
+  {
+   "header": "86400",
+   "expect_ms": 86400000
+  },
+  {
+   "header": "86401",
+   "expect_ms": 86400000
+  },
+  {
+   "header": "999999999",
+   "expect_ms": 86400000
+  },
+  {
+   "header": "99999999999999999999999",
+   "expect_ms": 86400000
+  },
+  {
+   "header": "86400.999",
+   "expect_ms": 86400000
+  },
+  {
+   "header": "",
+   "expect_ms": null
+  },
+  {
+   "header": " ",
+   "expect_ms": null
+  },
+  {
+   "header": "-1",
+   "expect_ms": null
+  },
+  {
+   "header": "+5",
+   "expect_ms": null
+  },
+  {
+   "header": "1e3",
+   "expect_ms": null
+  },
+  {
+   "header": "abc",
+   "expect_ms": null
+  },
+  {
+   "header": "5s",
+   "expect_ms": null
+  },
+  {
+   "header": "5 seconds",
+   "expect_ms": null
+  },
+  {
+   "header": "1.",
+   "expect_ms": null
+  },
+  {
+   "header": ".5",
+   "expect_ms": null
+  },
+  {
+   "header": "1.2.3",
+   "expect_ms": null
+  },
+  {
+   "header": "1,5",
+   "expect_ms": null
+  },
+  {
+   "header": "Wed, 21 Oct 2026 07:28:00 GMT",
+   "expect_ms": null
+  },
+  {
+   "header": "2026-10-21T07:28:00Z",
+   "expect_ms": null
+  },
+  {
+   "header": "0x10",
+   "expect_ms": null
+  },
+  {
+   "header": "٣",
+   "expect_ms": null
+  }
+ ]
+}

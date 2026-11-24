@@ -22,11 +22,13 @@ func TestHealthConformance(t *testing.T) {
 			Name   string           `json:"name"`
 			Policy map[string]int64 `json:"policy"`
 			Steps  []struct {
-				Op     string `json:"op"`
-				ID     string `json:"id"`
-				At     int64  `json:"at"`
-				Class  string `json:"class"`
-				Expect struct {
+				Op    string `json:"op"`
+				ID    string `json:"id"`
+				At    int64  `json:"at"`
+				Class string `json:"class"`
+				// RetryAfterMs is the provider's own wait, when the step carries one.
+				RetryAfterMs int64 `json:"retry_after_ms"`
+				Expect       struct {
 					Result  string `json:"result"`
 					UntilMs int64  `json:"until_ms"`
 					Class   string `json:"class"`
@@ -81,7 +83,7 @@ func TestHealthConformance(t *testing.T) {
 				if !ok {
 					t.Fatalf("%s: unknown class %q", c.Name, s.Class)
 				}
-				book.Failed(s.ID, class, s.At)
+				book.FailedAfter(s.ID, class, s.At, s.RetryAfterMs)
 			case "succeed":
 				book.Succeeded(s.ID)
 			default:

@@ -51,17 +51,27 @@ pub struct ProviderError {
     pub definitive: bool,
     pub retryable: bool,
     pub code: String,
+    /// How long the provider asked callers to wait before trying again (its `Retry-After`), in milliseconds. Only
+    /// a hint: a health book that cools the offering treats it as a minimum, never as a promise.
+    pub retry_after_ms: Option<u64>,
 }
 
 impl ProviderError {
     /// An outcome the provider may or may not have acted on: funds stay held.
     pub fn unknown(code: impl Into<String>) -> Self {
-        Self { definitive: false, retryable: false, code: code.into() }
+        Self { definitive: false, retryable: false, code: code.into(), retry_after_ms: None }
     }
 
     /// The provider certainly did nothing; `retryable` allows the next offering to be tried.
     pub fn definitive(code: impl Into<String>, retryable: bool) -> Self {
-        Self { definitive: true, retryable, code: code.into() }
+        Self { definitive: true, retryable, code: code.into(), retry_after_ms: None }
+    }
+
+    /// The same error carrying the wait the provider asked for. `None` leaves it as it was.
+    #[must_use]
+    pub fn with_retry_after(mut self, retry_after_ms: Option<u64>) -> Self {
+        self.retry_after_ms = retry_after_ms;
+        self
     }
 }
 
