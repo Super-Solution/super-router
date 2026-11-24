@@ -252,5 +252,6 @@ OpenAI and Anthropic providers (Azure, Vertex Anthropic), (6) decide whether the
 `accounting::price` for `RateCard` after the next release and gets Gemini either from this provider or by adding the
 protocol to its own gateway; its protocol table needs a call path that can carry the model name.
 
-Release: a new crate. The first publish of `super-router-provider-gemini` must happen with a token before Trusted
-Publishing can be configured for it (`docs/CRATES-PUBLISHING.md` lists ten crates; it becomes eleven at 0.3.0).
+Release: a new crate. The first publish of `super-router-provider-gemini` (0.3.0) was done by hand with a token, since
+Trusted Publishing can only be configured for a crate that exists; from the next release it is published by the
+workflow with the other ten (`docs/CRATES-PUBLISHING.md` lists eleven).
