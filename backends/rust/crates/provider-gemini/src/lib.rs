@@ -228,6 +228,26 @@ fn classify_status(status: u16) -> ProviderError {
     }
 }
 
+/// A signature only validates on the backend that minted it: the Gemini API answers a replayed Vertex signature with
+/// `400 Corrupted thought signature`, and Vertex answers the Gemini API's with `400 Invalid thought signature`.
+/// Telling that apart from any other 400 lets the caller see why a conversation cannot move to this offering.
+/// Only the error's own message is read, from the first 16 KiB; nothing of it is passed on.
+async fn names_rejected_signature(response: &mut reqwest::Response) -> bool {
+    const LIMIT: usize = 16_384;
+    let mut body = Vec::new();
+    while body.len() < LIMIT {
+        match response.chunk().await {
+            Ok(Some(chunk)) => body.extend_from_slice(&chunk),
+            _ => break,
+        }
+    }
+    body.truncate(LIMIT);
+    serde_json::from_slice::<Value>(&body)
+        .ok()
+        .and_then(|v| v["error"]["message"].as_str().map(|m| m.to_lowercase().replace('_', " ")))
+        .is_some_and(|m| m.contains("thought signature") || m.contains("thoughtsignature"))
+}
+
 impl Provider for Gemini {
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities { tools: true, images: true }
@@ -274,9 +294,12 @@ impl Provider for Gemini {
             if let Some(timeout) = timeout {
                 request = request.timeout(timeout);
             }
-            let response = request.send().await.map_err(|_| perr(false, false, "transport_unknown"))?;
+            let mut response = request.send().await.map_err(|_| perr(false, false, "transport_unknown"))?;
             let status = response.status().as_u16();
             if !(200..=299).contains(&status) {
+                if status == 400 && names_rejected_signature(&mut response).await {
+                    Err(perr(true, false, "thought_signature_rejected"))?;
+                }
                 Err(classify_status(status))?;
             }
             let mut frames = Box::pin(super_router_sse::frames(response.bytes_stream()));

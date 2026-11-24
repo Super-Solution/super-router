@@ -38,8 +38,9 @@ func add(a, b int64) (int64, bool) {
 // count, more cached tokens than prompt tokens, or a sum that does not fit.
 //
 // Gemini counts the cached tokens inside promptTokenCount, so the uncached input is the difference; tool-use prompt
-// tokens are billed as input and added to it. candidatesTokenCount is the visible answer only and thinking is
-// reported apart in thoughtsTokenCount, billed at the output rate, so the two add up to the output meter. There is
+// tokens are billed as input and added to it. candidatesTokenCount is normally the visible answer only and
+// thinking is reported apart in thoughtsTokenCount, billed at the output rate, so the two add up to the output meter;
+// when the total shows the thoughts are already inside candidatesTokenCount they are not added again. There is
 // no cache-write count (implicit caching writes for free, explicit caches bill storage by the hour). Tokens that only
 // totalTokenCount counts are priced as output, so nothing the provider counted goes unpriced.
 func Normalize(u UsageMetadata) (contracts.Meters, bool) {
@@ -59,7 +60,20 @@ func Normalize(u UsageMetadata) (contracts.Meters, bool) {
 	if !ok {
 		return contracts.Meters{}, false
 	}
-	output, ok := add(candidates, thoughts)
+	// The total is prompt + candidates + tool use + thoughts. When it equals the same sum without the thoughts, the
+	// thoughts were already inside candidatesTokenCount (seen on Vertex): adding them again would bill them twice.
+	folded := false
+	if u.TotalTokenCount != nil && thoughts > 0 {
+		if sum, ok := add(prompt, candidates); ok {
+			if sum, ok = add(sum, toolUse); ok && sum == *u.TotalTokenCount {
+				folded = true
+			}
+		}
+	}
+	output, ok := candidates, true
+	if !folded {
+		output, ok = add(candidates, thoughts)
+	}
 	if !ok {
 		return contracts.Meters{}, false
 	}

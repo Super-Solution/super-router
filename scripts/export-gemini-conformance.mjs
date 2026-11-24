@@ -251,6 +251,14 @@ stream("an empty signature is no signature", [
   { candidates: [{ content: { role: "model", parts: [{ functionCall: { name: "lookup", args: {} }, thoughtSignature: "" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 1, totalTokenCount: 1 }, responseId: "r13" },
 ], [{ type: "tool_call", index: 0, id: "r13_0", name: "lookup", arguments_delta: "{}" }, usageEvent(1, 0, 0, "r13"), done("succeeded")]);
 
+stream("thoughts folded into the candidate count are not billed twice", [
+  {
+    candidates: [{ content: text("Answer"), finishReason: "STOP" }],
+    usageMetadata: { promptTokenCount: 100, cachedContentTokenCount: 40, candidatesTokenCount: 35, thoughtsTokenCount: 25, totalTokenCount: 135 },
+    responseId: "r14",
+  },
+], [{ type: "delta", text: "Answer" }, usageEvent(60, 40, 35, "r14"), done("succeeded")]);
+
 stream("cut off by the output limit", [
   { candidates: [{ content: text("Hel"), finishReason: "MAX_TOKENS" }], usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 1, totalTokenCount: 6 }, responseId: "r5" },
 ], [{ type: "delta", text: "Hel" }, usageEvent(5, 0, 1, "r5"), done("partial")]);

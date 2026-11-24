@@ -149,6 +149,12 @@ func TestFailuresAreClassified(t *testing.T) {
 	status := func(code int) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(code) }
 	}
+	refusal := func(code int, message string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(code)
+			fmt.Fprintf(w, `{"error":{"code":%d,"message":%q,"status":"INVALID_ARGUMENT"}}`, code, message)
+		}
+	}
 	task := invocation()
 	task.Input.Task = &contracts.Task{}
 	cases := []struct {
@@ -162,6 +168,10 @@ func TestFailuresAreClassified(t *testing.T) {
 		{"bad request", status(400), "k", invocation(), [3]any{true, false, "upstream_http_400"}},
 		{"unauthorized", status(401), "k", invocation(), [3]any{true, false, "upstream_http_401"}},
 		{"forbidden", status(403), "k", invocation(), [3]any{true, false, "upstream_http_403"}},
+		{"a signature from another backend", refusal(400, "Corrupted thought signature."), "k", invocation(), [3]any{true, false, "thought_signature_rejected"}},
+		{"the other backend's wording", refusal(400, "Invalid thought_signature in the request"), "k", invocation(), [3]any{true, false, "thought_signature_rejected"}},
+		{"another bad request with a message", refusal(400, "Unknown name \"x\""), "k", invocation(), [3]any{true, false, "upstream_http_400"}},
+		{"a signature message on another status", refusal(500, "Corrupted thought signature."), "k", invocation(), [3]any{false, false, "upstream_http_500"}},
 		{"not found", status(404), "k", invocation(), [3]any{true, false, "upstream_http_404"}},
 		{"server error is unknown", status(500), "k", invocation(), [3]any{false, false, "upstream_http_500"}},
 		{"unavailable is unknown", status(503), "k", invocation(), [3]any{false, false, "upstream_http_503"}},
@@ -206,6 +216,10 @@ func TestNormalize(t *testing.T) {
 		{"tool-use prompt tokens are input", gemini.UsageMetadata{PromptTokenCount: n(100), ToolUsePromptTokenCount: n(25), CandidatesTokenCount: n(10), TotalTokenCount: n(135)}, contracts.Meters{Input: 125, Output: 10}, true},
 		{"a larger total adds the rest to output", gemini.UsageMetadata{PromptTokenCount: n(100), CandidatesTokenCount: n(10), TotalTokenCount: n(150)}, contracts.Meters{Input: 100, Output: 50}, true},
 		{"a smaller total changes nothing", gemini.UsageMetadata{PromptTokenCount: n(100), CandidatesTokenCount: n(10), TotalTokenCount: n(50)}, contracts.Meters{Input: 100, Output: 10}, true},
+		{"thoughts folded into the candidates are not added twice", gemini.UsageMetadata{PromptTokenCount: n(100), CandidatesTokenCount: n(40), ThoughtsTokenCount: n(30), TotalTokenCount: n(140)}, contracts.Meters{Input: 100, Output: 40}, true},
+		{"thoughts counted apart are added", gemini.UsageMetadata{PromptTokenCount: n(100), CandidatesTokenCount: n(40), ThoughtsTokenCount: n(30), TotalTokenCount: n(170)}, contracts.Meters{Input: 100, Output: 70}, true},
+		{"folded with cache and tool use", gemini.UsageMetadata{PromptTokenCount: n(100), CachedContentTokenCount: n(20), ToolUsePromptTokenCount: n(5), CandidatesTokenCount: n(40), ThoughtsTokenCount: n(30), TotalTokenCount: n(145)}, contracts.Meters{Input: 85, Cached: 20, Output: 40}, true},
+		{"no total, thoughts apart", gemini.UsageMetadata{PromptTokenCount: n(100), CandidatesTokenCount: n(40), ThoughtsTokenCount: n(30)}, contracts.Meters{Input: 100, Output: 70}, true},
 		{"only the prompt count is required", gemini.UsageMetadata{PromptTokenCount: n(7), TotalTokenCount: n(7)}, contracts.Meters{Input: 7}, true},
 		{"no prompt count", gemini.UsageMetadata{}, contracts.Meters{}, false},
 		{"more cached than prompt", gemini.UsageMetadata{PromptTokenCount: n(10), CachedContentTokenCount: n(11)}, contracts.Meters{}, false},

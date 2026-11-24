@@ -11,7 +11,7 @@ An upstream touches four layers. Keeping them apart is what lets one new upstrea
 | Layer | Owns | Does not own |
 | --- | --- | --- |
 | **Provider** (`provider-*`) | The wire dialect: request body, stream parsing, tool calls, failure classification, and **normalising the usage fields into `Meters`** | Prices, rounding, reservations |
-| **Pricing** (`pricing`) | Money: `Price`, `charge`, `bound`, `RateCard`, `RateSchedule` (exact integers, round up once) | What a provider's fields mean |
+| **Pricing** (`pricing`) | Money: `Price`, `charge`, `bound`, `RateCard`, `RateSchedule`, `RateTiers` (exact integers, round up once) | What a provider's fields mean |
 | **Router** | Reserve before, settle after, fallback between offerings | Any dialect |
 | **Application** | Its own prices, plans, caps | Dialects (it picks a provider) |
 
@@ -135,6 +135,45 @@ uses it names `"provider": "x"`.
   `1e3`, Rust writes `1000.0`. Both parse to the same value; the conformance cases use plain integers.
 - TypeScript and Python adapters: later, from the same conformance file.
 
+## What other gateways do, and what was taken from them
+
+Read for ideas and edge cases only, never copied: a New API fork (clawRouter, same lineage as New API itself; the
+upstream project was not fetched) and LiteLLM 1.110 (the published package). Both are older and broader than this
+library; the useful parts were few and specific.
+
+**Adopted**
+
+| Seen in | What | Where it landed |
+| --- | --- | --- |
+| LiteLLM | `candidatesTokenCount` sometimes already contains the thoughts (told apart by `prompt + candidates + toolUse == total`); adding `thoughtsTokenCount` again bills them twice | `usage.rs` / `usage.go`, with an oracle case |
+| LiteLLM | A thought signature only validates on the backend that minted it; the Gemini API and Vertex answer each other's with `400 Corrupted/Invalid thought signature` | the distinct definitive code `thought_signature_rejected`, so a conversation that moved backends says why it failed |
+| LiteLLM | Long-context prices: every rate of a call rises when the prompt passes 200,000 tokens, output and cache included | `RateTiers` (Rust + Go), exact integers, a hold that covers every reachable tier |
+| New API (via clawRouter) | A model with no cache-read rate is billed at the full input rate by default, and that has caused real overcharges; one bad value in the rate blob wipes every model's rates | already what `defaulted()` and a whole-card validation are for; the cases confirm the design rather than change it |
+| both | An empty-object tool schema is a request some Gemini models refuse | no-parameter tools declare no schema |
+| LiteLLM | Replaying the same signature on a text part and on its call part bills the previous turn's reasoning twice | not an issue here: text-part signatures are not sent at all |
+
+**Deliberately not adopted**
+
+- **Floating-point prices** (`3.1248e-07` dollars per token) and a mutable global price table. Prices stay exact
+  integers on a value the application owns.
+- **A field per modality and per service tier** (audio input, image output, cache-read audio, priority, flex and batch
+  variants: LiteLLM has dozens of price fields per model). One card prices six kinds; a modality or service tier is a
+  card of its own that the application selects. If real traffic needs per-modality prices, they become more cards, not
+  more fields on one.
+- **A placeholder signature after a rejected replay** (resend with Google's `skip_thought_signature_validator`). It
+  silently drops the reasoning continuity, so it is a policy for the application, not a default of the provider.
+- **Continuation hops after `MAX_TOKENS`**, a filler `"."` user message when only a system message is sent, and
+  stripping unsupported schema keywords. The first changes billing and output boundaries, the second invents content,
+  the third is unnecessary with `parametersJsonSchema`; a system-only request is refused instead.
+- **Search-grounding rules** (tool-use tokens free when a search ran, per-query fees): no grounding tool is exposed.
+- **A price floor of 1 quota unit** on any call with tokens: rounding up once already makes any usage with a positive
+  price at least one atom; a rate of `"0"` is a decision, not a collapse.
+
+LiteLLM's way to add a provider (a config object per provider that builds the URL, the headers and the body, with the
+price in a data file) is the same split as here: the provider crate owns the dialect, the price lives with the
+application. Two places where it is looser: pricing sits in a shared file that every deployment reads, and usage is
+normalised into one OpenAI-shaped record that has to grow a field per provider quirk.
+
 ## Order of work
 
 In this PR (separate commits): (1) Rust and Go Gemini providers with the shared conformance file, (2) `RateSchedule`
@@ -145,9 +184,12 @@ Also in this PR: (3) `ToolCall.signature` in the contracts (Rust and Go), the em
 conformance cases, from checking the adapter against how a production gateway handles Gemini edge cases (usage with
 tool-use prompt tokens, blocked prompts, empty schemas, signatures).
 
-Next, each small and separable: (4) path-prefix and auth options on the
-OpenAI and Anthropic providers (Azure, Vertex Anthropic), (5) decide whether the wire `Price` grows `reasoning`,
-`cache_write_1h` and a per-call fee, (6) TypeScript and Python parity, (7) application side: FirstFa swaps its own
+Also in this PR: (4) `RateTiers`, the folded-thoughts usage rule and `thought_signature_rejected`, from reading the
+other gateways (next section).
+
+Next, each small and separable: (5) path-prefix and auth options on the
+OpenAI and Anthropic providers (Azure, Vertex Anthropic), (6) decide whether the wire `Price` grows `reasoning`,
+`cache_write_1h` and a per-call fee, (7) TypeScript and Python parity, (8) application side: FirstFa swaps its own
 `accounting::price` for `RateCard` after the next release and gets Gemini either from this provider or by adding the
 protocol to its own gateway; its protocol table needs a call path that can carry the model name.
 

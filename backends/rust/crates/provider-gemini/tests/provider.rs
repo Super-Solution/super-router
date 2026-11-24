@@ -218,3 +218,28 @@ async fn the_key_never_appears_in_debug_output() {
     let text = format!("{provider:?}");
     assert!(!text.contains("super-secret"), "{text}");
 }
+
+#[tokio::test]
+async fn a_replayed_signature_the_backend_refuses_is_told_apart_from_other_bad_requests() {
+    let refusal = |code: u16, message: &'static str| {
+        move || {
+            let body = json!({ "error": { "code": code, "message": message, "status": "INVALID_ARGUMENT" } }).to_string();
+            Response::builder().status(code).header("content-type", "application/json").body(Body::from(body)).unwrap()
+        }
+    };
+    type Case = (&'static str, u16, &'static str, (bool, bool, &'static str));
+    let cases: Vec<Case> = vec![
+        ("another backend's signature", 400, "Corrupted thought signature.", (true, false, "thought_signature_rejected")),
+        ("the other wording", 400, "Invalid thought_signature in the request", (true, false, "thought_signature_rejected")),
+        ("any other bad request", 400, "Unknown name \"x\"", (true, false, "upstream_http_400")),
+        ("the message on another status", 500, "Corrupted thought signature.", (false, false, "upstream_http_500")),
+    ];
+    for (name, code, message, want) in cases {
+        let respond = refusal(code, message);
+        let base = serve(Router::new().fallback(move || async move { respond() })).await;
+        let provider = Gemini::builder("k").base_url(&base).build().unwrap();
+        let (events, error) = collect(&provider, &invocation(), "gemini-test").await;
+        assert!(events.is_empty(), "{name}");
+        assert_eq!(shape(&error.unwrap_or_else(|| panic!("{name}: no error"))), want, "{name}");
+    }
+}

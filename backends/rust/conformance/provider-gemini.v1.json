@@ -1855,6 +1855,89 @@
     ]
    },
    {
+    "name": "thoughts folded into the candidate count are not billed twice",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Answer"
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 100,
+       "cachedContentTokenCount": 40,
+       "candidatesTokenCount": 35,
+       "thoughtsTokenCount": 25,
+       "totalTokenCount": 135
+      },
+      "responseId": "r14"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Answer"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 60,
+       "cached": 40,
+       "cache_write": 0,
+       "output": 35
+      },
+      "upstream_id": "r14"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
     "name": "cut off by the output limit",
     "invocation": {
      "service": "chat",

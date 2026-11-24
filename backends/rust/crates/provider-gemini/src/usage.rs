@@ -5,8 +5,9 @@
 //! - `promptTokenCount` **includes** the cached tokens (`cachedContentTokenCount`), so the uncached input is the
 //!   difference. Tool-use prompt tokens (`toolUsePromptTokenCount`, the results of built-in tools) are billed as
 //!   input and added to it.
-//! - `candidatesTokenCount` is the visible answer only; thinking is reported apart in `thoughtsTokenCount` and
-//!   billed at the output rate, so the two add up to the output meter.
+//! - `candidatesTokenCount` is normally the visible answer only; thinking is reported apart in `thoughtsTokenCount`
+//!   and billed at the output rate, so the two add up to the output meter. Some responses (seen on Vertex) fold the
+//!   thoughts into `candidatesTokenCount`; they are told apart by the total, see below.
 //! - There is no cache-write count: implicit caching writes for free and explicit caches bill storage by the hour,
 //!   which is not a token meter. `cache_write` stays zero.
 //!
@@ -52,7 +53,11 @@ pub fn normalize(u: &UsageMetadata) -> Option<Meters> {
         return None;
     }
     let input = prompt.checked_sub(cached)?.checked_add(tool_use)?;
-    let mut output = candidates.checked_add(thoughts)?;
+    // The total is prompt + candidates + tool use + thoughts. When it equals the same sum without the thoughts, the
+    // thoughts were already inside `candidatesTokenCount`: adding them again would bill them twice.
+    let folded = thoughts > 0
+        && u.total_token_count.is_some_and(|total| prompt.checked_add(candidates).and_then(|n| n.checked_add(tool_use)) == Some(total));
+    let mut output = if folded { candidates } else { candidates.checked_add(thoughts)? };
     if let Some(total) = u.total_token_count {
         let counted = input.checked_add(cached)?.checked_add(output)?;
         if total > counted {
@@ -82,6 +87,22 @@ mod tests {
     fn cached_tokens_come_out_of_the_prompt_and_thoughts_join_the_output() {
         let m = normalize(&usage(1000, 400, 0, 50, 30, Some(1080))).unwrap();
         assert_eq!((m.input, m.cached, m.cache_write, m.output), (600, 400, 0, 80));
+    }
+
+    #[test]
+    fn thoughts_already_inside_the_candidates_are_not_added_twice() {
+        // prompt 100 + candidates 40 (30 of them thoughts) = total 140: the thoughts are folded in.
+        let m = normalize(&usage(100, 0, 0, 40, 30, Some(140))).unwrap();
+        assert_eq!((m.input, m.output), (100, 40));
+        // The same fields with the total that counts them apart: they add up.
+        let m = normalize(&usage(100, 0, 0, 40, 30, Some(170))).unwrap();
+        assert_eq!((m.input, m.output), (100, 70));
+        // Tool-use tokens are part of the comparison.
+        let m = normalize(&usage(100, 20, 5, 40, 30, Some(145))).unwrap();
+        assert_eq!((m.input, m.cached, m.output), (85, 20, 40));
+        // No total, no way to tell: the documented reading, thoughts apart.
+        let m = normalize(&usage(100, 0, 0, 40, 30, None)).unwrap();
+        assert_eq!(m.output, 70);
     }
 
     #[test]

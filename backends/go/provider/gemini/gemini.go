@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -181,6 +182,9 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode > 299 {
+		if res.StatusCode == 400 && namesRejectedSignature(res.Body) {
+			return perr(true, false, "thought_signature_rejected")
+		}
 		switch res.StatusCode {
 		case 400, 401, 403, 404, 422:
 			return perr(true, false, "upstream_http_"+strconv.Itoa(res.StatusCode))
@@ -299,4 +303,23 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 		completion = "succeeded"
 	}
 	return emit(contracts.ProviderEvent{Type: "done", Completion: completion})
+}
+
+// namesRejectedSignature reports whether a 400 body says a replayed thought signature was refused. A signature only
+// validates on the backend that minted it: the Gemini API answers a replayed Vertex signature with `400 Corrupted
+// thought signature`, and Vertex answers the Gemini API's with `400 Invalid thought signature`. Telling that apart
+// from any other 400 lets the caller see why a conversation cannot move to this offering. Only the error's own
+// message is read, from the first 16 KiB; nothing of it is passed on.
+func namesRejectedSignature(body io.Reader) bool {
+	raw, _ := io.ReadAll(io.LimitReader(body, 16384))
+	var e struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(raw, &e) != nil {
+		return false
+	}
+	m := strings.ReplaceAll(strings.ToLower(e.Error.Message), "_", " ")
+	return strings.Contains(m, "thought signature") || strings.Contains(m, "thoughtsignature")
 }
