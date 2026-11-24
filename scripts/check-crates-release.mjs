@@ -21,7 +21,6 @@ export const PUBLISH_ORDER = [
   "super-router-contracts",
   "super-router-provider-anthropic",
   "super-router-provider-openai",
-  "super-router-provider-gemini",
   "super-router-routing",
   "super-router-router",
   "super-router-server",

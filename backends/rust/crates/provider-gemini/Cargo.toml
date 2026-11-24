@@ -10,6 +10,10 @@ repository.workspace = true
 homepage.workspace = true
 keywords = ["gemini", "google", "llm", "streaming", "router"]
 categories = ["api-bindings", "asynchronous"]
+# Not published by the Publish crates workflow yet: a crate must exist on crates.io before it can have a trusted
+# publisher, so its first version is published by hand (docs/CRATES-PUBLISHING.md, "First release"). Remove this line,
+# add the crate back to PUBLISH_ORDER in scripts/check-crates-release.mjs and release the next version for all eleven.
+publish = false
 
 [dependencies]
 super-router-contracts.workspace = true
