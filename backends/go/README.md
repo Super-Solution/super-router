@@ -17,7 +17,8 @@ backends/go
 │   └── postgres/     PostgreSQL DataStore on database/sql, shared schema and migrations
 ├── provider/
 │   ├── openai/       Responses API
-│   └── anthropic/    Messages API
+│   ├── anthropic/    Messages API
+│   └── gemini/       generateContent (Gemini API, Vertex AI)
 ├── server/           the HTTP API as an http.Handler
 └── cmd/super-router-server   a ready-to-run binary
 ```
@@ -27,7 +28,7 @@ backends/go
 ```bash
 export SUPERROUTER_API_KEY=sr_$(openssl rand -hex 32)
 export SUPERROUTER_DIGEST_KEY=$(openssl rand -hex 32)
-export SUPERROUTER_MOCK=1                 # or OPENAI_API_KEY / ANTHROPIC_API_KEY
+export SUPERROUTER_MOCK=1                 # or OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY
 export DATABASE_URL=postgres://...        # optional: unset means the in-memory store
 go run ./cmd/super-router-server
 ```

@@ -13,8 +13,8 @@
 //	ADDR                     listen address, default 127.0.0.1:3410
 //	SUPERROUTER_WORKSPACE, SUPERROUTER_ENVIRONMENT, SUPERROUTER_CUSTOMER
 //	                         tenant of the owner key, default default, prod, default
-//	OPENAI_API_KEY, ANTHROPIC_API_KEY
-//	                         enable the "openai" and "anthropic" providers (offering.provider names them)
+//	OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY
+//	                         enable the "openai", "anthropic" and "gemini" providers (offering.provider names them)
 //	SUPERROUTER_MOCK=1       enable the deterministic "mock" provider and the scripted "mock-tools" one
 package main
 
@@ -36,6 +36,7 @@ import (
 
 	"github.com/Super-Solution/super-router/backends/go/contracts"
 	"github.com/Super-Solution/super-router/backends/go/provider/anthropic"
+	"github.com/Super-Solution/super-router/backends/go/provider/gemini"
 	"github.com/Super-Solution/super-router/backends/go/provider/openai"
 	"github.com/Super-Solution/super-router/backends/go/router"
 	"github.com/Super-Solution/super-router/backends/go/server"
@@ -106,13 +107,16 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, r
 	if k := getenv("ANTHROPIC_API_KEY"); k != "" {
 		providers["anthropic"] = anthropic.New(func() string { return k })
 	}
+	if k := getenv("GEMINI_API_KEY"); k != "" {
+		providers["gemini"] = gemini.New(func() string { return k })
+	}
 	if getenv("SUPERROUTER_MOCK") == "1" {
 		providers["mock"] = router.NewMockProvider("success")
 		// Scripted tool calling, so a client's tool loop can be exercised without a model key.
 		providers["mock-tools"] = &router.MockToolProvider{}
 	}
 	if len(providers) == 0 {
-		logger.Warn("no provider is configured: set OPENAI_API_KEY, ANTHROPIC_API_KEY or SUPERROUTER_MOCK=1")
+		logger.Warn("no provider is configured: set OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or SUPERROUTER_MOCK=1")
 	}
 	rt, err := router.New(store, providers, digestKey)
 	if err != nil {
