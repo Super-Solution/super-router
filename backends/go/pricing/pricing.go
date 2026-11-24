@@ -5,6 +5,9 @@
 // It mirrors packages/core (Charge, Bound) and packages/core/src/credit-rates.ts
 // (CompileCreditPrice). Money is integer atoms held in math/big, so results match the
 // TypeScript BigInt reference exactly. conformance/pricing.v1.json is the shared test data.
+//
+// Beyond the reference, RateCard prices the kinds of token the wire Price has no field for (one-hour cache writes,
+// reasoning tokens) and a per-call fee, from one value with the usual fallbacks.
 package pricing
 
 import (

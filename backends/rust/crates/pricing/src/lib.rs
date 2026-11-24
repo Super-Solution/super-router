@@ -3,6 +3,9 @@
 //! Mirrors `packages/core` (`charge`, `bound`) and `credit-rates.ts` (`compileCreditPrice`) of the TypeScript
 //! reference, as the Go and Python backends do. Money is integer atoms held in [`BigInt`], so results match the
 //! reference's `BigInt` exactly. `conformance/pricing.v1.json` is the shared test data.
+//!
+//! Beyond the reference, [`RateCard`] prices the kinds of token the wire [`Price`] has no field for (one-hour cache
+//! writes, reasoning tokens) and a per-call fee, from one value with the usual fallbacks.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -12,6 +15,9 @@ use num_integer::Integer;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+
+mod rate_card;
+pub use rate_card::{EffectiveRates, RateCard, TokenCounts};
 
 /// The fixed accounting scale of one credit.
 pub const CREDIT_ATOMS: i64 = 1_000_000_000;
