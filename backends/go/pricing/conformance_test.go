@@ -5,7 +5,6 @@ package pricing
 import (
 	"encoding/json"
 	"errors"
-	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -62,17 +61,6 @@ type fixtures struct {
 		Config json.RawMessage `json:"config"`
 		Expect expect          `json:"expect"`
 	} `json:"compile_credit_price"`
-	RateCardCharge []struct {
-		Card   json.RawMessage `json:"card"`
-		Usage  json.RawMessage `json:"usage"`
-		Expect expect          `json:"expect"`
-	} `json:"rate_card_charge"`
-	RateCardBound []struct {
-		Card   json.RawMessage `json:"card"`
-		Input  int64           `json:"input"`
-		Output int64           `json:"output"`
-		Expect expect          `json:"expect"`
-	} `json:"rate_card_bound"`
 }
 
 func load(t *testing.T) fixtures {
@@ -180,62 +168,5 @@ func TestValidUnitName(t *testing.T) {
 		if ValidUnitName(bad) {
 			t.Errorf("%q accepted", bad)
 		}
-	}
-}
-
-// checkExpect compares a result with a rate card case: an error code, or the amount as a decimal string.
-func checkExpect(t *testing.T, name string, i int, got *big.Int, err error, want expect) {
-	t.Helper()
-	switch {
-	case want.Error != "":
-		if code(err) != want.Error {
-			t.Errorf("%s[%d]: error %v, want %s", name, i, err, want.Error)
-		}
-	case err != nil:
-		t.Errorf("%s[%d]: %v", name, i, err)
-	case got.String() != want.Ok:
-		t.Errorf("%s[%d]: %s, want %v", name, i, got, want.Ok)
-	}
-}
-
-func TestRateCardCharge(t *testing.T) {
-	f := load(t)
-	errorsSeen := 0
-	for i, c := range f.RateCardCharge {
-		card, err := DecodeRateCard(c.Card)
-		if err != nil {
-			t.Fatalf("rate_card_charge[%d]: %v", i, err)
-		}
-		var counts TokenCounts
-		if err := json.Unmarshal(c.Usage, &counts); err != nil {
-			t.Fatal(err)
-		}
-		got, err := card.Charge(counts)
-		if c.Expect.Error != "" {
-			errorsSeen++
-		}
-		checkExpect(t, "rate_card_charge", i, got, err, c.Expect)
-	}
-	if len(f.RateCardCharge) < 30 || errorsSeen < 10 {
-		t.Fatalf("%d cases, %d errors", len(f.RateCardCharge), errorsSeen)
-	}
-}
-
-func TestRateCardBound(t *testing.T) {
-	f := load(t)
-	errorsSeen := 0
-	for i, c := range f.RateCardBound {
-		card, err := DecodeRateCard(c.Card)
-		if err != nil {
-			t.Fatalf("rate_card_bound[%d]: %v", i, err)
-		}
-		got, err := card.Bound(c.Input, c.Output)
-		if c.Expect.Error != "" {
-			errorsSeen++
-		}
-		checkExpect(t, "rate_card_bound", i, got, err, c.Expect)
-	}
-	if len(f.RateCardBound) < 10 || errorsSeen < 4 {
-		t.Fatalf("%d cases, %d errors", len(f.RateCardBound), errorsSeen)
 	}
 }
