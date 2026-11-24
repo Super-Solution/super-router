@@ -1814,6 +1814,7 @@ dependencies = [
  "sqlx",
  "super-router-contracts",
  "super-router-provider-anthropic",
+ "super-router-provider-gemini",
  "super-router-provider-openai",
  "super-router-router",
  "super-router-server",
@@ -1863,6 +1864,23 @@ dependencies = [
 
 [[package]]
 name = "super-router-provider-anthropic"
+version = "0.2.0"
+dependencies = [
+ "async-stream",
+ "axum",
+ "bytes",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "super-router-contracts",
+ "super-router-dataplane-test",
+ "super-router-sse",
+ "tokio",
+]
+
+[[package]]
+name = "super-router-provider-gemini"
 version = "0.2.0"
 dependencies = [
  "async-stream",

@@ -4,7 +4,7 @@
 
 mod providers;
 
-pub use providers::run_tool_cases;
+pub use providers::{run_tool_cases, run_tool_cases_in};
 
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;

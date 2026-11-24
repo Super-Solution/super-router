@@ -1,0 +1,1979 @@
+{
+ "version": 1,
+ "description": "Provider cases for the Gemini generateContent adapter: exact upstream request bodies from an invocation, and the events produced from a recorded upstream stream. Written by scripts/export-gemini-conformance.mjs from Google's documented wire format; there is no TypeScript reference for this provider.",
+ "offering": {
+  "id": "a",
+  "provider": "gemini",
+  "model": "mock-model",
+  "upstream_model": "upstream-model",
+  "region": "test",
+  "labels": [],
+  "enabled": true,
+  "source": "byok",
+  "max_input_tokens": 1024,
+  "max_output_tokens": 128,
+  "price": {
+   "asset": "USD",
+   "input": "1",
+   "cached": "1",
+   "cache_write": "1",
+   "output": "1",
+   "per": 1
+  }
+ },
+ "gemini": {
+  "requests": [
+   {
+    "name": "plain text",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "system",
+        "content": "Be brief"
+       },
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "systemInstruction": {
+      "parts": [
+       {
+        "text": "Be brief"
+       }
+      ]
+     },
+     "generationConfig": {
+      "maxOutputTokens": 32
+     }
+    }
+   },
+   {
+    "name": "several system messages",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "system",
+        "content": "A"
+       },
+       {
+        "role": "user",
+        "content": "hi"
+       },
+       {
+        "role": "system",
+        "content": "B"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "hi"
+        }
+       ]
+      }
+     ],
+     "systemInstruction": {
+      "parts": [
+       {
+        "text": "A\nB"
+       }
+      ]
+     },
+     "generationConfig": {
+      "maxOutputTokens": 32
+     }
+    }
+   },
+   {
+    "name": "tools and auto",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       },
+       {
+        "name": "other",
+        "input_schema": {
+         "type": "object"
+        }
+       }
+      ],
+      "tool_choice": "auto"
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        },
+        {
+         "name": "other",
+         "parametersJsonSchema": {
+          "type": "object"
+         }
+        }
+       ]
+      }
+     ],
+     "toolConfig": {
+      "functionCallingConfig": {
+       "mode": "AUTO"
+      }
+     }
+    }
+   },
+   {
+    "name": "tools without a choice",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "tool choice none",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ],
+      "tool_choice": "none"
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        }
+       ]
+      }
+     ],
+     "toolConfig": {
+      "functionCallingConfig": {
+       "mode": "NONE"
+      }
+     }
+    }
+   },
+   {
+    "name": "tool choice required",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ],
+      "tool_choice": "required"
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        }
+       ]
+      }
+     ],
+     "toolConfig": {
+      "functionCallingConfig": {
+       "mode": "ANY"
+      }
+     }
+    }
+   },
+   {
+    "name": "tool choice by name",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       },
+       {
+        "name": "other",
+        "input_schema": {
+         "type": "object"
+        }
+       }
+      ],
+      "tool_choice": {
+       "name": "other"
+      }
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        },
+        {
+         "name": "other",
+         "parametersJsonSchema": {
+          "type": "object"
+         }
+        }
+       ]
+      }
+     ],
+     "toolConfig": {
+      "functionCallingConfig": {
+       "mode": "ANY",
+       "allowedFunctionNames": [
+        "other"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "name": "history with text and calls",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "system",
+        "content": "Be brief"
+       },
+       {
+        "role": "user",
+        "content": "Find it"
+       },
+       {
+        "role": "assistant",
+        "content": "Looking",
+        "tool_calls": [
+         {
+          "id": "call_1",
+          "name": "lookup",
+          "arguments": "{\"q\":\"a\"}"
+         }
+        ]
+       },
+       {
+        "role": "tool",
+        "tool_call_id": "call_1",
+        "content": "found"
+       },
+       {
+        "role": "assistant",
+        "content": "Found it."
+       },
+       {
+        "role": "user",
+        "content": "Again"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      },
+      {
+       "role": "model",
+       "parts": [
+        {
+         "text": "Looking"
+        },
+        {
+         "functionCall": {
+          "name": "lookup",
+          "args": {
+           "q": "a"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "parts": [
+        {
+         "functionResponse": {
+          "name": "lookup",
+          "response": {
+           "output": "found"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "role": "model",
+       "parts": [
+        {
+         "text": "Found it."
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Again"
+        }
+       ]
+      }
+     ],
+     "systemInstruction": {
+      "parts": [
+       {
+        "text": "Be brief"
+       }
+      ]
+     },
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "parallel calls and an error result",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       },
+       {
+        "role": "assistant",
+        "tool_calls": [
+         {
+          "id": "a",
+          "name": "lookup",
+          "arguments": "{\"q\":\"1\"}"
+         },
+         {
+          "id": "b",
+          "name": "other",
+          "arguments": "{ \"q\" : \"2\" }"
+         }
+        ]
+       },
+       {
+        "role": "tool",
+        "tool_call_id": "a",
+        "content": "one"
+       },
+       {
+        "role": "tool",
+        "tool_call_id": "b",
+        "content": "bad",
+        "is_error": true
+       },
+       {
+        "role": "assistant",
+        "tool_calls": [
+         {
+          "id": "c",
+          "name": "lookup",
+          "arguments": "{}"
+         }
+        ]
+       },
+       {
+        "role": "tool",
+        "tool_call_id": "c",
+        "content": "",
+        "is_error": false
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       },
+       {
+        "name": "other",
+        "input_schema": {
+         "type": "object"
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      },
+      {
+       "role": "model",
+       "parts": [
+        {
+         "functionCall": {
+          "name": "lookup",
+          "args": {
+           "q": "1"
+          }
+         }
+        },
+        {
+         "functionCall": {
+          "name": "other",
+          "args": {
+           "q": "2"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "parts": [
+        {
+         "functionResponse": {
+          "name": "lookup",
+          "response": {
+           "output": "one"
+          }
+         }
+        },
+        {
+         "functionResponse": {
+          "name": "other",
+          "response": {
+           "error": "bad"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "role": "model",
+       "parts": [
+        {
+         "functionCall": {
+          "name": "lookup",
+          "args": {}
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "parts": [
+        {
+         "functionResponse": {
+          "name": "lookup",
+          "response": {
+           "output": ""
+          }
+         }
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        },
+        {
+         "name": "other",
+         "parametersJsonSchema": {
+          "type": "object"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "inline images",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": [
+         {
+          "type": "text",
+          "text": "What is this?"
+         },
+         {
+          "type": "image",
+          "url": "data:image/png;base64,AAAA",
+          "detail": "low"
+         }
+        ]
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "What is this?"
+        },
+        {
+         "inlineData": {
+          "mimeType": "image/png",
+          "data": "AAAA"
+         }
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     }
+    }
+   }
+  ],
+  "streams": [
+   {
+    "name": "text with cached input",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Hel"
+          }
+         ]
+        }
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 7,
+       "totalTokenCount": 7
+      },
+      "responseId": "r1"
+     },
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "lo"
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 7,
+       "cachedContentTokenCount": 3,
+       "candidatesTokenCount": 2,
+       "totalTokenCount": 9
+      },
+      "responseId": "r1"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Hel"
+     },
+     {
+      "type": "delta",
+      "text": "lo"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 4,
+       "cached": 3,
+       "cache_write": 0,
+       "output": 2
+      },
+      "upstream_id": "r1"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
+    "name": "thinking is output and thoughts are not forwarded",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "pondering",
+           "thought": true
+          }
+         ]
+        }
+       }
+      ],
+      "responseId": "r2"
+     },
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Answer"
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 100,
+       "cachedContentTokenCount": 40,
+       "candidatesTokenCount": 10,
+       "thoughtsTokenCount": 25,
+       "totalTokenCount": 135
+      },
+      "responseId": "r2"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Answer"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 60,
+       "cached": 40,
+       "cache_write": 0,
+       "output": 35
+      },
+      "upstream_id": "r2"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
+    "name": "one tool call",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Checking. "
+          },
+          {
+           "functionCall": {
+            "name": "lookup",
+            "args": {
+             "q": "x"
+            }
+           }
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 20,
+       "candidatesTokenCount": 5,
+       "totalTokenCount": 25
+      },
+      "responseId": "r3"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Checking. "
+     },
+     {
+      "type": "tool_call",
+      "index": 0,
+      "id": "r3_0",
+      "name": "lookup",
+      "arguments_delta": "{\"q\":\"x\"}"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 20,
+       "cached": 0,
+       "cache_write": 0,
+       "output": 5
+      },
+      "upstream_id": "r3"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
+    "name": "parallel calls, one with an id",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "functionCall": {
+            "id": "c_a",
+            "name": "lookup",
+            "args": {
+             "q": "1"
+            }
+           }
+          },
+          {
+           "functionCall": {
+            "name": "other"
+           }
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 9,
+       "candidatesTokenCount": 4,
+       "totalTokenCount": 13
+      },
+      "responseId": "r4"
+     }
+    ],
+    "events": [
+     {
+      "type": "tool_call",
+      "index": 0,
+      "id": "c_a",
+      "name": "lookup",
+      "arguments_delta": "{\"q\":\"1\"}"
+     },
+     {
+      "type": "tool_call",
+      "index": 1,
+      "id": "r4_1",
+      "name": "other",
+      "arguments_delta": "{}"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 9,
+       "cached": 0,
+       "cache_write": 0,
+       "output": 4
+      },
+      "upstream_id": "r4"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
+    "name": "cut off by the output limit",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Hel"
+          }
+         ]
+        },
+        "finishReason": "MAX_TOKENS"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 5,
+       "candidatesTokenCount": 1,
+       "totalTokenCount": 6
+      },
+      "responseId": "r5"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Hel"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 5,
+       "cached": 0,
+       "cache_write": 0,
+       "output": 1
+      },
+      "upstream_id": "r5"
+     },
+     {
+      "type": "done",
+      "completion": "partial"
+     }
+    ]
+   },
+   {
+    "name": "usage in a chunk after the finish reason",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Hi"
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 5,
+       "candidatesTokenCount": 1,
+       "totalTokenCount": 6
+      },
+      "responseId": "r6"
+     },
+     {
+      "usageMetadata": {
+       "promptTokenCount": 5,
+       "candidatesTokenCount": 3,
+       "totalTokenCount": 8
+      },
+      "responseId": "r6"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Hi"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 5,
+       "cached": 0,
+       "cache_write": 0,
+       "output": 3
+      },
+      "upstream_id": "r6"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
+    "name": "a blocked prompt",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "promptFeedback": {
+       "blockReason": "SAFETY"
+      },
+      "usageMetadata": {
+       "promptTokenCount": 7,
+       "totalTokenCount": 7
+      },
+      "responseId": "r7"
+     }
+    ],
+    "events": [
+     {
+      "type": "usage",
+      "usage": {
+       "input": 7,
+       "cached": 0,
+       "cache_write": 0,
+       "output": 0
+      },
+      "upstream_id": "r7"
+     },
+     {
+      "type": "done",
+      "completion": "partial"
+     }
+    ]
+   },
+   {
+    "name": "a call without a name",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "functionCall": {
+            "args": {}
+           }
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 1
+      }
+     }
+    ],
+    "events": [],
+    "error": "invalid_upstream_event"
+   },
+   {
+    "name": "arguments that are not an object",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "functionCall": {
+            "name": "lookup",
+            "args": "q"
+           }
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 1
+      }
+     }
+    ],
+    "events": [],
+    "error": "invalid_upstream_event"
+   },
+   {
+    "name": "ends without a finish reason",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Hel"
+          }
+         ]
+        }
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 5,
+       "totalTokenCount": 5
+      },
+      "responseId": "r8"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Hel"
+     }
+    ],
+    "error": "stream_interrupted"
+   },
+   {
+    "name": "finishes without usage",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Hi"
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "responseId": "r9"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Hi"
+     }
+    ],
+    "error": "usage_unknown"
+   },
+   {
+    "name": "more cached than prompt",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Hi"
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 5,
+       "cachedContentTokenCount": 6,
+       "candidatesTokenCount": 1
+      },
+      "responseId": "r10"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Hi"
+     }
+    ],
+    "error": "invalid_usage"
+   },
+   {
+    "name": "an error frame",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Hel"
+          }
+         ]
+        }
+       }
+      ]
+     },
+     {
+      "error": {
+       "code": 500,
+       "message": "internal",
+       "status": "INTERNAL"
+      }
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Hel"
+     }
+    ],
+    "error": "upstream_incomplete"
+   }
+  ]
+ }
+}

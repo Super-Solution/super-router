@@ -23,6 +23,7 @@ super-router-store-memory.workspace = true
 super-router-store-postgres.workspace = true
 super-router-provider-openai.workspace = true
 super-router-provider-anthropic.workspace = true
+super-router-provider-gemini.workspace = true
 tokio = { workspace = true, features = ["net", "signal"] }
 tokio-util.workspace = true
 axum = "0.8"

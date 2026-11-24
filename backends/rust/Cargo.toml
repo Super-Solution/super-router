@@ -22,6 +22,7 @@ super-router-store-memory = { path = "crates/store-memory", version = "0.2.0" }
 super-router-store-postgres = { path = "crates/store-postgres", version = "0.2.0" }
 super-router-provider-openai = { path = "crates/provider-openai", version = "0.2.0" }
 super-router-provider-anthropic = { path = "crates/provider-anthropic", version = "0.2.0" }
+super-router-provider-gemini = { path = "crates/provider-gemini", version = "0.2.0" }
 super-router-server = { path = "crates/server", version = "0.2.0" }
 
 # External.
