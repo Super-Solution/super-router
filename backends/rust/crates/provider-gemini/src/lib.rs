@@ -221,6 +221,22 @@ fn parse_chunk(data: &str) -> Result<Chunk, ProviderError> {
     serde_json::from_value(value).map_err(|_| invalid())
 }
 
+/// Finish reasons (and `PROMPT_BLOCKED`, which this adapter assigns to a blocked prompt) that mean the content
+/// policy ended the call, as opposed to the output limit or a malformed call.
+fn refused_by_policy(finish: &str) -> bool {
+    matches!(
+        finish,
+        "SAFETY"
+            | "RECITATION"
+            | "BLOCKLIST"
+            | "PROHIBITED_CONTENT"
+            | "SPII"
+            | "IMAGE_SAFETY"
+            | "IMAGE_PROHIBITED_CONTENT"
+            | "PROMPT_BLOCKED"
+    )
+}
+
 /// A signature only validates on the backend that minted it: the Gemini API answers a replayed Vertex signature with
 /// `400 Corrupted thought signature`, and Vertex answers the Gemini API's with `400 Invalid thought signature`.
 /// Telling that apart from any other 400 lets the caller see why a conversation cannot move to this offering, and
@@ -367,8 +383,12 @@ impl Provider for Gemini {
             let usage = usage.ok_or_else(|| perr(false, false, "usage_unknown"))?;
             let meters = normalize(&usage).ok_or_else(|| perr(false, false, "invalid_usage"))?;
             yield ProviderEvent::Usage { usage: meters, upstream_id };
-            // Anything but a natural stop (length, safety, recitation, a blocked prompt) cut the answer short.
-            let completion = if finish == "STOP" { "succeeded" } else { "partial" };
+            // Anything but a natural stop cut the answer short: by the output limit, or by the content policy.
+            let completion = match finish.as_str() {
+                "STOP" => "succeeded",
+                f if refused_by_policy(f) => "filtered",
+                _ => "partial",
+            };
             yield ProviderEvent::Done { completion: Some(completion.to_string()) };
         })
     }

@@ -270,7 +270,18 @@ stream("usage in a chunk after the finish reason", [
 
 stream("a blocked prompt", [
   { promptFeedback: { blockReason: "SAFETY" }, usageMetadata: { promptTokenCount: 7, totalTokenCount: 7 }, responseId: "r7" },
-], [usageEvent(7, 0, 0, "r7"), done("partial")]);
+], [usageEvent(7, 0, 0, "r7"), done("filtered")]);
+
+// The finish reasons that end a call by content policy are `filtered`; the rest that are not a natural stop stay
+// `partial` (the output limit, a malformed call, anything the API adds later).
+for (const [reason, completion] of [
+  ["SAFETY", "filtered"], ["RECITATION", "filtered"], ["BLOCKLIST", "filtered"], ["PROHIBITED_CONTENT", "filtered"], ["SPII", "filtered"],
+  ["MAX_TOKENS", "partial"], ["MALFORMED_FUNCTION_CALL", "partial"], ["OTHER", "partial"], ["SOMETHING_NEW", "partial"],
+]) {
+  stream(`finish reason ${reason}`, [
+    { candidates: [{ content: text("x"), finishReason: reason }], usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 1, totalTokenCount: 4 }, responseId: "rf" },
+  ], [{ type: "delta", text: "x" }, usageEvent(3, 0, 1, "rf"), done(completion)]);
+}
 
 stream("a call without a name", [
   { candidates: [{ content: { role: "model", parts: [{ functionCall: { args: {} } }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 1 } },

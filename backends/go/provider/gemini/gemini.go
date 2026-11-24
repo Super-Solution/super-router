@@ -288,12 +288,25 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	if err := emit(contracts.ProviderEvent{Type: "usage", Usage: meters, UpstreamID: upstreamID}); err != nil {
 		return err
 	}
-	// Anything but a natural stop (length, safety, recitation, a blocked prompt) cut the answer short.
+	// Anything but a natural stop cut the answer short: by the output limit, or by the content policy.
 	completion := "partial"
-	if finish == "STOP" {
+	switch {
+	case finish == "STOP":
 		completion = "succeeded"
+	case refusedByPolicy(finish):
+		completion = "filtered"
 	}
 	return emit(contracts.ProviderEvent{Type: "done", Completion: completion})
+}
+
+// refusedByPolicy reports whether a finish reason (or PROMPT_BLOCKED, which this adapter assigns to a blocked prompt)
+// means the content policy ended the call, as opposed to the output limit or a malformed call.
+func refusedByPolicy(finish string) bool {
+	switch finish {
+	case "SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT", "PROMPT_BLOCKED":
+		return true
+	}
+	return false
 }
 
 // namesRejectedSignature reports whether a 400 body says a replayed thought signature was refused. A signature only

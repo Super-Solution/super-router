@@ -43,7 +43,7 @@ func (s *scripted) Invoke(_ context.Context, _ contracts.Invocation, _ contracts
 
 // twoOfferings publishes a service whose offerings a (provider "first") and b (provider "second") cost the same, so a
 // is preferred, and returns a router over the two scripted providers. The clock can be moved with advance.
-func twoOfferings(t *testing.T, first, second *scripted, book *routing.HealthBook) (contracts.Principal, *router.Router, func(time.Duration)) {
+func twoOfferings(t *testing.T, first, second contracts.Provider, book *routing.HealthBook) (contracts.Principal, *router.Router, func(time.Duration)) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "rust", "conformance", "dataplane.v1.json"))
 	if err != nil {
@@ -172,5 +172,40 @@ func TestWhenEveryOfferingIsCoolingNoneIsSkipped(t *testing.T) {
 	infer(t, rt, p, "k2")
 	if got := calls(first, second); got != [2]int64{2, 2} {
 		t.Fatalf("calls %v", got)
+	}
+}
+
+// finishing answers every call with a partial answer that ends with the given completion.
+type finishing struct{ completion string }
+
+func (f finishing) Invoke(_ context.Context, _ contracts.Invocation, _ contracts.Offering, emit func(contracts.ProviderEvent) error) error {
+	for _, e := range []contracts.ProviderEvent{
+		{Type: "delta", Text: "x"},
+		{Type: "usage", Usage: contracts.Meters{Input: 10, Output: 1}, UpstreamID: "up"},
+		{Type: "done", Completion: f.completion},
+	} {
+		if err := emit(e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func TestAnAnswerCutShortSaysWhyInItsFinishReason(t *testing.T) {
+	for completion, finish := range map[string]string{"filtered": "content_filter", "partial": "length"} {
+		p, rt, _ := twoOfferings(t, finishing{completion}, finishing{completion}, nil)
+		var events []contracts.StreamEvent
+		res, err := rt.Infer(context.Background(), p, []byte(chatBody), "k1", func(e contracts.StreamEvent) error {
+			events = append(events, e)
+			return nil
+		})
+		// Either way the customer got a partial answer and the books treat it as one.
+		if err != nil || res.ExecutionStatus != "partial" || res.FinishReason != finish {
+			t.Fatalf("%s: %v %s %q, want partial %s", completion, err, res.ExecutionStatus, res.FinishReason, finish)
+		}
+		last := events[len(events)-1]
+		if last.Type != "request.failed" || last.Data["finish_reason"] != finish {
+			t.Errorf("%s: last event %s %v", completion, last.Type, last.Data)
+		}
 	}
 }

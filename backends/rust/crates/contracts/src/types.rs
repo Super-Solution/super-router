@@ -508,7 +508,9 @@ pub enum ProviderEvent {
         usage: Meters,
         upstream_id: String,
     },
-    /// `completion` is `"succeeded"` (the default when `None`) or `"partial"`.
+    /// `completion` is `"succeeded"` (the default when `None`), `"partial"` (cut short) or `"filtered"` (cut short by
+    /// the provider's content policy: recorded as partial, reported to the caller as the finish reason
+    /// `content_filter` rather than `length`).
     Done {
         completion: Option<String>,
     },

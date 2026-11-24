@@ -377,7 +377,7 @@ type ProviderEvent struct {
 	Text       string
 	Usage      Meters
 	UpstreamID string
-	Completion string // for "done": "succeeded" (default) or "partial"
+	Completion string // for "done": "succeeded" (default), "partial", or "filtered" (cut short by the provider's content policy: recorded as partial, reported as finish reason content_filter)
 	// For "tool_call": calls are numbered from zero by Index. The first event of an index carries ID and Name (and
 	// Signature, when the upstream attached one); ArgumentsDelta is the next piece of the call's JSON arguments.
 	Index          int

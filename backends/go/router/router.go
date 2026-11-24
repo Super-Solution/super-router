@@ -149,7 +149,7 @@ type Result struct {
 	Model           string         `json:"model,omitempty"`
 	Tier            string         `json:"tier,omitempty"`
 	Output          *Output        `json:"output,omitempty"`
-	FinishReason    string         `json:"finish_reason,omitempty"` // stop, length or tool_calls
+	FinishReason    string         `json:"finish_reason,omitempty"` // stop, length, content_filter or tool_calls
 	Usage           *UsageReport   `json:"usage,omitempty"`
 	Billing         *BillingReport `json:"billing,omitempty"`
 }
@@ -319,16 +319,17 @@ func (r *Router) Infer(ctx context.Context, p contracts.Principal, raw []byte, k
 func (r *Router) execute(ctx context.Context, p contracts.Principal, in contracts.Invocation, service contracts.Service, candidates []routing.Candidate, legs []Leg, request *RequestRecord, emit func(contracts.StreamEvent) error) (result *Result, failure error) {
 	bg := context.WithoutCancel(ctx)
 	var (
-		seq        int
-		text       []byte
-		started    bool
-		finalUsage *contracts.Meters
-		execution  = "failed"
-		pending    bool
-		lastModel  string
-		toolBytes  int
-		toolCalls  = map[int]*contracts.ToolCall{}
-		downgrade  *Downgrade
+		seq             int
+		text            []byte
+		started         bool
+		finalUsage      *contracts.Meters
+		execution       = "failed"
+		pending         bool
+		lastModel       string
+		toolBytes       int
+		toolCalls       = map[int]*contracts.ToolCall{}
+		downgrade       *Downgrade
+		contentFiltered bool
 	)
 	send := func(kind string, data map[string]any) error {
 		seq++
@@ -417,6 +418,7 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 			upstream   string
 			done       bool
 			completion = "succeeded"
+			filtered   bool
 		)
 		lastModel = candidate.Offering.Model
 		if downgrade = downgradeOf(service, candidate); downgrade != nil {
@@ -478,7 +480,12 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 			default:
 				done = true
 				if ev.Completion != "" {
+					// "filtered" is a partial completion with a reason: it is stored as partial.
+					filtered = ev.Completion == "filtered"
 					completion = ev.Completion
+					if filtered {
+						completion = "partial"
+					}
 				}
 			}
 			return nil
@@ -502,6 +509,7 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 					r.noteHealth(candidate.Offering, nil)
 				}
 				finalUsage = usage
+				contentFiltered = filtered
 				execution = completion
 				pending = cost.Cmp(candidate.Cost) > 0
 				break
@@ -572,6 +580,8 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 	}
 	finish := ""
 	switch {
+	case execution == "partial" && finalUsage != nil && contentFiltered:
+		finish = "content_filter"
 	case execution == "partial" && finalUsage != nil:
 		finish = "length"
 	case execution != "succeeded":

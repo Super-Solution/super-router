@@ -369,3 +369,22 @@ async fn when_every_offering_is_cooling_none_is_skipped() {
 fn now_ms() -> i64 {
     super_router_router::system_clock()()
 }
+
+#[tokio::test]
+async fn an_answer_cut_short_says_why_in_its_finish_reason() {
+    for (completion, finish) in [("filtered", "content_filter"), ("partial", "length")] {
+        let w =
+            world(vec![delta("x"), usage(10, 1), Ok(ProviderEvent::Done { completion: Some(completion.into()) })], Duration::ZERO).await;
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let sink = events.clone();
+        let emit: Emit = Box::new(move |e| {
+            sink.lock().unwrap().push(e);
+            Ok(())
+        });
+        let r = w.infer("k1", Some(emit), CancellationToken::new()).await.unwrap();
+        // Either way the customer got a partial answer and the books treat it as one.
+        assert_eq!((r.execution_status.as_str(), r.finish_reason.as_deref()), ("partial", Some(finish)), "{completion}");
+        let last = events.lock().unwrap().last().cloned().unwrap();
+        assert_eq!((last.kind.as_str(), last.data["finish_reason"].as_str()), ("request.failed", Some(finish)), "{completion}");
+    }
+}

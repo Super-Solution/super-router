@@ -469,6 +469,7 @@ impl Router {
         let mut pending = false;
         let mut last_model = String::new();
         let mut downgrade: Option<Downgrade> = None;
+        let mut content_filtered = false;
 
         run.send(id, "request.started", json!({ "service_version": service.version }))?;
         let max_attempts = usize::try_from(service.max_attempts).unwrap_or(0);
@@ -505,6 +506,7 @@ impl Router {
             let mut upstream = String::new();
             let mut done = false;
             let mut completion = "succeeded".to_string();
+            let mut filtered = false;
             let mut stream = provider.invoke(input, &candidate.offering);
             let mut call_err: Option<ProviderError> = loop {
                 tokio::select! {
@@ -581,7 +583,11 @@ impl Router {
                         }
                         Some(Ok(ProviderEvent::Done { completion: c })) => {
                             done = true;
-                            if let Some(c) = c { completion = c; }
+                            if let Some(c) = c {
+                                // "filtered" is a partial completion with a reason: it is stored as partial.
+                                filtered = c == "filtered";
+                                completion = if filtered { "partial".to_string() } else { c };
+                            }
                             break None;
                         }
                     }
@@ -611,6 +617,7 @@ impl Router {
                                         self.note_health(&candidate.offering, Ok(()));
                                     }
                                     final_usage = usage.clone();
+                                    content_filtered = filtered;
                                     execution.clone_from(&completion);
                                     pending = cost > candidate.cost;
                                     break;
@@ -664,6 +671,7 @@ impl Router {
             }
         }
         let finish_reason = match execution.as_str() {
+            "partial" if final_usage.is_some() && content_filtered => Some("content_filter"),
             "partial" if final_usage.is_some() => Some("length"),
             "succeeded" if !calls.is_empty() => Some("tool_calls"),
             "succeeded" => Some("stop"),
