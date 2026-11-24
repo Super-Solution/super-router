@@ -167,11 +167,11 @@ async fn failures_are_classified() {
     task.input.task = Some(serde_json::from_value(json!({"kind": "image", "prompt": "x"})).unwrap());
     type Case = (&'static str, u16, &'static str, Invocation, (bool, bool, &'static str));
     let cases: Vec<Case> = vec![
-        ("rate limited", 429, "k", invocation(), (true, true, "upstream_http_429")),
+        ("rate limited", 429, "k", invocation(), (true, true, "rate_limited")),
         ("bad request", 400, "k", invocation(), (true, false, "upstream_http_400")),
-        ("unauthorized", 401, "k", invocation(), (true, false, "upstream_http_401")),
-        ("forbidden", 403, "k", invocation(), (true, false, "upstream_http_403")),
-        ("not found", 404, "k", invocation(), (true, false, "upstream_http_404")),
+        ("unauthorized", 401, "k", invocation(), (true, true, "credentials_rejected")),
+        ("forbidden", 403, "k", invocation(), (true, true, "credentials_rejected")),
+        ("not found", 404, "k", invocation(), (true, true, "model_unavailable")),
         ("server error is unknown", 500, "k", invocation(), (false, false, "upstream_http_500")),
         ("unavailable is unknown", 503, "k", invocation(), (false, false, "upstream_http_503")),
         ("empty 200 is interrupted", 200, "k", invocation(), (false, false, "stream_interrupted")),
@@ -229,10 +229,21 @@ async fn a_replayed_signature_the_backend_refuses_is_told_apart_from_other_bad_r
     };
     type Case = (&'static str, u16, &'static str, (bool, bool, &'static str));
     let cases: Vec<Case> = vec![
-        ("another backend's signature", 400, "Corrupted thought signature.", (true, false, "thought_signature_rejected")),
-        ("the other wording", 400, "Invalid thought_signature in the request", (true, false, "thought_signature_rejected")),
+        ("another backend's signature", 400, "Corrupted thought signature.", (true, true, "thought_signature_rejected")),
+        ("the other wording", 400, "Invalid thought_signature in the request", (true, true, "thought_signature_rejected")),
         ("any other bad request", 400, "Unknown name \"x\"", (true, false, "upstream_http_400")),
         ("the message on another status", 500, "Corrupted thought signature.", (false, false, "upstream_http_500")),
+        ("a key the API says is not valid", 400, "API key not valid. Please pass a valid API key.", (true, true, "credentials_rejected")),
+        ("a region the API refuses", 400, "User location is not supported for the API use.", (true, true, "region_blocked")),
+        (
+            "an empty balance reported as 429",
+            429,
+            "You exceeded your current quota, please check your plan and billing details.",
+            (true, true, "quota_exhausted"),
+        ),
+        ("a per-minute 429 stays a rate limit", 429, "Quota exceeded for metric requests per minute", (true, true, "rate_limited")),
+        ("another client error is the request's", 422, "bad", (true, false, "upstream_http_422")),
+        ("a server error with a key message keeps the hold", 503, "API key not valid", (false, false, "upstream_http_503")),
     ];
     for (name, code, message, want) in cases {
         let respond = refusal(code, message);

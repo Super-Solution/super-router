@@ -2,11 +2,13 @@
 //! canonical JSON that feeds the idempotency digest.
 
 mod datetime;
+mod failure;
 mod parse;
 mod tools;
 mod types;
 
 pub use datetime::{parse_utc_millis, valid_datetime};
+pub use failure::{classify as classify_failure, FailureClass};
 pub use parse::{canonical, invalid_request, js_number, parse_invocation, parse_service};
 pub use tools::{
     invocation_needs, is_js_space, is_json_object, js_stringify, js_trim, valid_image_url, valid_signature, valid_tool_call_id,
