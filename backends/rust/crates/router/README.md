@@ -4,7 +4,7 @@ The Super Router data plane: idempotent admission, reserve, execute and settle.
 
 ```toml
 [dependencies]
-super-router-router = "0.3"
+super-router-router = "0.4"
 ```
 
 `Router::infer` admits a request once per idempotency key, routes it, reserves funds, calls the provider as a stream

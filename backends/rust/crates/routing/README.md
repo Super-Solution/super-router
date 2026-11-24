@@ -4,7 +4,7 @@ Offering selection for Super Router: hard limits, weighted scoring and ordering.
 
 ```toml
 [dependencies]
-super-router-routing = "0.3"
+super-router-routing = "0.4"
 ```
 
 `route(&Service, &Invocation)` drops offerings that break a hard limit, scores the rest with the service's weights and orders them by score, then by id. It reproduces the TypeScript
