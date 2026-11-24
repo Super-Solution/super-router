@@ -84,7 +84,7 @@ The Postgres tests use `postgresql://superrouter:local-development-only@127.0.0.
 
 The Go data plane speaks the same tool-calling wire as the TypeScript reference: `input.tools`, `input.tool_choice`,
 assistant `tool_calls`, `role: "tool"` results, image parts and several system messages; the stream adds
-`output.tool_call.delta` and `output.tool_call.completed`, and the terminal event carries `finish_reason` and `usage`.
+`output.tool_call.delta` and `output.tool_call.completed`, and the terminal event carries `finish_reason` and `usage`. A call may carry an opaque `signature` (Gemini 3's `thoughtSignature`): it is on the first delta and the completed event, in the result's `tool_calls`, and goes back unchanged when the call is replayed.
 A provider says what it can carry through `contracts.CapableProvider`; an invocation that needs tools or images and
 finds no capable offering is refused with `422 unsupported_capability` before anything is reserved. Once a call has
 started streaming it is output, so a later failure is partial and never falls back. `/v1/inferences` and the routing

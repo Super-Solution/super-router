@@ -105,6 +105,9 @@ type part struct {
 	Text         *string       `json:"text"`
 	Thought      *bool         `json:"thought"`
 	FunctionCall *functionCall `json:"functionCall"`
+	// ThoughtSignature is Gemini 3's opaque signature of its reasoning; on a function call it must come back when
+	// the call is replayed. It is passed on untouched as the call's Signature.
+	ThoughtSignature *string `json:"thoughtSignature"`
 }
 
 type chunk struct {
@@ -242,7 +245,11 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 					if err != nil {
 						return bad
 					}
-					if err := emit(contracts.ProviderEvent{Type: "tool_call", Index: calls, ID: id, Name: *pt.FunctionCall.Name, ArgumentsDelta: text}); err != nil {
+					signature := ""
+					if pt.ThoughtSignature != nil {
+						signature = *pt.ThoughtSignature
+					}
+					if err := emit(contracts.ProviderEvent{Type: "tool_call", Index: calls, ID: id, Name: *pt.FunctionCall.Name, Signature: signature, ArgumentsDelta: text}); err != nil {
 						return err
 					}
 					calls++

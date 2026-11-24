@@ -103,3 +103,29 @@ fn stringify_keeps_key_order_and_renders_numbers_like_javascript() {
         assert_eq!(js_stringify(input).unwrap(), want, "{input}");
     }
 }
+
+#[test]
+fn a_call_signature_is_kept_and_a_bad_one_is_refused() {
+    let with = |signature: &str| {
+        let raw = format!(
+            r#"{{"service":"s","customer_id":"c","input":{{"messages":[{{"role":"user","content":"hi"}},{{"role":"assistant","tool_calls":[{{"id":"c1","name":"lookup","arguments":"{{}}"{signature}}}]}},{{"role":"tool","tool_call_id":"c1","content":"x"}}],"tools":[{{"name":"lookup","input_schema":{{"type":"object"}}}}]}},"limits":{{}}}}"#
+        );
+        parse_invocation(raw.as_bytes())
+    };
+    let kept = with(r#","signature":"c2lnLUE9""#).expect("a signed call parses");
+    let calls = kept.input.messages[1].tool_calls.as_ref().unwrap();
+    assert_eq!(calls[0].signature.as_deref(), Some("c2lnLUE9"));
+    assert!(canonical(&kept).unwrap().contains(r#""signature":"c2lnLUE9""#), "the digest must cover it");
+    assert_eq!(with("").unwrap().input.messages[1].tool_calls.as_ref().unwrap()[0].signature, None);
+    let too_long = format!(r#","signature":"{}""#, "a".repeat(16_385));
+    for bad in [
+        r#","signature":"""#,
+        r#","signature":"a b""#,
+        r#","signature":"a\nb""#,
+        r#","signature":5"#,
+        r#","signature":null"#,
+        too_long.as_str(),
+    ] {
+        assert_eq!(with(bad).err().map(|e| e.code), Some("invalid_request".to_string()), "{bad}");
+    }
+}

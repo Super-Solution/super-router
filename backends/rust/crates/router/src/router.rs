@@ -16,8 +16,8 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::Sha256;
 use super_router_contracts::{
-    canonical, invocation_needs, js_trim, parse_invocation, Invocation, Meters, Principal, Provider, ProviderError, ProviderEvent,
-    RouterError, Service, StreamEvent, ToolCall, ToolCalls,
+    canonical, invocation_needs, js_trim, parse_invocation, valid_signature, Invocation, Meters, Principal, Provider, ProviderError,
+    ProviderEvent, RouterError, Service, StreamEvent, ToolCall, ToolCalls,
 };
 use super_router_pricing::{atoms, charge};
 use super_router_routing::{invocation_bound, route_at, Candidate, Excluded};
@@ -481,7 +481,7 @@ impl Router {
                                 break Some(ProviderError::unknown(format!("emit: {e}")));
                             }
                         }
-                        Some(Ok(ProviderEvent::ToolCall { index, id: call_id, name, arguments_delta })) => {
+                        Some(Ok(ProviderEvent::ToolCall { index, id: call_id, name, signature, arguments_delta })) => {
                             let known = tool_calls.contains_key(&index);
                             let new_ok = tool_calls.len() < MAX_TOOL_CALLS
                                 && call_id.as_deref().is_some_and(|s| !s.is_empty())
@@ -506,8 +506,12 @@ impl Router {
                                 json!({ "index": index, "arguments_delta": arguments_delta })
                             } else {
                                 let (call_id, name) = (call_id.unwrap_or_default(), name.unwrap_or_default());
-                                let data = json!({ "index": index, "id": call_id, "name": name, "arguments_delta": arguments_delta });
-                                tool_calls.insert(index, ToolCall { id: call_id, name, arguments: arguments_delta });
+                                let signature = signature.filter(|s| valid_signature(s));
+                                let mut data = json!({ "index": index, "id": call_id, "name": name, "arguments_delta": arguments_delta });
+                                if let Some(signature) = &signature {
+                                    data["signature"] = json!(signature);
+                                }
+                                tool_calls.insert(index, ToolCall { id: call_id, name, arguments: arguments_delta, signature });
                                 data
                             };
                             if let Err(e) = run.send(id, "output.tool_call.delta", data) {
@@ -591,11 +595,11 @@ impl Router {
                     "" => "{}".to_string(),
                     trimmed => trimmed.to_string(),
                 };
-                run.send(
-                    id,
-                    "output.tool_call.completed",
-                    json!({ "index": index, "id": call.id, "name": call.name, "arguments": call.arguments }),
-                )?;
+                let mut data = json!({ "index": index, "id": call.id, "name": call.name, "arguments": call.arguments });
+                if let Some(signature) = &call.signature {
+                    data["signature"] = json!(signature);
+                }
+                run.send(id, "output.tool_call.completed", data)?;
                 calls.push(call);
             }
         }

@@ -36,6 +36,11 @@ pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub arguments: String,
+    /// An opaque token the upstream attached to this call and wants back when the call is replayed in a later
+    /// request (Gemini 3's `thoughtSignature`). It is never interpreted: a caller stores it with the call and sends
+    /// it again unchanged, and a provider that has no such token ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// A function the model may call. `input_schema` is a JSON Schema whose `type` is `"object"`.
@@ -206,7 +211,11 @@ impl<'de> Deserialize<'de> for Message {
                 }
                 let calls: Vec<ToolCall> = serde_json::from_value(o["tool_calls"].clone()).map_err(|_| invalid())?;
                 let calls_ok = calls.iter().all(|c| {
-                    valid_tool_call_id(&c.id) && valid_tool_name(&c.name) && length(&c.arguments) <= 256_000 && is_json_object(&c.arguments)
+                    valid_tool_call_id(&c.id)
+                        && valid_tool_name(&c.name)
+                        && length(&c.arguments) <= 256_000
+                        && is_json_object(&c.arguments)
+                        && c.signature.as_deref().is_none_or(valid_signature)
                 });
                 if !(1..=64).contains(&calls.len()) || !calls_ok {
                     return Err(invalid());
@@ -483,3 +492,9 @@ fn array_index(key: &str) -> Option<u32> {
 
 /// Collected tool calls of one answer, by index.
 pub type ToolCalls = BTreeMap<usize, ToolCall>;
+
+/// A call signature is opaque text of 1 to 16384 characters with no whitespace or control characters (providers send
+/// base64 or similar).
+pub fn valid_signature(s: &str) -> bool {
+    (1..=16_384).contains(&s.chars().count()) && s.chars().all(|c| !c.is_whitespace() && !c.is_control())
+}

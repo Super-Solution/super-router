@@ -312,3 +312,24 @@ func TestInferenceBodiesHaveTheirOwnLimit(t *testing.T) {
 		t.Errorf("other routes keep 256 KB: %d", res.StatusCode)
 	}
 }
+
+func TestCallSignatureTravelsWithTheCallAndComesBackOnTheNextTurn(t *testing.T) {
+	const signature = "c2lnLUE9"
+	f := toolSetup(t, map[string]contracts.Provider{"mock": &router.MockToolProvider{Args: map[string]any{"q": "a"}, Signature: signature}})
+	list := readEvents(t, f.post(t, streaming(withTools("")), ""))
+	if list[1]["signature"] != signature || list[3]["signature"] != signature || list[2]["signature"] != nil {
+		t.Fatalf("signature in events: %v", list)
+	}
+	first := f.json(t, withTools(""))
+	call := first["output"].(map[string]any)["tool_calls"].([]any)[0].(map[string]any)
+	if call["signature"] != signature {
+		t.Fatalf("call %v", call)
+	}
+	callJSON, _ := json.Marshal(call)
+	replay := `{"service":"chat","customer_id":"c1","input":{"messages":[{"role":"user","content":"Find it"},` +
+		`{"role":"assistant","tool_calls":[` + string(callJSON) + `]},{"role":"tool","tool_call_id":"` + call["id"].(string) + `","content":"found"}],` +
+		`"tools":[` + lookup + `]},"limits":{"max_output_tokens":32}}`
+	if done := f.json(t, replay); done["finish_reason"] != "stop" {
+		t.Fatalf("replay %v", done)
+	}
+}

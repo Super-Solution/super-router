@@ -132,3 +132,29 @@ func TestJSStringify(t *testing.T) {
 		}
 	}
 }
+
+func TestCallSignatureIsKeptAndABadOneIsRefused(t *testing.T) {
+	with := func(signature string) (Invocation, error) {
+		raw := `{"service":"s","customer_id":"c","input":{"messages":[{"role":"user","content":"hi"},{"role":"assistant","tool_calls":[{"id":"c1","name":"lookup","arguments":"{}"` +
+			signature + `}]},{"role":"tool","tool_call_id":"c1","content":"x"}],"tools":[{"name":"lookup","input_schema":{"type":"object"}}]},"limits":{}}`
+		return ParseInvocation([]byte(raw))
+	}
+	kept, err := with(`,"signature":"c2lnLUE9"`)
+	if err != nil {
+		t.Fatalf("a signed call must parse: %v", err)
+	}
+	if got := kept.Input.Messages[1].ToolCalls[0].Signature; got != "c2lnLUE9" {
+		t.Errorf("signature %q", got)
+	}
+	if c, _ := Canonical(kept); !strings.Contains(c, `"signature":"c2lnLUE9"`) {
+		t.Errorf("the digest must cover it: %s", c)
+	}
+	if plain, err := with(""); err != nil || plain.Input.Messages[1].ToolCalls[0].Signature != "" {
+		t.Errorf("no signature: %v", err)
+	}
+	for _, bad := range []string{`,"signature":""`, `,"signature":"a b"`, `,"signature":"a\nb"`, `,"signature":5`, `,"signature":null`, `,"signature":"` + strings.Repeat("a", 16385) + `"`} {
+		if _, err := with(bad); err == nil {
+			t.Errorf("accepted %.40s", bad)
+		}
+	}
+}

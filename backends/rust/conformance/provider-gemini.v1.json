@@ -198,10 +198,7 @@
          }
         },
         {
-         "name": "other",
-         "parametersJsonSchema": {
-          "type": "object"
-         }
+         "name": "other"
         }
        ]
       }
@@ -526,10 +523,7 @@
          }
         },
         {
-         "name": "other",
-         "parametersJsonSchema": {
-          "type": "object"
-         }
+         "name": "other"
         }
        ]
       }
@@ -882,9 +876,243 @@
          }
         },
         {
-         "name": "other",
+         "name": "other"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "a call signature goes back beside the call",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       },
+       {
+        "role": "assistant",
+        "tool_calls": [
+         {
+          "id": "a",
+          "name": "lookup",
+          "arguments": "{\"q\":\"1\"}",
+          "signature": "c2lnLUE="
+         },
+         {
+          "id": "b",
+          "name": "other",
+          "arguments": "{}"
+         }
+        ]
+       },
+       {
+        "role": "tool",
+        "tool_call_id": "a",
+        "content": "one"
+       },
+       {
+        "role": "tool",
+        "tool_call_id": "b",
+        "content": "two"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       },
+       {
+        "name": "other",
+        "input_schema": {
+         "type": "object"
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      },
+      {
+       "role": "model",
+       "parts": [
+        {
+         "functionCall": {
+          "name": "lookup",
+          "args": {
+           "q": "1"
+          }
+         },
+         "thoughtSignature": "c2lnLUE="
+        },
+        {
+         "functionCall": {
+          "name": "other",
+          "args": {}
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "parts": [
+        {
+         "functionResponse": {
+          "name": "lookup",
+          "response": {
+           "output": "one"
+          }
+         }
+        },
+        {
+         "functionResponse": {
+          "name": "other",
+          "response": {
+           "output": "two"
+          }
+         }
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
          "parametersJsonSchema": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        },
+        {
+         "name": "other"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "name": "a tool with no parameters declares none",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "ping",
+        "description": "Ping",
+        "input_schema": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       },
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "ping",
+         "description": "Ping"
+        },
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
          }
         }
        ]
@@ -1341,6 +1569,284 @@
        "output": 4
       },
       "upstream_id": "r4"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
+    "name": "a signed call keeps its signature",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "pondering",
+           "thought": true
+          },
+          {
+           "functionCall": {
+            "name": "lookup",
+            "args": {
+             "q": "x"
+            }
+           },
+           "thoughtSignature": "c2lnLUE="
+          },
+          {
+           "functionCall": {
+            "name": "other",
+            "args": {}
+           }
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 20,
+       "candidatesTokenCount": 5,
+       "thoughtsTokenCount": 3,
+       "totalTokenCount": 28
+      },
+      "responseId": "r11"
+     }
+    ],
+    "events": [
+     {
+      "type": "tool_call",
+      "index": 0,
+      "id": "r11_0",
+      "name": "lookup",
+      "signature": "c2lnLUE=",
+      "arguments_delta": "{\"q\":\"x\"}"
+     },
+     {
+      "type": "tool_call",
+      "index": 1,
+      "id": "r11_1",
+      "name": "other",
+      "arguments_delta": "{}"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 20,
+       "cached": 0,
+       "cache_write": 0,
+       "output": 8
+      },
+      "upstream_id": "r11"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
+    "name": "a signature on text is not a call signature",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "text": "Hi",
+           "thoughtSignature": "c2ln"
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 5,
+       "candidatesTokenCount": 1,
+       "totalTokenCount": 6
+      },
+      "responseId": "r12"
+     }
+    ],
+    "events": [
+     {
+      "type": "delta",
+      "text": "Hi"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 5,
+       "cached": 0,
+       "cache_write": 0,
+       "output": 1
+      },
+      "upstream_id": "r12"
+     },
+     {
+      "type": "done",
+      "completion": "succeeded"
+     }
+    ]
+   },
+   {
+    "name": "an empty signature is no signature",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "frames": [
+     {
+      "candidates": [
+       {
+        "content": {
+         "role": "model",
+         "parts": [
+          {
+           "functionCall": {
+            "name": "lookup",
+            "args": {}
+           },
+           "thoughtSignature": ""
+          }
+         ]
+        },
+        "finishReason": "STOP"
+       }
+      ],
+      "usageMetadata": {
+       "promptTokenCount": 1,
+       "totalTokenCount": 1
+      },
+      "responseId": "r13"
+     }
+    ],
+    "events": [
+     {
+      "type": "tool_call",
+      "index": 0,
+      "id": "r13_0",
+      "name": "lookup",
+      "arguments_delta": "{}"
+     },
+     {
+      "type": "usage",
+      "usage": {
+       "input": 1,
+       "cached": 0,
+       "cache_write": 0,
+       "output": 0
+      },
+      "upstream_id": "r13"
      },
      {
       "type": "done",

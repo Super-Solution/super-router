@@ -146,6 +146,7 @@ impl Provider for MockTaskProvider {
 pub struct MockToolProvider {
     behavior: String,
     args: serde_json::Map<String, serde_json::Value>,
+    signature: Option<String>,
     calls: AtomicU64,
 }
 
@@ -158,6 +159,13 @@ impl MockToolProvider {
     #[must_use]
     pub fn with_args(mut self, args: serde_json::Map<String, serde_json::Value>) -> Self {
         self.args = args;
+        self
+    }
+
+    /// The signature every call carries, as an upstream that signs its calls would send it.
+    #[must_use]
+    pub fn with_signature(mut self, signature: &str) -> Self {
+        self.signature = Some(signature.to_string());
         self
     }
 
@@ -186,6 +194,7 @@ impl Provider for MockToolProvider {
             (_, Some(first)) => Some(first),
         };
         let raw = serde_json::Value::Object(self.args.clone()).to_string();
+        let signature = self.signature.clone();
         Box::pin(async_stream::stream! {
             if behavior == "reject" {
                 yield Err(ProviderError::definitive("rate_limited", true));
@@ -199,13 +208,13 @@ impl Provider for MockToolProvider {
                 let middle = raw.len().div_ceil(2);
                 let middle = (middle..=raw.len()).find(|i| raw.is_char_boundary(*i)).unwrap_or(raw.len());
                 let id = format!("call_{}", Uuid::new_v4().simple());
-                yield Ok(ProviderEvent::ToolCall { index: 0, id: Some(id), name: Some(name), arguments_delta: raw[..middle].to_string() });
+                yield Ok(ProviderEvent::ToolCall { index: 0, id: Some(id), name: Some(name), signature, arguments_delta: raw[..middle].to_string() });
                 if behavior == "truncated" {
                     yield Ok(usage());
                     yield Ok(ProviderEvent::Done { completion: Some("partial".to_string()) });
                     return;
                 }
-                yield Ok(ProviderEvent::ToolCall { index: 0, id: None, name: None, arguments_delta: raw[middle..].to_string() });
+                yield Ok(ProviderEvent::ToolCall { index: 0, id: None, name: None, signature: None, arguments_delta: raw[middle..].to_string() });
             } else {
                 let text = if last_is_result { "The tool finished." } else { "Hello from SuperRouter." };
                 yield Ok(ProviderEvent::Delta { text: text.to_string() });

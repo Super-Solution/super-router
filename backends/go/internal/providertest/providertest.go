@@ -130,6 +130,9 @@ func wire(e contracts.ProviderEvent) map[string]any {
 		if e.ID != "" {
 			out["id"], out["name"] = e.ID, e.Name
 		}
+		if e.Signature != "" {
+			out["signature"] = e.Signature
+		}
 		return out
 	case "usage":
 		out := map[string]any{"type": "usage", "usage": e.Usage}

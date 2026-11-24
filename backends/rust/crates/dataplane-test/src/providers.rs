@@ -47,11 +47,14 @@ fn normalise(v: Value) -> Value {
 fn wire(e: &ProviderEvent) -> Value {
     match e {
         ProviderEvent::Delta { text } => json!({ "type": "delta", "text": text }),
-        ProviderEvent::ToolCall { index, id, name, arguments_delta } => {
+        ProviderEvent::ToolCall { index, id, name, signature, arguments_delta } => {
             let mut out = json!({ "type": "tool_call", "index": index, "arguments_delta": arguments_delta });
             if let Some(id) = id {
                 out["id"] = json!(id);
                 out["name"] = json!(name);
+            }
+            if let Some(signature) = signature {
+                out["signature"] = json!(signature);
             }
             out
         }

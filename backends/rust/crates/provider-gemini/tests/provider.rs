@@ -135,7 +135,7 @@ async fn requests_the_upstream_would_reject_never_leave_the_process() {
         input.input.messages = messages;
         input
     };
-    let call = |arguments: &str| ToolCall { id: "c1".into(), name: "lookup".into(), arguments: arguments.into() };
+    let call = |arguments: &str| ToolCall { id: "c1".into(), name: "lookup".into(), arguments: arguments.into(), signature: None };
     let calling = |arguments: &str| Message { role: "assistant".into(), tool_calls: Some(vec![call(arguments)]), ..Message::default() };
     let result = |id: &str| Message { role: "tool".into(), tool_call_id: id.into(), content: "x".into(), ..Message::default() };
     let image = |url: &str| Message {

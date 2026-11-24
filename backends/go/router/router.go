@@ -407,7 +407,12 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 				if known != nil {
 					known.Arguments += ev.ArgumentsDelta
 				} else {
-					toolCalls[ev.Index] = &contracts.ToolCall{ID: ev.ID, Name: ev.Name, Arguments: ev.ArgumentsDelta}
+					call := &contracts.ToolCall{ID: ev.ID, Name: ev.Name, Arguments: ev.ArgumentsDelta}
+					if contracts.ValidSignature(ev.Signature) {
+						call.Signature = ev.Signature
+						data["signature"] = call.Signature
+					}
+					toolCalls[ev.Index] = call
 					data["id"], data["name"] = ev.ID, ev.Name
 				}
 				return send("output.tool_call.delta", data)
@@ -500,7 +505,11 @@ func (r *Router) execute(ctx context.Context, p contracts.Principal, in contract
 				call.Arguments = "{}"
 			}
 			calls = append(calls, call)
-			if err := send("output.tool_call.completed", map[string]any{"index": i, "id": call.ID, "name": call.Name, "arguments": call.Arguments}); err != nil {
+			done := map[string]any{"index": i, "id": call.ID, "name": call.Name, "arguments": call.Arguments}
+			if call.Signature != "" {
+				done["signature"] = call.Signature
+			}
+			if err := send("output.tool_call.completed", done); err != nil {
 				return nil, err
 			}
 		}

@@ -314,7 +314,7 @@ impl Provider for Anthropic {
                             }
                             let index = calls.len();
                             calls.insert(position, Call { index, streamed: false, input: block.input });
-                            yield ProviderEvent::ToolCall { index, id: Some(id), name: Some(name), arguments_delta: String::new() };
+                            yield ProviderEvent::ToolCall { index, id: Some(id), name: Some(name), signature: None, arguments_delta: String::new() };
                         }
                     }
                     "content_block_stop" => {
@@ -322,7 +322,7 @@ impl Provider for Anthropic {
                         let call = tools::safe_index(event.index.as_ref()).and_then(|p| calls.get(&p)).filter(|c| !c.streamed);
                         if let Some(call) = call {
                             if let Some(arguments) = tools::whole_input(call.input.as_deref()) {
-                                yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, arguments_delta: arguments };
+                                yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, signature: None, arguments_delta: arguments };
                             }
                         }
                     }
@@ -332,7 +332,7 @@ impl Provider for Anthropic {
                             let call = tools::safe_index(event.index.as_ref()).and_then(|p| calls.get_mut(&p)).ok_or_else(bad)?;
                             let partial = tools::text(delta.partial_json.as_ref()).ok_or_else(bad)?;
                             call.streamed = true;
-                            yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, arguments_delta: partial };
+                            yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, signature: None, arguments_delta: partial };
                         }
                         _ => {}
                     },

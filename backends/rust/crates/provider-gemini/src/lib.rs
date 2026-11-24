@@ -194,6 +194,10 @@ struct Part {
     thought: Option<bool>,
     #[serde(default)]
     function_call: Option<FunctionCall>,
+    /// Gemini 3 attaches an opaque signature of its reasoning to a function call and requires it back when the call
+    /// is replayed in the next request. It is passed on untouched as the call's `signature`.
+    #[serde(default)]
+    thought_signature: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -312,7 +316,8 @@ impl Provider for Gemini {
                                 format!("{stem}_{calls}")
                             });
                             let arguments_delta = serde_json::to_string(&args).map_err(|_| bad())?;
-                            yield ProviderEvent::ToolCall { index: calls, id: Some(id), name: Some(name), arguments_delta };
+                            let signature = part.thought_signature.filter(|s| !s.is_empty());
+                            yield ProviderEvent::ToolCall { index: calls, id: Some(id), name: Some(name), signature, arguments_delta };
                             calls += 1;
                         } else if part.thought != Some(true) {
                             if let Some(text) = part.text.filter(|t| !t.is_empty()) {

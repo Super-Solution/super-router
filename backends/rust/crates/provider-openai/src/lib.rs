@@ -250,14 +250,14 @@ impl Provider for OpenAi {
                             }
                             let index = calls.len();
                             calls.insert(position, Call { index, streamed: false });
-                            yield ProviderEvent::ToolCall { index, id: Some(id), name: Some(name), arguments_delta: String::new() };
+                            yield ProviderEvent::ToolCall { index, id: Some(id), name: Some(name), signature: None, arguments_delta: String::new() };
                         }
                     }
                     "response.function_call_arguments.delta" => {
                         let call = tools::safe_index(event.output_index.as_ref()).and_then(|p| calls.get_mut(&p)).ok_or_else(bad)?;
                         let delta = tools::text(event.delta.as_ref()).ok_or_else(bad)?;
                         call.streamed = true;
-                        yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, arguments_delta: delta };
+                        yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, signature: None, arguments_delta: delta };
                     }
                     "response.function_call_arguments.done" => {
                         let call = tools::safe_index(event.output_index.as_ref()).and_then(|p| calls.get(&p)).ok_or_else(bad)?;
@@ -268,7 +268,7 @@ impl Provider for OpenAi {
                         };
                         // Some models send the arguments only here.
                         if !call.streamed {
-                            yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, arguments_delta: arguments };
+                            yield ProviderEvent::ToolCall { index: call.index, id: None, name: None, signature: None, arguments_delta: arguments };
                         }
                     }
                     "response.completed" | "response.incomplete" => {

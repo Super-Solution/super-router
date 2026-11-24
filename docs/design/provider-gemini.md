@@ -24,9 +24,9 @@ sees the same four disjoint meters: `input` (uncached), `cached`, `cache_write`,
 | --- | --- |
 | `system` messages (joined with `\n`) | `systemInstruction.parts[0].text` |
 | `assistant` / `user` | role `model` / `user`, `parts: [{text}]` |
-| assistant tool call (`arguments` JSON string) | `functionCall {name, args}`; `args` must be an object, `""` is `{}` |
+| assistant tool call (`arguments` JSON string) | `functionCall {name, args}`; `args` must be an object, `""` is `{}`. A call's `signature`, when it has one, goes beside it as `thoughtSignature`, unchanged |
 | `tool` message | `functionResponse {name, response: {output \| error: content}}`; the name is found from the call id, a result for a call never made is refused. The results of one step share one user turn |
-| tools | `tools[0].functionDeclarations`, schema as `parametersJsonSchema` (JSON Schema as written; the older `parameters` accepts only an OpenAPI subset and would need a lossy translator) |
+| tools | `tools[0].functionDeclarations`, schema as `parametersJsonSchema` (JSON Schema as written; the older `parameters` accepts only an OpenAPI subset and would need a lossy translator). A schema that is just an empty object (no properties, no other keywords) declares no schema at all: that is how Gemini says "no parameters", and an empty object schema is a request some models refuse |
 | `tool_choice` | `toolConfig.functionCallingConfig`: `auto` → `AUTO`, `none` → `NONE`, `required` → `ANY`, `{name}` → `ANY` + `allowedFunctionNames` |
 | image part | `inlineData {mimeType, data}` for `data:` URLs. A link is refused (`request_invalid`): Gemini fetches only its own file URIs |
 | `max_output_tokens` | `generationConfig.maxOutputTokens` |
@@ -42,7 +42,9 @@ The model name goes into the path, so only `[A-Za-z0-9._-]` is accepted (a `mode
 
 - text parts → `Delta`; thought summaries (`thought: true`) are not forwarded.
 - a `functionCall` part arrives whole, not in pieces → one `ToolCall` event with id, name and the arguments. A call
-  without an `id` gets `{responseId}_{index}`; one without a name is refused rather than invented.
+  without an `id` gets `{responseId}_{index}`; one without a name is refused rather than invented. A
+  `thoughtSignature` on that part becomes the event's `signature` (an empty one is dropped); a signature on a text
+  part is not a call signature and is ignored.
 - `finishReason` ends the answer; `STOP` is `succeeded`, anything else (`MAX_TOKENS`, `SAFETY`, a blocked prompt) is
   `partial`. The stream is read to its end because the last chunk holds the final usage; no `finishReason` is
   `stream_interrupted`, no `usageMetadata` is `usage_unknown`, an unusable one `invalid_usage`. A call is never billed
@@ -106,20 +108,29 @@ separately (like Anthropic), over SSE. In Rust:
    `scripts/export-gemini-conformance.mjs`) and a three-line test that calls `run_tool_cases_in`.
 5. Go: `backends/go/provider/x/` and one `providertest.RunFile` call; register in `cmd/super-router-server/main.go`.
 
-It does **not** touch `contracts`, `pricing`, `routing`, `router`, the stores or any other provider. The offering that
+A provider crate does **not** touch `pricing`, `routing`, `router`, the stores or any other provider (the one change to `contracts` in this PR, the call signature, is its own commit). The offering that
 uses it names `"provider": "x"`.
 
 ## What is not covered, and what comes next
 
-- **Thought signatures (blocks multi-turn tool use on Gemini 3 models).** Gemini 3 returns a `thoughtSignature` on
-  `functionCall` parts and, as I understand Google's documentation, rejects the next turn if it is not sent back. The
-  contracts' `ToolCall` has no field to carry it. Proposed: an optional opaque `signature` on `ToolCall` and on the
-  `ToolCall` provider event, echoed by the provider that produced it. It is additive but touches the contracts of every
-  backend, so it is its own change. Verify against a live key first.
+- **Thought signatures: carried, not yet seen live.** Gemini 3 returns a `thoughtSignature` on `functionCall` parts
+  and, as I understand Google's documentation, rejects the next turn if a call from the current turn is replayed
+  without it. `ToolCall` and the `ToolCall` provider event now have an optional opaque `signature` (1 to 16384
+  characters, no whitespace; the router puts it on the first delta and on `output.tool_call.completed`, the result's
+  `tool_calls[]` carries it, and a caller sends the call back unchanged). Rust and Go only, like the other
+  additions beyond the TypeScript reference, which refuses the unknown key until it follows. Not carried: signatures
+  on text parts (Google recommends, but does not require, sending them back) and a replayed history that never had
+  signatures (another model's turns). For that case Google documents placeholder values; using them is a policy
+  choice for the application, not something the provider should do silently.
 - Not run against live Gemini. First step once a key exists: replay one recorded real stream into the conformance file.
 - Structured output (`response_format`): no provider writes the schema yet (router-wide, 422 after routing).
-- Generation parameters beyond `maxOutputTokens` (temperature, safety settings), grounding tools, audio and video
-  parts, explicit-cache creation: not in the contracts.
+- Generation parameters beyond `maxOutputTokens` (temperature, thinking level or budget, safety settings), grounding
+  tools, audio and video parts, explicit-cache creation: not in the contracts. Safety settings and thinking controls
+  are the ones real traffic will ask for first; they are application policy, so they should arrive as optional
+  provider options, not as FirstFa-specific fields.
+- Modality-specific prices (Gemini bills audio input higher than text) need the per-modality token counts in
+  `usageMetadata.promptTokensDetails`; `Meters` has one `input` cell, so today the whole prompt is priced alike. A
+  card per modality is possible without touching the wire price; it is not built.
 - Tool-call arguments are re-encoded as compact JSON with sorted keys. Number spelling differs by backend: Go keeps
   `1e3`, Rust writes `1000.0`. Both parse to the same value; the conformance cases use plain integers.
 - TypeScript and Python adapters: later, from the same conformance file.
@@ -130,7 +141,11 @@ In this PR (separate commits): (1) Rust and Go Gemini providers with the shared 
 and `RateCard::defaulted()`, which are what FirstFa's pricing incident asked for: a price that changes on a date, and a
 warning when usage counted cache reads from a card that has no cache-read rate.
 
-Next, each small and separable: (3) `ToolCall.signature` in the contracts, (4) path-prefix and auth options on the
+Also in this PR: (3) `ToolCall.signature` in the contracts (Rust and Go), the empty-parameters rule and their
+conformance cases, from checking the adapter against how a production gateway handles Gemini edge cases (usage with
+tool-use prompt tokens, blocked prompts, empty schemas, signatures).
+
+Next, each small and separable: (4) path-prefix and auth options on the
 OpenAI and Anthropic providers (Azure, Vertex Anthropic), (5) decide whether the wire `Price` grows `reasoning`,
 `cache_write_1h` and a per-call fee, (6) TypeScript and Python parity, (7) application side: FirstFa swaps its own
 `accounting::price` for `RateCard` after the next release and gets Gemini either from this provider or by adding the

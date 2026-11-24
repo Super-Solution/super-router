@@ -52,7 +52,12 @@ pub(crate) fn contents(messages: &[Message]) -> Result<Vec<Value>, Refusal> {
             }
             for c in calls {
                 names.insert(c.id.as_str(), c.name.as_str());
-                parts.push(json!({ "functionCall": { "name": c.name, "args": args(&c.arguments)? } }));
+                let mut part = json!({ "functionCall": { "name": c.name, "args": args(&c.arguments)? } });
+                if let Some(signature) = &c.signature {
+                    // The signature sits beside the call, not inside it, and goes back exactly as it was received.
+                    part["thoughtSignature"] = json!(signature);
+                }
+                parts.push(part);
             }
             out.push(json!({ "role": role, "parts": parts }));
         } else if let Some(parts) = &m.parts {
@@ -86,6 +91,14 @@ fn args(arguments: &str) -> Result<Value, Refusal> {
     }
 }
 
+/// A schema that says "an object with nothing in it" declares no parameters. Gemini declares such a function by
+/// leaving the schema out, and an object schema with no properties is a request some of its models refuse.
+fn takes_no_arguments(o: &Map<String, Value>) -> bool {
+    o.get("type").and_then(Value::as_str) == Some("object")
+        && o.get("properties").is_none_or(|p| p.as_object().is_some_and(Map::is_empty))
+        && o.keys().all(|k| matches!(k.as_str(), "type" | "properties" | "additionalProperties" | "$schema"))
+}
+
 /// Adds `tools` and `toolConfig` to a request body, and nothing when the request declares no tools.
 ///
 /// The schema travels as `parametersJsonSchema`, which takes JSON Schema as written. The older `parameters` field
@@ -95,7 +108,10 @@ pub(crate) fn tool_fields(body: &mut Map<String, Value>, input: &Input) {
         let declarations: Vec<Value> = tools
             .iter()
             .map(|t| {
-                let mut declaration = json!({ "name": t.name, "parametersJsonSchema": t.input_schema });
+                let mut declaration = json!({ "name": t.name });
+                if !takes_no_arguments(&t.input_schema) {
+                    declaration["parametersJsonSchema"] = Value::Object(t.input_schema.clone());
+                }
                 if let Some(d) = &t.description {
                     declaration["description"] = json!(d);
                 }

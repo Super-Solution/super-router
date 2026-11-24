@@ -495,11 +495,13 @@ pub enum ProviderEvent {
         text: String,
     },
     /// Part of a tool call. Calls are numbered from zero by `index`; the first event of an index carries `id` and
-    /// `name`, and `arguments_delta` is the next piece of the call's JSON arguments.
+    /// `name` (and `signature`, when the upstream attached one), and `arguments_delta` is the next piece of the
+    /// call's JSON arguments.
     ToolCall {
         index: usize,
         id: Option<String>,
         name: Option<String>,
+        signature: Option<String>,
         arguments_delta: String,
     },
     Usage {

@@ -65,7 +65,12 @@ func contents(messages []contracts.Message) ([]any, error) {
 				if err != nil {
 					return nil, err
 				}
-				parts = append(parts, map[string]any{"functionCall": map[string]any{"name": c.Name, "args": args}})
+				call := map[string]any{"functionCall": map[string]any{"name": c.Name, "args": args}}
+				if c.Signature != "" {
+					// The signature sits beside the call, not inside it, and goes back exactly as it was received.
+					call["thoughtSignature"] = c.Signature
+				}
+				parts = append(parts, call)
 			}
 			out = append(out, map[string]any{"role": role, "parts": parts})
 		case m.Parts != nil:
@@ -114,6 +119,26 @@ func arguments(text string) (map[string]any, error) {
 	return v, nil
 }
 
+// takesNoArguments is true for a schema that says "an object with nothing in it". Gemini declares such a function
+// by leaving the schema out, and an object schema with no properties is a request some of its models refuse.
+func takesNoArguments(schema contracts.JSONObject) bool {
+	if t, _ := schema["type"].(string); t != "object" {
+		return false
+	}
+	for k, v := range schema {
+		switch k {
+		case "type", "additionalProperties", "$schema":
+		case "properties":
+			if p, ok := v.(map[string]any); !ok || len(p) != 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // toolFields adds `tools` and `toolConfig` to a request body, and nothing when the request declares no tools. The
 // schema travels as `parametersJsonSchema`, which takes JSON Schema as written; the older `parameters` field accepts
 // only an OpenAPI subset.
@@ -121,7 +146,10 @@ func toolFields(body map[string]any, in contracts.Input) {
 	if in.Tools != nil {
 		declarations := make([]any, 0, len(in.Tools))
 		for _, t := range in.Tools {
-			d := map[string]any{"name": t.Name, "parametersJsonSchema": t.InputSchema}
+			d := map[string]any{"name": t.Name}
+			if !takesNoArguments(t.InputSchema) {
+				d["parametersJsonSchema"] = t.InputSchema
+			}
 			if t.Description != nil {
 				d["description"] = *t.Description
 			}

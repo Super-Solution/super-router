@@ -18,7 +18,7 @@ const lookup = {
 };
 const other = { name: "other", input_schema: { type: "object" } };
 const declared = { name: "lookup", description: "Find a thing", parametersJsonSchema: lookup.input_schema };
-const declaredOther = { name: "other", parametersJsonSchema: { type: "object" } };
+const declaredOther = { name: "other" };
 
 const invocation = (input, maxOutput = 32) => ({
   service: "chat",
@@ -121,6 +121,46 @@ request("parallel calls and an error result", {
   generationConfig: { maxOutputTokens: 32 },
   tools: [{ functionDeclarations: [declared, declaredOther] }],
 });
+request("a call signature goes back beside the call", {
+  messages: [
+    user("Find it"),
+    {
+      role: "assistant",
+      tool_calls: [
+        { id: "a", name: "lookup", arguments: '{"q":"1"}', signature: "c2lnLUE=" },
+        { id: "b", name: "other", arguments: "{}" },
+      ],
+    },
+    { role: "tool", tool_call_id: "a", content: "one" },
+    { role: "tool", tool_call_id: "b", content: "two" },
+  ],
+  tools: [lookup, other],
+}, {
+  contents: [
+    { role: "user", parts: [{ text: "Find it" }] },
+    {
+      role: "model",
+      parts: [{ functionCall: { name: "lookup", args: { q: "1" } }, thoughtSignature: "c2lnLUE=" }, { functionCall: { name: "other", args: {} } }],
+    },
+    {
+      role: "user",
+      parts: [
+        { functionResponse: { name: "lookup", response: { output: "one" } } },
+        { functionResponse: { name: "other", response: { output: "two" } } },
+      ],
+    },
+  ],
+  generationConfig: { maxOutputTokens: 32 },
+  tools: [{ functionDeclarations: [declared, declaredOther] }],
+});
+request("a tool with no parameters declares none", {
+  messages: [user("Find it")],
+  tools: [{ name: "ping", description: "Ping", input_schema: { type: "object", properties: {}, additionalProperties: false } }, lookup],
+}, {
+  contents: [{ role: "user", parts: [{ text: "Find it" }] }],
+  generationConfig: { maxOutputTokens: 32 },
+  tools: [{ functionDeclarations: [{ name: "ping", description: "Ping" }, declared] }],
+});
 request("inline images", {
   messages: [{ role: "user", content: [{ type: "text", text: "What is this?" }, { type: "image", url: "data:image/png;base64,AAAA", detail: "low" }] }],
 }, {
@@ -177,6 +217,39 @@ stream("parallel calls, one with an id", [
   usageEvent(9, 0, 4, "r4"),
   done("succeeded"),
 ]);
+
+stream("a signed call keeps its signature", [
+  {
+    candidates: [
+      {
+        content: {
+          role: "model",
+          parts: [
+            { text: "pondering", thought: true },
+            { functionCall: { name: "lookup", args: { q: "x" } }, thoughtSignature: "c2lnLUE=" },
+            { functionCall: { name: "other", args: {} } },
+          ],
+        },
+        finishReason: "STOP",
+      },
+    ],
+    usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 5, thoughtsTokenCount: 3, totalTokenCount: 28 },
+    responseId: "r11",
+  },
+], [
+  { type: "tool_call", index: 0, id: "r11_0", name: "lookup", signature: "c2lnLUE=", arguments_delta: '{"q":"x"}' },
+  { type: "tool_call", index: 1, id: "r11_1", name: "other", arguments_delta: "{}" },
+  usageEvent(20, 0, 8, "r11"),
+  done("succeeded"),
+]);
+
+stream("a signature on text is not a call signature", [
+  { candidates: [{ content: { role: "model", parts: [{ text: "Hi", thoughtSignature: "c2ln" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 1, totalTokenCount: 6 }, responseId: "r12" },
+], [{ type: "delta", text: "Hi" }, usageEvent(5, 0, 1, "r12"), done("succeeded")]);
+
+stream("an empty signature is no signature", [
+  { candidates: [{ content: { role: "model", parts: [{ functionCall: { name: "lookup", args: {} }, thoughtSignature: "" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 1, totalTokenCount: 1 }, responseId: "r13" },
+], [{ type: "tool_call", index: 0, id: "r13_0", name: "lookup", arguments_delta: "{}" }, usageEvent(1, 0, 0, "r13"), done("succeeded")]);
 
 stream("cut off by the output limit", [
   { candidates: [{ content: text("Hel"), finishReason: "MAX_TOKENS" }], usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 1, totalTokenCount: 6 }, responseId: "r5" },
