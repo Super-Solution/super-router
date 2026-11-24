@@ -1,6 +1,6 @@
 # Publishing to crates.io
 
-Ten crates of the Rust backend (`backends/rust`) are public. They are released together, at one version, by the manual
+Ten crates of the Rust backend (`backends/rust`) are public. An eleventh, `super-router-provider-gemini`, exists from 0.3.0 but is first published by hand (see the table), so the workflow does not touch it yet. They are released together, at one version, by the manual
 workflow **Publish crates** (`.github/workflows/crates-publish.yml`), which uses crates.io Trusted Publishing (OIDC):
 no crates.io token and no repository secret. The **first** release of every crate is different: a crate must exist
 before it can have a trusted publisher, so that release is published by hand, once, with a short-lived token
@@ -17,6 +17,7 @@ before it can have a trusted publisher, so that release is published by hand, on
 | `super-router-store-postgres` | yes | PostgreSQL store with embedded migrations |
 | `super-router-provider-openai` | yes | OpenAI Responses provider |
 | `super-router-provider-anthropic` | yes | Anthropic Messages provider |
+| `super-router-provider-gemini` | **not yet** (`publish = false`) | Google Gemini provider (Gemini API and Vertex AI). Its first version (0.3.0) is published by hand with a short-lived token once the other ten are out, then its trusted publisher is added; after that remove `publish = false`, add it to `PUBLISH_ORDER` and release all eleven together |
 | `super-router-server` | yes | the HTTP API as an axum `Router` |
 | `super-router-cli` | **no** (`publish = false`) | a binary; undecided, see below |
 | `super-router-dataplane-test` | **no** (`publish = false`) | cannot be published as it is, see below |
@@ -101,7 +102,7 @@ by yanking: a published version stays on crates.io for ever.
 
 ## Releasing
 
-1. Choose the version. All ten crates move together; while the major version is 0, a minor bump may break the API and a
+1. Choose the version. All publishable crates move together; while the major version is 0, a minor bump may break the API and a
    patch only fixes bugs. A pre-release is `X.Y.Z-alpha.N`, `-beta.N` or `-rc.N`; crates.io never selects a pre-release
    unless it is requested by exact version.
 2. Edit `version` under `[workspace.package]` and every `version = "..."` of the ten internal crates under
