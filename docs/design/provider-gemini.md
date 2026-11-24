@@ -30,6 +30,7 @@ sees the same four disjoint meters: `input` (uncached), `cached`, `cache_write`,
 | `tool_choice` | `toolConfig.functionCallingConfig`: `auto` → `AUTO`, `none` → `NONE`, `required` → `ANY`, `{name}` → `ANY` + `allowedFunctionNames` |
 | image part | `inlineData {mimeType, data}` for `data:` URLs. A link is refused (`request_invalid`): Gemini fetches only its own file URIs |
 | `max_output_tokens` | `generationConfig.maxOutputTokens` |
+| `response_format` (`json_schema`) | `generationConfig.responseMimeType: "application/json"` and `responseJsonSchema` (the schema as written). The API has no place for the schema's name or description, so they are dropped; a schema is always enforced (the contract refuses `strict: false`). Known limit: some models refuse a JSON response type together with function calling; that is the upstream's `400`, a request refusal that stops the call |
 
 Everything the upstream would reject (bad model name, non-object arguments, unknown tool result, link image) is refused
 as a definitive `request_invalid` before anything is sent, so the router tries the next offering and nothing is billed.
@@ -45,12 +46,19 @@ The model name goes into the path, so only `[A-Za-z0-9._-]` is accepted (a `mode
   without an `id` gets `{responseId}_{index}`; one without a name is refused rather than invented. A
   `thoughtSignature` on that part becomes the event's `signature` (an empty one is dropped); a signature on a text
   part is not a call signature and is ignored.
-- `finishReason` ends the answer; `STOP` is `succeeded`, anything else (`MAX_TOKENS`, `SAFETY`, a blocked prompt) is
-  `partial`. The stream is read to its end because the last chunk holds the final usage; no `finishReason` is
+- `finishReason` ends the answer; `STOP` is `succeeded`. A content-policy ending (`SAFETY`, `RECITATION`, `BLOCKLIST`,
+  `PROHIBITED_CONTENT`, `SPII`, the image policy reasons, and a blocked prompt) is `filtered`: stored as `partial`, the
+  books unchanged, and reported to the caller as `finish_reason: content_filter`. Anything else (`MAX_TOKENS`,
+  a malformed call, a reason the API adds later) is `partial` and reported as `length`. The stream is read to its end because the last chunk holds the final usage; no `finishReason` is
   `stream_interrupted`, no `usageMetadata` is `usage_unknown`, an unusable one `invalid_usage`. A call is never billed
   as free.
-- an `error` frame is `upstream_incomplete`; HTTP 400/401/403/404/422 are definitive, 429 definitive and retryable,
-  anything else uncertain (the reservation stays pending), as for the other providers.
+- an `error` frame is `upstream_incomplete`. A non-2xx answer is read (the error's own `message`, first 16 KiB of a
+  client error only) and classified by `contracts::classify_failure`: a failure that belongs to the offering
+  (`credentials_rejected`, `model_unavailable`, `quota_exhausted`, `region_blocked`, `rate_limited`) is definitive and
+  retryable, so the router falls through to the next offering; a request the API refuses (other 4xx, including `400`
+  and `422`) is definitive and stops the call; server errors and anything unknown are uncertain (the reservation stays
+  pending). `thought_signature_rejected` is definitive and retryable: the offering that minted the signature may
+  accept it.
 
 ## `usageMetadata` → `Meters`
 
@@ -123,7 +131,10 @@ uses it names `"provider": "x"`.
   signatures (another model's turns). For that case Google documents placeholder values; using them is a policy
   choice for the application, not something the provider should do silently.
 - Not run against live Gemini. First step once a key exists: replay one recorded real stream into the conformance file.
-- Structured output (`response_format`): no provider writes the schema yet (router-wide, 422 after routing).
+- Structured output is written by this provider only. The router now asks each provider whether it carries
+  `response_format` (`ProviderCapabilities.structured_output`, default false) and refuses with `422
+  unsupported_capability`, before anything is reserved, when no candidate's provider does; OpenAI and Anthropic stay
+  false until their adapters write the schema. Not run against live Gemini.
 - Generation parameters beyond `maxOutputTokens` (temperature, thinking level or budget, safety settings), grounding
   tools, audio and video parts, explicit-cache creation: not in the contracts. Safety settings and thinking controls
   are the ones real traffic will ask for first; they are application policy, so they should arrive as optional
@@ -174,6 +185,40 @@ price in a data file) is the same split as here: the provider crate owns the dia
 application. Two places where it is looser: pricing sits in a shared file that every deployment reads, and usage is
 normalised into one OpenAI-shaped record that has to grow a field per provider quirk.
 
+## What the wider survey adopted
+
+Beyond Gemini, the whole design was compared with open-source gateways: Bifrost (Go), Portkey's gateway, the Vercel AI
+SDK, LiteLLM again, Envoy AI Gateway, and the `genai-prices` data. Read-only, for ideas and edge cases; nothing
+copied, and nothing from a commercial or AGPL directory.
+
+**Adopted**
+
+| Seen in | What | Where it landed |
+| --- | --- | --- |
+| Bifrost, LiteLLM, Portkey | A refusal belongs either to the request or to the offering. A rejected key, a retired model, an empty account, a blocked region and a rate limit say nothing about the request, so the next offering should be tried; a malformed body would fail everywhere | `contracts::classify_failure` (`FailureClass`): status plus the error's own message, one table for every HTTP provider, 49 shared cases from an independent oracle. Gemini uses it. A 4xx that was stopping the whole request now falls through |
+| LiteLLM, Bifrost | Cool an offering down after such a failure instead of paying a failed attempt per request; Envoy and LiteLLM probe a recovering backend with one request | `routing::HealthBook`: pure state machine with an injected clock, class-based cooldowns doubling to a ceiling, in-flight failures ignored, one half-open probe; `Router::with_health` skips cooling offerings (`cooling_down`) and fails open when all are cooling. Off by default. 15 shared incident cases |
+| Vercel AI SDK | Unified finish reasons: a content filter is not a length limit | `finish_reason: content_filter` via `completion: "filtered"`; Gemini maps its policy reasons to it |
+| genai-prices | Long-context prices are cliffs by prompt size | `RateTiers` (earlier commit) |
+| Portkey | Structured output needs the provider's own support, not a router-wide switch | `ProviderCapabilities.structured_output`; Gemini writes `responseJsonSchema` |
+
+**Deliberately not adopted**
+
+- **Server errors as certain failures** (LiteLLM cools on any non-4xx, Bifrost retries 5xx freely). Whether a failed
+  `500/502/503/504/529` is ever billed is not documented by the providers; treating it as certain would release a
+  reservation for work that may have been charged. They stay uncertain, so they neither fall through nor cool.
+- **A failure-rate trip** (Portkey, Bifrost: open the circuit after N failures in a window). It needs request
+  outcomes the router cannot classify as the offering's fault; the class-based cooldown covers the cases that are.
+- **`Retry-After` driven cooldowns.** `ProviderError` has no field for it. A rate limit cools for 5 s, doubling on
+  repeat, which is what a missing header gets in the other gateways too. Adding the field is a contract change.
+- **Per-attempt and first-token timeouts** (Portkey, Envoy). Also a contract field; today one timeout covers the
+  request.
+- **Weighted random load balancing and sticky sessions.** Offering choice is deterministic by score and id so that a
+  decision can be replayed and explained; the health book removes offerings, it does not randomise.
+- **A prompt-token rate limit enforced in the proxy** (Envoy). Window limits already count tokens.
+- **Provider-specific finish reasons in the contract** (the Vercel SDK keeps a `raw` value). The finish reason set
+  stays small: `stop`, `length`, `tool_calls`, `content_filter`. OpenAI and Anthropic still report their own refusals
+  as `length` until their adapters follow, because the TypeScript reference does.
+
 ## Order of work
 
 In this PR (separate commits): (1) Rust and Go Gemini providers with the shared conformance file, (2) `RateSchedule`
@@ -186,6 +231,9 @@ tool-use prompt tokens, blocked prompts, empty schemas, signatures).
 
 Also in this PR: (4) `RateTiers`, the folded-thoughts usage rule and `thought_signature_rejected`, from reading the
 other gateways (next section).
+
+Also in this PR: (5) the failure classifier, the health book, `content_filter` and structured output for Gemini, from
+reading the whole gateway design (previous section).
 
 Next, each small and separable: (5) path-prefix and auth options on the
 OpenAI and Anthropic providers (Azure, Vertex Anthropic), (6) decide whether the wire `Price` grows `reasoning`,

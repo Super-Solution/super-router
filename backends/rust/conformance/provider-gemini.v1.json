@@ -539,6 +539,192 @@
     }
    },
    {
+    "name": "structured output",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Weather?"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false,
+     "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+       "name": "weather",
+       "description": "A reading",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         },
+         "temp": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "city"
+        ],
+        "additionalProperties": false
+       },
+       "strict": true
+      }
+     }
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Weather?"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        },
+        "temp": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "city"
+       ],
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   {
+    "name": "structured output beside tools",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Weather?"
+       }
+      ],
+      "tools": [
+       {
+        "name": "lookup",
+        "description": "Find a thing",
+        "input_schema": {
+         "type": "object",
+         "properties": {
+          "q": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "q"
+         ]
+        }
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false,
+     "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+       "name": "weather",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         },
+         "temp": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "city"
+        ],
+        "additionalProperties": false
+       }
+      }
+     }
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Weather?"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        },
+        "temp": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "city"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "tools": [
+      {
+       "functionDeclarations": [
+        {
+         "name": "lookup",
+         "description": "Find a thing",
+         "parametersJsonSchema": {
+          "type": "object",
+          "properties": {
+           "q": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "q"
+          ]
+         }
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
     "name": "history with text and calls",
     "invocation": {
      "service": "chat",

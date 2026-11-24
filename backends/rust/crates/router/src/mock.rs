@@ -177,7 +177,7 @@ impl MockToolProvider {
 
 impl Provider for MockToolProvider {
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities { tools: true, images: true }
+        ProviderCapabilities { tools: true, images: true, ..ProviderCapabilities::default() }
     }
 
     fn invoke(&self, input: &Invocation, _offering: &Offering) -> ProviderStream {

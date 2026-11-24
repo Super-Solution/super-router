@@ -64,15 +64,15 @@ fn needs_follow_what_the_invocation_carries() {
         (r#"{"messages":[{"role":"user","content":"hi"}]}"#, Needs::default()),
         (
             r#"{"messages":[{"role":"user","content":"hi"}],"tools":[{"name":"a","input_schema":{"type":"object"}}]}"#,
-            Needs { tools: true, images: false },
+            Needs { tools: true, ..Needs::default() },
         ),
         (
             r#"{"messages":[{"role":"user","content":"hi"},{"role":"assistant","tool_calls":[{"id":"a","name":"a","arguments":"{}"}]},{"role":"tool","tool_call_id":"a","content":""}]}"#,
-            Needs { tools: true, images: false },
+            Needs { tools: true, ..Needs::default() },
         ),
         (
             r#"{"messages":[{"role":"user","content":[{"type":"image","url":"https://e.example/a.png"}]}]}"#,
-            Needs { tools: false, images: true },
+            Needs { images: true, ..Needs::default() },
         ),
         (r#"{"messages":[{"role":"user","content":[{"type":"text","text":"x"}]}]}"#, Needs::default()),
     ];

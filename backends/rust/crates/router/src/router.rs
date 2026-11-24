@@ -370,9 +370,6 @@ impl Router {
         if candidates.is_empty() {
             return Err(fail("no_eligible_offering", 422).into());
         }
-        if input.response_format.is_some() {
-            return Err(fail("unsupported_capability", 422).into());
-        }
         let mut providers = Vec::with_capacity(candidates.len());
         for c in &candidates {
             providers.push(self.providers.get(&c.offering.provider).ok_or_else(|| fail("provider_unavailable", 503))?.capabilities());

@@ -388,3 +388,59 @@ async fn an_answer_cut_short_says_why_in_its_finish_reason() {
         assert_eq!((last.kind.as_str(), last.data["finish_reason"].as_str()), ("request.failed", Some(finish)), "{completion}");
     }
 }
+
+/// Says whether it carries structured output, and records the schema names it was sent.
+struct Structured {
+    carries: bool,
+    seen: Mutex<Vec<String>>,
+}
+
+impl Provider for Structured {
+    fn capabilities(&self) -> super_router_contracts::ProviderCapabilities {
+        super_router_contracts::ProviderCapabilities { structured_output: self.carries, ..Default::default() }
+    }
+
+    fn invoke(&self, input: &Invocation, _offering: &Offering) -> ProviderStream {
+        if let Some(f) = &input.response_format {
+            self.seen.lock().unwrap().push(f.json_schema.name.clone());
+        }
+        Box::pin(stream::iter(healthy()))
+    }
+}
+
+#[tokio::test]
+async fn structured_output_reaches_only_a_provider_that_carries_it() {
+    for carries in [true, false] {
+        let data = load();
+        let mut raw = data["services"]["chat"].clone();
+        raw["offerings"][0]["capabilities"] = serde_json::json!(["structured_output"]);
+        let service = parse_service(&serde_json::to_vec(&raw).unwrap()).unwrap();
+        let principal = Principal {
+            workspace: format!("ws-structured-{carries}"),
+            environment: "test".into(),
+            customer: "c1".into(),
+            scopes: ["invoke", "service:write", "billing:write", "billing:read"].map(String::from).to_vec(),
+            ..Principal::default()
+        };
+        let store = Arc::new(MemoryStore::default());
+        store.publish(&principal, &service, "", None).await.unwrap();
+        store.grant(&principal, "customer_sale", "credit:demo", "100000", "g1", None).await.unwrap();
+        let provider = Arc::new(Structured { carries, seen: Mutex::new(vec![]) });
+        let providers: HashMap<String, Arc<dyn Provider>> = HashMap::from([("ok".to_string(), provider.clone() as Arc<dyn Provider>)]);
+        let router = Router::new(store.clone(), providers, DIGEST_KEY).unwrap();
+        let mut body = data["invocation"].clone();
+        body["response_format"] =
+            serde_json::json!({"type": "json_schema", "json_schema": {"name": "answer", "schema": {"type": "object"}}});
+        let outcome = router.infer(&principal, &serde_json::to_vec(&body).unwrap(), "k1", None, CancellationToken::new()).await;
+        if carries {
+            assert_eq!(outcome.unwrap().execution_status, "succeeded");
+            assert_eq!(*provider.seen.lock().unwrap(), vec!["answer".to_string()]);
+        } else {
+            let e = outcome.expect_err("refused");
+            assert!(e.to_string().contains("unsupported_capability"), "{e}");
+            assert!(provider.seen.lock().unwrap().is_empty());
+            let rows = store.balance(&principal).await.unwrap();
+            assert_eq!((rows[0].balance.as_str(), rows[0].held.as_str()), ("100000", "0"), "nothing is reserved");
+        }
+    }
+}

@@ -362,14 +362,18 @@ pub(crate) fn valid_tool_use(i: &Invocation) -> bool {
 pub struct Needs {
     pub tools: bool,
     pub images: bool,
+    /// The request carries a `response_format`: the answer must follow a JSON Schema.
+    pub structured_output: bool,
 }
 
-/// Whether a request declares tools or carries tool history, and whether it carries images.
+/// Whether a request declares tools or carries tool history, whether it carries images, and whether it asks for
+/// structured output.
 pub fn invocation_needs(i: &Invocation) -> Needs {
     let messages = &i.input.messages;
     Needs {
         tools: i.input.tools.is_some() || messages.iter().any(|m| m.role == "tool" || m.tool_calls.is_some()),
         images: messages.iter().flat_map(|m| m.parts.iter().flatten()).any(|p| matches!(p, ContentPart::Image { .. })),
+        structured_output: i.response_format.is_some(),
     }
 }
 
@@ -379,12 +383,15 @@ pub fn invocation_needs(i: &Invocation) -> Needs {
 pub struct ProviderCapabilities {
     pub tools: bool,
     pub images: bool,
+    /// The provider writes a request's `response_format` schema into its call. A provider that does not say so is
+    /// never sent one: the answer would silently ignore the schema.
+    pub structured_output: bool,
 }
 
 impl ProviderCapabilities {
     /// Whether these capabilities cover a request's needs.
     pub fn can(&self, n: Needs) -> bool {
-        (!n.tools || self.tools) && (!n.images || self.images)
+        (!n.tools || self.tools) && (!n.images || self.images) && (!n.structured_output || self.structured_output)
     }
 }
 

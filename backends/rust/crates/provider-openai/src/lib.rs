@@ -181,7 +181,7 @@ fn classify_status(status: u16) -> ProviderError {
 
 impl Provider for OpenAi {
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities { tools: true, images: true }
+        ProviderCapabilities { tools: true, images: true, ..ProviderCapabilities::default() }
     }
 
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream {

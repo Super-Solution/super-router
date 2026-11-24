@@ -46,6 +46,14 @@ backends/rust
   TypeScript reference does not know the key yet): it travels with the call and goes back unchanged on replay.
   `MockToolProvider` (`mock-tools` under `SUPERROUTER_MOCK=1`) scripts a tool call for demos.
   Inference bodies may be up to 4 MB (`MAX_INFERENCE_BODY_BYTES`), other routes 256 KB.
+- **A refusal says whose fault it was.** `classify_failure(status, message)` returns a `FailureClass`: a failure that
+  belongs to the offering (rejected key, retired model, empty account, blocked region, rate limit) is definitive and
+  retryable, so the router tries the next offering; a refused request stops the call; a server error stays uncertain
+  and keeps the hold (`conformance/failure.v1.json`). `routing::HealthBook` plus `Router::with_health` skip offerings
+  whose own failure is repeating, with class-based cooldowns and one half-open probe, and fail open when every
+  candidate is cooling; off by default (`conformance/health.v1.json`). `ProviderCapabilities::structured_output` says
+  whether a provider writes a `response_format` schema; a provider that ends an answer by content policy emits
+  completion `filtered` and the result's `finish_reason` is `content_filter`. All Rust and Go only.
 - **Time is milliseconds since the epoch** (`i64`) at every port, so no date library is needed in the core.
 - **Money is `BigInt` and decimal strings**, never floats. Scores are `f64` and match the reference bit for bit.
 - Internal failures (`StoreError::Internal`) never reach a customer; they surface as `internal_error` or, once funds

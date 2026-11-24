@@ -286,11 +286,14 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 type Needs struct {
 	Tools  bool
 	Images bool
+	// StructuredOutput: the request carries a response_format, so the answer must follow a JSON Schema.
+	StructuredOutput bool
 }
 
-// InvocationNeeds reports whether a request declares tools or carries tool history, and whether it carries images.
+// InvocationNeeds reports whether a request declares tools or carries tool history, whether it carries images, and
+// whether it asks for structured output.
 func InvocationNeeds(in Invocation) Needs {
-	n := Needs{Tools: in.Input.Tools != nil}
+	n := Needs{Tools: in.Input.Tools != nil, StructuredOutput: in.ResponseFormat != nil}
 	for _, m := range in.Input.Messages {
 		if m.Role == "tool" || m.ToolCalls != nil {
 			n.Tools = true
@@ -309,6 +312,9 @@ func InvocationNeeds(in Invocation) Needs {
 type ProviderCapabilities struct {
 	Tools  bool
 	Images bool
+	// StructuredOutput: the provider writes a request's response_format schema into its call. A provider that does
+	// not say so is never sent one: the answer would silently ignore the schema.
+	StructuredOutput bool
 }
 
 // CapableProvider is a Provider that declares its capabilities. A provider that does not implement it carries text
@@ -328,7 +334,7 @@ func CapabilitiesOf(p Provider) ProviderCapabilities {
 
 // Can reports whether capabilities cover a request's needs.
 func (c ProviderCapabilities) Can(n Needs) bool {
-	return (!n.Tools || c.Tools) && (!n.Images || c.Images)
+	return (!n.Tools || c.Tools) && (!n.Images || c.Images) && (!n.StructuredOutput || c.StructuredOutput)
 }
 
 var (

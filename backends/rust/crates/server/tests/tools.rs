@@ -269,7 +269,7 @@ struct Rogue;
 
 impl Provider for Rogue {
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities { tools: true, images: false }
+        ProviderCapabilities { tools: true, images: false, ..ProviderCapabilities::default() }
     }
 
     fn invoke(&self, _input: &Invocation, _offering: &Offering) -> ProviderStream {

@@ -20,18 +20,19 @@ const other = { name: "other", input_schema: { type: "object" } };
 const declared = { name: "lookup", description: "Find a thing", parametersJsonSchema: lookup.input_schema };
 const declaredOther = { name: "other" };
 
-const invocation = (input, maxOutput = 32) => ({
+const invocation = (input, maxOutput = 32, extra = {}) => ({
   service: "chat",
   customer_id: "c1",
   payer_mode: "developer",
   input,
   limits: { max_output_tokens: maxOutput, timeout_ms: 30000 },
   stream: false,
+  ...extra,
 });
 const user = (content) => ({ role: "user", content });
 
 const requests = [];
-const request = (name, input, body) => requests.push({ name, invocation: invocation(input), body });
+const request = (name, input, body, extra) => requests.push({ name, invocation: invocation(input, 32, extra), body });
 
 request("plain text", { messages: [{ role: "system", content: "Be brief" }, user("Find it")] }, {
   contents: [{ role: "user", parts: [{ text: "Find it" }] }],
@@ -72,6 +73,17 @@ request("tool choice by name", { messages: [user("Find it")], tools: [lookup, ot
   tools: [{ functionDeclarations: [declared, declaredOther] }],
   toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["other"] } },
 });
+const answer = { type: "object", properties: { city: { type: "string" }, temp: { type: "number" } }, required: ["city"], additionalProperties: false };
+request("structured output", { messages: [user("Weather?")] }, {
+  contents: [{ role: "user", parts: [{ text: "Weather?" }] }],
+  // The name and description have no place in the API; the schema is sent as JSON Schema.
+  generationConfig: { maxOutputTokens: 32, responseMimeType: "application/json", responseJsonSchema: answer },
+}, { response_format: { type: "json_schema", json_schema: { name: "weather", description: "A reading", schema: answer, strict: true } } });
+request("structured output beside tools", { messages: [user("Weather?")], tools: [lookup] }, {
+  contents: [{ role: "user", parts: [{ text: "Weather?" }] }],
+  generationConfig: { maxOutputTokens: 32, responseMimeType: "application/json", responseJsonSchema: answer },
+  tools: [{ functionDeclarations: [declared] }],
+}, { response_format: { type: "json_schema", json_schema: { name: "weather", schema: answer } } });
 request("history with text and calls", {
   messages: [
     { role: "system", content: "Be brief" },

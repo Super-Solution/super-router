@@ -5,6 +5,7 @@ package memory_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -206,6 +207,77 @@ func TestAnAnswerCutShortSaysWhyInItsFinishReason(t *testing.T) {
 		last := events[len(events)-1]
 		if last.Type != "request.failed" || last.Data["finish_reason"] != finish {
 			t.Errorf("%s: last event %s %v", completion, last.Type, last.Data)
+		}
+	}
+}
+
+// structured says whether it carries structured output, and records the schema names it was sent.
+type structured struct {
+	carries bool
+	seen    []string
+}
+
+func (s *structured) Capabilities() contracts.ProviderCapabilities {
+	return contracts.ProviderCapabilities{StructuredOutput: s.carries}
+}
+
+func (s *structured) Invoke(ctx context.Context, in contracts.Invocation, o contracts.Offering, emit func(contracts.ProviderEvent) error) error {
+	if f := in.ResponseFormat; f != nil {
+		s.seen = append(s.seen, f.JSONSchema.Name)
+	}
+	return (&scripted{}).Invoke(ctx, in, o, emit)
+}
+
+func TestStructuredOutputReachesOnlyAProviderThatCarriesIt(t *testing.T) {
+	body := `{"service":"chat","customer_id":"c1","payer_mode":"developer","input":{"messages":[{"role":"user","content":"Hello"}]},"limits":{"max_output_tokens":32,"timeout_ms":30000},` +
+		`"response_format":{"type":"json_schema","json_schema":{"name":"answer","schema":{"type":"object"}}}}`
+	for _, carries := range []bool{true, false} {
+		raw, err := os.ReadFile(filepath.Join("..", "..", "..", "rust", "conformance", "dataplane.v1.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var data struct {
+			Services map[string]map[string]any `json:"services"`
+		}
+		if err := json.Unmarshal(raw, &data); err != nil {
+			t.Fatal(err)
+		}
+		svc := data.Services["chat"]
+		svc["offerings"].([]any)[0].(map[string]any)["capabilities"] = []any{"structured_output"}
+		encoded, _ := json.Marshal(svc)
+		service, err := contracts.ParseService(encoded)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := memory.New(time.Now)
+		p := contracts.Principal{Workspace: "structured-" + uuid.New(), Environment: "test", Customer: "c1",
+			Scopes: []string{"invoke", "service:write", "billing:write", "billing:read"}}
+		ctx := context.Background()
+		if _, err := store.Publish(ctx, p, service, "self-host", nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Grant(ctx, p, "customer_sale", "credit:demo", "100000", "g1", nil); err != nil {
+			t.Fatal(err)
+		}
+		provider := &structured{carries: carries}
+		rt, err := router.New(store, map[string]contracts.Provider{"ok": provider}, "health-test-digest-key-0123456789abcdef")
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := rt.Infer(ctx, p, []byte(body), "k1", nil)
+		if carries {
+			if err != nil || res.ExecutionStatus != "succeeded" || len(provider.seen) != 1 || provider.seen[0] != "answer" {
+				t.Fatalf("carrying: %v %+v %v", err, res, provider.seen)
+			}
+			continue
+		}
+		var re *contracts.RouterError
+		if !errors.As(err, &re) || re.Code != "unsupported_capability" || len(provider.seen) != 0 {
+			t.Fatalf("not carrying: %v %v", err, provider.seen)
+		}
+		rows, err := store.Balance(ctx, p)
+		if err != nil || rows[0].Held != "0" || rows[0].Balance != "100000" {
+			t.Fatalf("nothing may be reserved: %v %+v", err, rows)
 		}
 	}
 }

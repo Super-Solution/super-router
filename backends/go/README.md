@@ -111,8 +111,16 @@ These match the Rust data plane and are pinned by its conformance copy:
   the dearest tier a prompt of up to `maxInput` tokens can reach (cases `rate_tiers_charge`, `rate_tiers_bound`).
 - **Structured output.** `response_format` (`json_schema` with a name, a schema object and optional description and
   `strict`) excludes offerings without the `structured_output` capability as `structured_output_unsupported`. No
-  provider adapter writes the schema yet, so a request that still has a candidate is refused with
-  `422 unsupported_capability` before anything is reserved.
+  provider whose `Capabilities()` says `StructuredOutput` receives it (the Gemini provider does and writes
+  `responseJsonSchema`); a request with no such candidate is refused with `422 unsupported_capability` before anything
+  is reserved.
+- **Failure classes and the health book.** `contracts.ClassifyFailure` reads an upstream refusal's status and message and
+  returns a `FailureClass`; a failure that belongs to the offering (credentials, model, quota, region, rate limit) is
+  definitive and retryable, so the router tries the next offering. `routing.HealthBook` (with `router.WithHealth`)
+  skips offerings whose own failure is repeating, with class-based cooldowns and one half-open probe, and fails open
+  when every candidate is cooling. Off by default. Cases: `failure.v1.json`, `health.v1.json`.
+- **Finish reasons.** A provider that ends an answer by content policy emits completion `filtered`: stored as partial,
+  reported as `finish_reason: content_filter`.
 - **Downgrade policy.** A tier service may name a lower tier and its offerings. They pass the same hard limits, are
   tried after every primary offering, emit `routing.downgrade` when tried, and the result reports `downgrade`
   (`from_tier`, `to_tier`) and the lower tier.

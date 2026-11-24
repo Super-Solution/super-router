@@ -274,7 +274,7 @@ async fn refusal(response: &mut reqwest::Response) -> ProviderError {
 
 impl Provider for Gemini {
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities { tools: true, images: true }
+        ProviderCapabilities { tools: true, images: true, structured_output: true }
     }
 
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream {
@@ -286,6 +286,9 @@ impl Provider for Gemini {
         let mut body = Map::new();
         tools::tool_fields(&mut body, &input.input);
         let max_output = input.limits.max_output_tokens;
+        // The schema goes in as JSON Schema; the API has no place for its name or description, and a schema is always
+        // enforced (the contract refuses `strict: false`).
+        let response_schema = input.response_format.as_ref().map(|f| Value::Object(f.json_schema.schema.clone()));
         let timeout = u64::try_from(input.limits.timeout_ms).ok().filter(|ms| *ms > 0).map(Duration::from_millis);
         let model = model_segment(&offering.upstream_model).map(str::to_string);
         Box::pin(try_stream! {
@@ -312,7 +315,12 @@ impl Provider for Gemini {
             if !system.is_empty() {
                 body.insert("systemInstruction".into(), json!({ "parts": [{ "text": system }] }));
             }
-            body.insert("generationConfig".into(), json!({ "maxOutputTokens": max_output }));
+            let mut config = json!({ "maxOutputTokens": max_output });
+            if let Some(schema) = response_schema {
+                config["responseMimeType"] = json!("application/json");
+                config["responseJsonSchema"] = schema;
+            }
+            body.insert("generationConfig".into(), config);
             let url = format!("{}{}/models/{model}:streamGenerateContent?alt=sse", this.base, this.prefix);
             let mut request = this.client.post(url).header(name, credential).json(&body);
             if let Some(timeout) = timeout {

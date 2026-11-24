@@ -39,7 +39,7 @@ var _ contracts.CapableProvider = (*Provider)(nil)
 
 // Capabilities implements contracts.CapableProvider: tool calling and image input (inline data only).
 func (p *Provider) Capabilities() contracts.ProviderCapabilities {
-	return contracts.ProviderCapabilities{Tools: true, Images: true}
+	return contracts.ProviderCapabilities{Tools: true, Images: true, StructuredOutput: true}
 }
 
 // Option configures New.
@@ -152,7 +152,14 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	if len(turns) == 0 {
 		return perr(true, false, "messages_required")
 	}
-	fields := map[string]any{"contents": turns, "generationConfig": map[string]any{"maxOutputTokens": in.Limits.MaxOutputTokens}}
+	config := map[string]any{"maxOutputTokens": in.Limits.MaxOutputTokens}
+	// The schema goes in as JSON Schema; the API has no place for its name or description, and a schema is always
+	// enforced (the contract refuses strict: false).
+	if f := in.ResponseFormat; f != nil {
+		config["responseMimeType"] = "application/json"
+		config["responseJsonSchema"] = f.JSONSchema.Schema
+	}
+	fields := map[string]any{"contents": turns, "generationConfig": config}
 	// Omitted rather than sent empty when there is no system message.
 	if joined := strings.Join(system, "\n"); joined != "" {
 		fields["systemInstruction"] = map[string]any{"parts": []any{map[string]any{"text": joined}}}

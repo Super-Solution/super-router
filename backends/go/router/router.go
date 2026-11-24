@@ -250,10 +250,6 @@ func (r *Router) Infer(ctx context.Context, p contracts.Principal, raw []byte, k
 	if len(candidates) == 0 {
 		return nil, fail("no_eligible_offering", 422)
 	}
-	// Routing already excludes offerings without the capability; no provider adapter writes the schema yet.
-	if in.ResponseFormat != nil {
-		return nil, fail("unsupported_capability", 422)
-	}
 	for _, c := range candidates {
 		if r.providers[c.Offering.Provider] == nil {
 			return nil, fail("provider_unavailable", 503)
