@@ -545,7 +545,8 @@ export function parseRetryAfter(value: string | null): number | undefined {
   const v = (value ?? "").replace(/^[ \t]+|[ \t]+$/g, "");
   const m = /^([0-9]+)(?:\.([0-9]+))?$/.exec(v);
   if (!m) return undefined;
-  const seconds = m[1].length > 9 ? RETRY_AFTER_MAX_MS / 1000 : Number(m[1]);
+  const whole = m[1] ?? "";
+  const seconds = whole.length > 9 ? RETRY_AFTER_MAX_MS / 1000 : Number(whole);
   const millis = Number((m[2] ?? "").slice(0, 3).padEnd(3, "0"));
   return Math.min(seconds * 1000 + millis, RETRY_AFTER_MAX_MS);
 }
