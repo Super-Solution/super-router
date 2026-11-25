@@ -163,6 +163,13 @@ export const Sampling = z
 export type Sampling = z.infer<typeof Sampling>;
 export const ReasoningEffort = z.enum(["low", "medium", "high"]);
 export type ReasoningEffort = z.infer<typeof ReasoningEffort>;
+/**
+ * Whether the router asks a provider to cache the prompt. A hint, not a need: `auto` is sent to providers that have an
+ * explicit switch (Anthropic) and changes nothing for providers that cache by themselves. Absent and `none` send nothing.
+ * Caching is billed through the existing `cache_write` and `cached` meters.
+ */
+export const Cache = z.object({ mode: z.enum(["auto", "none"]) }).strict();
+export type Cache = z.infer<typeof Cache>;
 /** Free-form labels for attribution: one to sixteen name/value pairs, never interpreted by the router. */
 export const Tags = z
   .record(
@@ -230,10 +237,11 @@ export const Invocation = z
           .optional(),
       })
       .strict(),
-    // No defaults on these three: a request without them keeps its exact canonical form and idempotency digest.
+    // No defaults on these four: a request without them keeps its exact canonical form and idempotency digest.
     sampling: Sampling.optional(),
     reasoning_effort: ReasoningEffort.optional(),
     tags: Tags.optional(),
+    cache: Cache.optional(),
     stream: z.boolean().default(false),
   })
   .strict()

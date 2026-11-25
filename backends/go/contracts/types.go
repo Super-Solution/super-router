@@ -312,6 +312,12 @@ type Sampling struct {
 	Seed        *int64   `json:"seed,omitempty"`
 }
 
+// Cache says whether the router asks a provider to cache the prompt: Mode is "auto" or "none". A hint, not a need: "auto"
+// is sent to providers that have an explicit switch (Anthropic) and changes nothing for providers that cache by themselves.
+type Cache struct {
+	Mode string `json:"mode"`
+}
+
 // Invocation is one request to run a service.
 type Invocation struct {
 	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
@@ -321,6 +327,7 @@ type Invocation struct {
 	Sampling        *Sampling         `json:"sampling,omitempty"`
 	ReasoningEffort *string           `json:"reasoning_effort,omitempty"`
 	Tags            map[string]string `json:"tags,omitempty"`
+	Cache           *Cache            `json:"cache,omitempty"`
 	Service         string            `json:"service"`
 	ServiceVersion  *int64            `json:"service_version,omitempty"`
 	CustomerID      string            `json:"customer_id"`

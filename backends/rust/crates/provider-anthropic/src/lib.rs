@@ -263,6 +263,11 @@ impl Provider for Anthropic {
                 fields.insert("stop_sequences".into(), json!(stop));
             }
         }
+        // Automatic prompt caching (5 minutes, written at 1.25 times the input price): only when asked for. Absent and `none`
+        // send nothing, so nothing is cached and no write is billed. The Anthropic API only: Amazon Bedrock refuses it.
+        if input.cache.as_ref().is_some_and(|c| c.mode == "auto") {
+            fields.insert("cache_control".into(), json!({"type": "ephemeral"}));
+        }
         let max_tokens = input.limits.max_output_tokens;
         let timeout = u64::try_from(input.limits.timeout_ms).ok().filter(|ms| *ms > 0).map(Duration::from_millis);
         let model = offering.upstream_model.clone();

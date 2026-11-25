@@ -262,6 +262,28 @@ async def test_anthropic_streams_text_and_merges_usage():
     ]
 
 
+@pytest.mark.parametrize(
+    ("cache", "sent"),
+    [
+        (None, False),
+        ({"mode": "none"}, False),
+        ({"mode": "auto"}, True),
+    ],
+)
+async def test_anthropic_automatic_caching_is_sent_only_when_asked_for(cache, sent):
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return stream(START, frame('{"type":"message_stop"}'))(request)
+
+    inv = invocation()
+    if cache is not None:
+        inv["cache"] = cache
+    await collect(anthropic(handler), inv)
+    assert seen["body"].get("cache_control") == ({"type": "ephemeral"} if sent else None)
+
+
 async def test_anthropic_max_tokens_is_partial():
     events = await collect(
         anthropic(

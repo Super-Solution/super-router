@@ -8728,6 +8728,78 @@
     }
    },
    {
+    "name": "automatic caching",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "cache": {
+      "mode": "auto"
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "input": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "max_output_tokens": 32,
+     "store": false,
+     "stream": true
+    }
+   },
+   {
+    "name": "caching none sends nothing",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "cache": {
+      "mode": "none"
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "input": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "max_output_tokens": 32,
+     "store": false,
+     "stream": true
+    }
+   },
+   {
     "name": "long output limit",
     "invocation": {
      "service": "chat",
@@ -10390,6 +10462,79 @@
      "stop_sequences": [
       "END",
       "\n\n"
+     ],
+     "stream": true
+    }
+   },
+   {
+    "name": "automatic caching",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "cache": {
+      "mode": "auto"
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "max_tokens": 32,
+     "messages": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "cache_control": {
+      "type": "ephemeral"
+     },
+     "stream": true
+    }
+   },
+   {
+    "name": "caching none sends nothing",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "cache": {
+      "mode": "none"
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "max_tokens": 32,
+     "messages": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
      ],
      "stream": true
     }

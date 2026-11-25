@@ -116,6 +116,11 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 			fields["stop_sequences"] = sm.Stop
 		}
 	}
+	// Automatic prompt caching (5 minutes, written at 1.25 times the input price): only when asked for. Absent and "none"
+	// send nothing, so nothing is cached and no write is billed. The Anthropic API only: Amazon Bedrock refuses it.
+	if in.Cache != nil && in.Cache.Mode == "auto" {
+		fields["cache_control"] = map[string]string{"type": "ephemeral"}
+	}
 	body, err := json.Marshal(fields)
 	if err != nil {
 		return perr(true, false, "request_invalid") // tool-call arguments that are not JSON, from a hand-built invocation

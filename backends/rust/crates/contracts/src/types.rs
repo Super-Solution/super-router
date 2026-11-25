@@ -428,6 +428,14 @@ pub struct Sampling {
     pub seed: Option<i64>,
 }
 
+/// Whether the router asks a provider to cache the prompt: `mode` is `auto` or `none`. A hint, not a need: `auto` is sent
+/// to providers that have an explicit switch (Anthropic) and changes nothing for providers that cache by themselves.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Cache {
+    pub mode: String,
+}
+
 /// One request to run a service.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -443,6 +451,9 @@ pub struct Invocation {
     /// Attribution labels: one to sixteen name/value pairs, never interpreted by the router.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<BTreeMap<String, String>>,
+    /// `None` when absent. Prompt caching is off unless this says `auto`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache: Option<Cache>,
     pub service: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_version: Option<i64>,

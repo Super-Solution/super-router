@@ -4523,6 +4523,102 @@
    }
   },
   {
+   "name": "cache auto",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "cache": {
+     "mode": "auto"
+    }
+   },
+   "expect": {
+    "ok": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "cache": {
+      "mode": "auto"
+     },
+     "stream": false
+    },
+    "canonical": "{\"cache\":{\"mode\":\"auto\"},\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
+   "name": "cache none",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "cache": {
+     "mode": "none"
+    }
+   },
+   "expect": {
+    "ok": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "cache": {
+      "mode": "none"
+     },
+     "stream": false
+    },
+    "canonical": "{\"cache\":{\"mode\":\"none\"},\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
    "name": "tags",
    "input": {
     "service": "chat",
@@ -7350,6 +7446,136 @@
     },
     "stream": false,
     "reasoning_effort": null
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "cache mode unknown",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "cache": {
+     "mode": "always"
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "cache mode missing",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "cache": {}
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "cache ttl is not a field",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "cache": {
+     "mode": "auto",
+     "ttl": "1h"
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "cache null",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "cache": null
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "cache is a string",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "cache": "auto"
    },
    "expect": {
     "error": "invalid_request"

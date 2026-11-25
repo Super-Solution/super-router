@@ -659,6 +659,22 @@
               "maxLength": 256
             }
           },
+          "cache": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "none"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ],
+            "additionalProperties": false
+          },
           "stream": {
             "default": false,
             "type": "boolean"

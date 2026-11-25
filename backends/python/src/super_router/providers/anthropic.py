@@ -61,6 +61,10 @@ class AnthropicProvider:
                 body[name] = sampling[name]
         if "stop" in sampling:
             body["stop_sequences"] = sampling["stop"]
+        # Automatic prompt caching (5 minutes, written at 1.25 times the input price): only when asked for. Absent and
+        # "none" send nothing, so nothing is cached and no write is billed. The Anthropic API only: Bedrock refuses it.
+        if invocation.get("cache", {}).get("mode") == "auto":
+            body["cache_control"] = {"type": "ephemeral"}
         headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
         current: dict[str, int | None] | None = None
         upstream_id: str | None = None

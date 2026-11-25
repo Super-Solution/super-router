@@ -434,6 +434,9 @@ func validInvocation(in *Invocation) bool {
 	if in.Sampling != nil && !validSampling(in.Sampling) || in.Tags != nil && !validTags(in.Tags) {
 		return false
 	}
+	if in.Cache != nil && in.Cache.Mode != "auto" && in.Cache.Mode != "none" {
+		return false
+	}
 	if e := in.ReasoningEffort; e != nil && *e != "low" && *e != "medium" && *e != "high" {
 		return false
 	}

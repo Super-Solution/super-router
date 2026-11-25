@@ -729,6 +729,12 @@ const requestInputs: Record<string, Json> = {
   "reasoning effort": inv({ messages: [user] }, (v) => {
     v.reasoning_effort = "medium";
   }),
+  "automatic caching": inv({ messages: [user] }, (v) => {
+    v.cache = { mode: "auto" };
+  }),
+  "caching none sends nothing": inv({ messages: [user] }, (v) => {
+    v.cache = { mode: "none" };
+  }),
   "long output limit": inv({ messages: [user] }, (v) => {
     v.limits.max_output_tokens = 128000;
   }),

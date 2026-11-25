@@ -198,6 +198,7 @@ fn valid_invocation(i: &Invocation) -> bool {
     if i.sampling.as_ref().is_some_and(|s| !valid_sampling(s))
         || i.reasoning_effort.as_deref().is_some_and(|e| !matches!(e, "low" | "medium" | "high"))
         || i.tags.as_ref().is_some_and(|t| !valid_tags(t))
+        || i.cache.as_ref().is_some_and(|c| !matches!(c.mode.as_str(), "auto" | "none"))
     {
         return false;
     }

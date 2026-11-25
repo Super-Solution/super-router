@@ -317,7 +317,7 @@ def _invocation(value: Any) -> Json:
     obj = _object(
         value,
         ("service", "customer_id", "input", "limits"),
-        ("service_version", "payer_mode", "stream", "response_format", "sampling", "reasoning_effort", "tags"),
+        ("service_version", "payer_mode", "stream", "response_format", "sampling", "reasoning_effort", "tags", "cache"),
     )
     inp = _object(obj["input"], (), ("messages", "task"))
     messages = []
@@ -366,6 +366,11 @@ def _invocation(value: Any) -> Json:
         out["reasoning_effort"] = obj["reasoning_effort"]
     if "tags" in obj:
         out["tags"] = _tags(obj["tags"])
+    if "cache" in obj:
+        cache = _object(obj["cache"], ("mode",), ())
+        if cache["mode"] not in ("auto", "none"):
+            raise _fail()
+        out["cache"] = {"mode": cache["mode"]}
     return out
 
 

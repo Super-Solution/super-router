@@ -71,6 +71,8 @@
 
 取樣、推理與標籤（四種語言的資料平面皆解析，`conformance/contracts.v1.json`）：請求頂層可帶 `sampling`（`temperature` 0 到 2、`top_p` 大於 0 且至多 1、`stop` 最多 4 個各 1 到 64 字元的字串、`seed` 安全整數；至少一項）、`reasoning_effort`（`low`、`medium`、`high`）與 `tags`（1 到 16 組名稱／值，名稱 `[A-Za-z0-9_.:-]{1,64}`，值 1 到 256 字元且不含控制字元）。省略這些欄位時 canonical JSON 與冪等摘要完全不變。每個控制項都是 provider 的一項 `capabilities`（`temperature`、`top_p`、`stop`、`seed`、`reasoning_effort`）：沒有任何可用 offering 能承載時回 422 `unsupported_capability`，且不預留款項，不會默默忽略。目前 OpenAI Responses 承載 `temperature`、`top_p`、`reasoning_effort`（沒有 `stop` 與 `seed`）；Anthropic Messages 承載 `temperature`、`top_p`、`stop`；Gemini（Rust、Go）承載 `temperature`、`top_p`、`stop`；`seed` 與 Anthropic／Gemini 的 `reasoning_effort` 尚無 provider 承載。以上都只用固定的測試資料（fixtures）驗證，未對真實上游驗證。`tags` 目前只會被驗證並納入冪等摘要，尚未寫入請求紀錄或用於限額；它們是給 Observer（尚未提供）與日後的歸因查詢用的。
 
+提示快取（`conformance/contracts.v1.json`、`conformance/tools.v1.json`）：請求可帶 `cache: {"mode": "auto" | "none"}`（不接受其他欄位，沒有 `ttl`）。這是提示，不是 capability：`auto` 只對有明確開關的 provider 生效，目前只有 Anthropic Messages，它會在上游請求頂層加 `cache_control: {"type": "ephemeral"}`（5 分鐘；依 Anthropic 官方文件，快取至最後一個可快取區塊，首次寫入為輸入價的 1.25 倍、讀取為 0.1 倍）；OpenAI 與 Gemini 本來就自動快取，不送任何東西。省略 `cache` 或 `none` 時完全不送，**預設為關閉**，因此沒有人會在不知情下付寫入費；這個預設值（開或關）是 owner 的決定，改它不需要改契約。計費沿用既有的 `cache_write` 與 `cached` meter（預留上限本來就取輸入、快取讀取、快取寫入三者的最高費率，所以預留夠用）。**不含** 1 小時快取（它需要第五個 meter，會動 `Meters`、`charge()` 與 `pricing.v1.json`，等 owner 決定）。自動快取在 Amazon Bedrock 上會被上游以 400 拒絕，所以只適用 Anthropic 自家 API。以上同樣只用固定的測試資料驗證，未對真實上游驗證。
+
 輸出與逾時上限：`limits.max_output_tokens`、offering 與 Service 的 `max_output_tokens` 上限為 131072（原為 8192，無法上架 128,000 token 輸出的模型）；`limits.timeout_ms` 上限為 600000（原為 120000，超過兩分鐘的推理串流會被切斷）。實際生效的仍是 Service 與 offering 自己設定的值，這只是契約的天花板。
 
 ### 3.2 成功回應

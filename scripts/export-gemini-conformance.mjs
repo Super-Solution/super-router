@@ -88,6 +88,10 @@ request("sampling", { messages: [user("Find it")] }, {
   contents: [{ role: "user", parts: [{ text: "Find it" }] }],
   generationConfig: { maxOutputTokens: 32, temperature: 0.3, topP: 0.8, stopSequences: ["END", "\n\n"] },
 }, { sampling: { temperature: 0.3, top_p: 0.8, stop: ["END", "\n\n"] } });
+request("cache is a hint Gemini does not need", { messages: [user("Find it")] }, {
+  contents: [{ role: "user", parts: [{ text: "Find it" }] }],
+  generationConfig: { maxOutputTokens: 32 },
+}, { cache: { mode: "auto" } });
 request("history with text and calls", {
   messages: [
     { role: "system", content: "Be brief" },

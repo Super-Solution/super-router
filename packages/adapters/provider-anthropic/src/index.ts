@@ -101,6 +101,16 @@ function sampling(input: Invocation) {
       : { stop_sequences: input.sampling.stop }),
   };
 }
+/**
+ * Automatic prompt caching: a top-level `cache_control` makes the API cache everything up to the last cacheable block
+ * (5 minutes, written at 1.25 times the input price, read at 0.1). Sent only for `cache.mode = "auto"`: absent and
+ * `none` send nothing, so nothing is cached and no write is billed. The Anthropic API only: Amazon Bedrock refuses it.
+ */
+function caching(input: Invocation) {
+  return input.cache?.mode === "auto"
+    ? { cache_control: { type: "ephemeral" } }
+    : {};
+}
 export class AnthropicProvider implements Provider {
   capabilities = {
     tools: true,
@@ -144,6 +154,7 @@ export class AnthropicProvider implements Provider {
           messages,
           ...toolFields(input.input),
           ...sampling(input),
+          ...caching(input),
           stream: true,
         }),
       });

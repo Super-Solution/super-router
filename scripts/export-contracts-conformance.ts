@@ -187,6 +187,8 @@ invocation("sampling temperature bounds", (i) => {
   i.sampling = { temperature: 0 };
 });
 invocation("reasoning effort", (i) => (i.reasoning_effort = "high"));
+invocation("cache auto", (i) => (i.cache = { mode: "auto" }));
+invocation("cache none", (i) => (i.cache = { mode: "none" }));
 invocation("tags", (i) => {
   i.tags = {
     team: "search",
@@ -324,6 +326,12 @@ const invocationMutations: Record<string, (s: Json) => unknown> = {
   "sampling null": (i: Json) => (i.sampling = null),
   "reasoning effort unknown": (i: Json) => (i.reasoning_effort = "max"),
   "reasoning effort null": (i: Json) => (i.reasoning_effort = null),
+  "cache mode unknown": (i: Json) => (i.cache = { mode: "always" }),
+  "cache mode missing": (i: Json) => (i.cache = {}),
+  "cache ttl is not a field": (i: Json) =>
+    (i.cache = { mode: "auto", ttl: "1h" }),
+  "cache null": (i: Json) => (i.cache = null),
+  "cache is a string": (i: Json) => (i.cache = "auto"),
   "tags empty": (i: Json) => (i.tags = {}),
   "tags seventeen": (i: Json) =>
     (i.tags = Object.fromEntries(

@@ -775,6 +775,45 @@
     }
    },
    {
+    "name": "cache is a hint Gemini does not need",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false,
+     "cache": {
+      "mode": "auto"
+     }
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     }
+    }
+   },
+   {
     "name": "history with text and calls",
     "invocation": {
      "service": "chat",
