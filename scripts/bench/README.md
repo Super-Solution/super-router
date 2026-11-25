@@ -41,7 +41,20 @@ Harness router, fake upstream with no delay, streaming, concurrency 1, 2000 requ
 The median falls by about 80 times. The tail of the second repetition is noise from the shared machine (the `direct` row
 moved the same way). Non-streaming responses, which are one write, do not change.
 
-The shipped `super-router-server` (`rust-cli`, mock provider, which writes its events together) shows the same effect
-only in the tail, because its events are not separate writes: before, with `TCP_NODELAY` off, streaming concurrency 1 had
+The shipped `super-router-server` against the fake upstream (`rust-cli-upstream`: the real OpenAI provider pointed at
+the fake host with `OPENAI_BASE_URL`), streaming, no upstream delay, 3 repetitions each, same machine at a load average of
+10 to 11 (so the absolute numbers are pessimistic). Before is the binary without `TCP_NODELAY`, after is the binary of
+this change; the two builds differ in that one line.
+
+| concurrency | build | p50 | p99 | requests/s |
+| --- | --- | --- | --- | --- |
+| 1 | before | 44.7 to 47.6 ms | 82 to 136 ms | 20 to 21 |
+| 1 | after | 0.43 to 0.53 ms | 13.8 to 15.9 ms | 760 to 812 |
+| 64 | before | 47.9 to 48.2 ms | 128 to 287 ms | 1226 to 1296 |
+| 64 | after | 13.4 to 22.1 ms | 89 to 180 ms | 1888 to 3674 |
+| (floor) 1 | direct to the fake upstream | 0.06 to 0.07 ms | 0.16 to 1.66 ms | 7398 to 14675 |
+
+The mock-provider benchmark of the same binary (`rust-cli`, whose mock provider writes its events together) shows the
+same effect only in the tail, because its events are not separate writes: before, with `TCP_NODELAY` off, streaming concurrency 1 had
 a p99 of about 43 ms (rps 803 and 941); after, 2 to 3 ms (rps 3603 and 3729). The p50 stayed at 0.18 to 0.21 ms.
 At concurrency 64 the two builds are inside each other's noise (8853 to 13407 requests/s before, 10700 to 11498 after).
