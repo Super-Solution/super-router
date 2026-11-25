@@ -157,3 +157,18 @@ async fn database_auth_refuses_a_well_formed_key_that_is_not_in_the_database() {
     assert_eq!(res.status(), 401);
     server.stop().await;
 }
+
+#[tokio::test]
+async fn accepted_connections_have_tcp_nodelay() {
+    use axum::serve::Listener as _;
+    let raw = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = raw.local_addr().unwrap();
+    // Without the wrapper the accepted socket keeps the operating system's default (Nagle on).
+    let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+    let (plain, _) = raw.accept().await.unwrap();
+    assert!(!plain.nodelay().unwrap(), "the default must be Nagle on, or this test proves nothing");
+    let mut listener = super_router_cli::nodelay(raw);
+    let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+    let (io, _) = listener.accept().await;
+    assert!(io.nodelay().unwrap(), "a streamed answer is many small writes; Nagle would delay all but the first by ~40 ms");
+}

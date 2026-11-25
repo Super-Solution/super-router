@@ -179,7 +179,7 @@ pub async fn run(cfg: Config, shutdown: CancellationToken, ready: Option<oneshot
         let _ = ready.send(local);
     }
     let stopping = shutdown.clone();
-    let serve = axum::serve(listener, app).with_graceful_shutdown(async move { stopping.cancelled().await });
+    let serve = axum::serve(nodelay(listener), app).with_graceful_shutdown(async move { stopping.cancelled().await });
     let mut serve = Box::pin(async move { serve.await.map_err(|e| e.to_string()) });
     tokio::select! {
         result = &mut serve => result,
@@ -191,6 +191,19 @@ pub async fn run(cfg: Config, shutdown: CancellationToken, ready: Option<oneshot
             }
         }
     }
+}
+
+/// Sets `TCP_NODELAY` on every accepted connection. A streamed answer is many small writes (one per event); with
+/// Nagle's algorithm on, the second write waits for the peer's delayed ACK, so the first events of a stream arrive
+/// roughly 40 ms late on a loopback or LAN connection. Measured: 44 ms against 0.46 ms at the median
+/// (`scripts/bench`).
+pub fn nodelay(listener: tokio::net::TcpListener) -> impl axum::serve::Listener<Io = tokio::net::TcpStream, Addr = SocketAddr> {
+    use axum::serve::ListenerExt;
+    listener.tap_io(|tcp| {
+        if let Err(e) = tcp.set_nodelay(true) {
+            tracing::debug!(error = %e, "could not set TCP_NODELAY");
+        }
+    })
 }
 
 /// Settles or releases requests whose deadline passed, for example after a crash mid-call.

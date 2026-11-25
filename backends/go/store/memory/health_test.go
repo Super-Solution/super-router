@@ -71,8 +71,11 @@ func twoOfferings(t *testing.T, first, second contracts.Provider, book *routing.
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A frozen clock moved only by `advance`: with the wall clock, real time passing between two requests moved the
+	// instant by a few milliseconds and the one-millisecond boundary below failed on a busy machine.
+	frozen := time.Now()
 	var offset atomic.Int64
-	clock := func() time.Time { return time.Now().Add(time.Duration(offset.Load())) }
+	clock := func() time.Time { return frozen.Add(time.Duration(offset.Load())) }
 	store := memory.New(clock)
 	p := contracts.Principal{Workspace: "health-" + uuid.New(), Environment: "test", Customer: "c1",
 		Scopes: []string{"invoke", "service:write", "billing:write", "billing:read"}}
