@@ -4,7 +4,7 @@ Wire types, strict parsing of untrusted JSON and canonical JSON for [Super Route
 
 ```toml
 [dependencies]
-super-router-contracts = "0.4"
+super-router-contracts = "0.5"
 ```
 
 Everything the other crates exchange: `Service`, `Offering`, `Invocation`, `Principal`, `Meters`, the `Provider`

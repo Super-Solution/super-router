@@ -4,7 +4,7 @@ Google Gemini `generateContent` provider for Super Router: the Gemini API and, w
 
 ```toml
 [dependencies]
-super-router-provider-gemini = "0.4"
+super-router-provider-gemini = "0.5"
 ```
 
 `Gemini` implements `super_router_contracts::Provider`: it streams text and tool calls, normalises `usageMetadata`

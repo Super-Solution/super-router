@@ -4,7 +4,7 @@ Anthropic Messages API provider for Super Router.
 
 ```toml
 [dependencies]
-super-router-provider-anthropic = "0.4"
+super-router-provider-anthropic = "0.5"
 ```
 
 `Anthropic` implements `super_router_contracts::Provider`: it streams text, normalises usage into router meters and

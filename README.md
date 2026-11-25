@@ -4,7 +4,7 @@
 
 AI routing, billing and serving infrastructure that you embed as a set of packages. Define a **Service** (an AI capability you sell), pick the models behind it, set prices, subscriptions and credits, and let SuperRouter route each request, meter the usage and settle the books.
 
-> **Status: development release (0.3.0).** The local core runs end to end: service versions, model routing, PostgreSQL reserve/settle accounting, HTTP + SSE, an SDK, a recovery worker, multi-tenant roles and keys, subscriptions and scoped credits. The OpenAI, Anthropic and Gemini adapters are tested against official-format fixtures and fake upstreams but have not been accepted against live upstreams, and the three hosted-payment adapters have not been run with real merchant accounts. There is no hosted Cloud and no production-readiness claim.
+> **Status: development release (0.5.0).** The local core runs end to end: service versions, model routing, PostgreSQL reserve/settle accounting, HTTP + SSE, an SDK, a recovery worker, multi-tenant roles and keys, subscriptions and scoped credits. The OpenAI, Anthropic and Gemini adapters are tested against official-format fixtures and fake upstreams but have not been accepted against live upstreams, and the three hosted-payment adapters have not been run with real merchant accounts. There is no hosted Cloud and no production-readiness claim.
 
 ## What it does
 

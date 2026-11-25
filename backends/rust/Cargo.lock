@@ -1805,7 +1805,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "super-router-cli"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -1829,7 +1829,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-contracts"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures-core",
  "serde",
@@ -1839,7 +1839,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-dataplane-test"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "axum",
  "futures-util",
@@ -1855,7 +1855,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-pricing"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "num-bigint",
  "num-integer",
@@ -1866,7 +1866,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-provider-anthropic"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-stream",
  "axum",
@@ -1883,7 +1883,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-provider-gemini"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-stream",
  "axum",
@@ -1900,7 +1900,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-provider-openai"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-stream",
  "axum",
@@ -1917,7 +1917,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-router"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -1938,7 +1938,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-routing"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -1950,7 +1950,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-server"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -1975,7 +1975,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-sse"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-stream",
  "futures-util",
@@ -1984,7 +1984,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-store-memory"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2004,7 +2004,7 @@ dependencies = [
 
 [[package]]
 name = "super-router-store-postgres"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "futures-util",

@@ -4,7 +4,7 @@ In-memory DataStore for Super Router: tests, demos and single-process self-hosti
 
 ```toml
 [dependencies]
-super-router-store-memory = "0.4"
+super-router-store-memory = "0.5"
 ```
 
 `MemoryStore` follows the PostgreSQL store's semantics exactly: idempotent admission, bucketed holds, a provider cost
