@@ -200,6 +200,7 @@ impl Provider for OpenAi {
             temperature: true,
             top_p: true,
             reasoning_effort: true,
+            structured_output: true,
             ..ProviderCapabilities::default()
         }
     }
@@ -218,6 +219,17 @@ impl Provider for OpenAi {
         }
         if let Some(effort) = &input.reasoning_effort {
             body.insert("reasoning".into(), json!({ "effort": effort }));
+        }
+        if let Some(format) = &input.response_format {
+            // Always `strict`: the router promises the schema is enforced. Strict mode only takes schemas that list every
+            // property and close `additionalProperties`; the API refuses others with a 400 (a refused request). A model
+            // refusal or an output cut by `max_output_tokens` need not match the schema, so the caller validates it.
+            let schema = &format.json_schema;
+            let mut spec = json!({"type": "json_schema", "name": schema.name, "schema": schema.schema, "strict": true});
+            if let Some(description) = &schema.description {
+                spec["description"] = json!(description);
+            }
+            body.insert("text".into(), json!({ "format": spec }));
         }
         let max_output = input.limits.max_output_tokens;
         let timeout = u64::try_from(input.limits.timeout_ms).ok().filter(|ms| *ms > 0).map(Duration::from_millis);

@@ -729,6 +729,36 @@ const requestInputs: Record<string, Json> = {
   "reasoning effort": inv({ messages: [user] }, (v) => {
     v.reasoning_effort = "medium";
   }),
+  "structured output": inv({ messages: [user] }, (v) => {
+    v.response_format = {
+      type: "json_schema",
+      json_schema: {
+        name: "weather",
+        description: "A reading",
+        schema: {
+          type: "object",
+          properties: { city: { type: "string" }, temp: { type: "number" } },
+          required: ["city", "temp"],
+          additionalProperties: false,
+        },
+        strict: true,
+      },
+    };
+  }),
+  "structured output without description": inv({ messages: [user] }, (v) => {
+    v.response_format = {
+      type: "json_schema",
+      json_schema: {
+        name: "flag",
+        schema: {
+          type: "object",
+          properties: { ok: { type: "boolean" } },
+          required: ["ok"],
+          additionalProperties: false,
+        },
+      },
+    };
+  }),
   "automatic caching": inv({ messages: [user] }, (v) => {
     v.cache = { mode: "auto" };
   }),

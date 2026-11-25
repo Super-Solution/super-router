@@ -31,7 +31,7 @@ var _ contracts.CapableProvider = (*Provider)(nil)
 // Capabilities implements contracts.CapableProvider: tool calling and image input.
 func (p *Provider) Capabilities() contracts.ProviderCapabilities {
 	// The Responses API has no stop sequences and no seed: a request that asks for them is refused before reserving.
-	return contracts.ProviderCapabilities{Tools: true, Images: true, Temperature: true, TopP: true, ReasoningEffort: true}
+	return contracts.ProviderCapabilities{Tools: true, Images: true, Temperature: true, TopP: true, ReasoningEffort: true, StructuredOutput: true}
 }
 
 // Option configures New.
@@ -111,6 +111,16 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	}
 	if in.ReasoningEffort != nil {
 		fields["reasoning"] = map[string]any{"effort": *in.ReasoningEffort}
+	}
+	if rf := in.ResponseFormat; rf != nil {
+		// Always strict: the router promises the schema is enforced. Strict mode only takes schemas that list every
+		// property and close additionalProperties; the API refuses others with a 400 (a refused request). A model refusal
+		// or an output cut by max_output_tokens need not match the schema, so the caller validates it.
+		format := map[string]any{"type": "json_schema", "name": rf.JSONSchema.Name, "schema": rf.JSONSchema.Schema, "strict": true}
+		if rf.JSONSchema.Description != nil {
+			format["description"] = *rf.JSONSchema.Description
+		}
+		fields["text"] = map[string]any{"format": format}
 	}
 	body, _ := json.Marshal(fields)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.base+"/v1/responses", bytes.NewReader(body))

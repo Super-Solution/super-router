@@ -54,7 +54,7 @@ backends/rust
   whose own failure is repeating, with class-based cooldowns and one half-open probe, and fail open when every
   candidate is cooling; off by default (`conformance/health.v1.json`, Rust and Go only). `ProviderCapabilities::structured_output` says
   whether a provider writes a `response_format` schema; a provider that ends an answer by content policy emits
-  completion `filtered` and the result's `finish_reason` is `content_filter`. The health book and structured output are Rust and Go only.
+  completion `filtered` and the result's `finish_reason` is `content_filter`. The health book is Rust and Go only.
 - **Time is milliseconds since the epoch** (`i64`) at every port, so no date library is needed in the core.
 - **Money is `BigInt` and decimal strings**, never floats. Scores are `f64` and match the reference bit for bit.
 - Internal failures (`StoreError::Internal`) never reach a customer; they surface as `internal_error` or, once funds

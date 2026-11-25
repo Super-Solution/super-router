@@ -61,7 +61,7 @@
 
 `service` 必填 ID；`service_version` 省略時解析 active version 並固定。`customer_id` 在 Service 有 customer_sale 時必填，且只允許可信伺服器代理或綁定該 customer 的 key。`max_charge` 限制 customer_sale；不改寫平台價目、供應預算或 routing policy。App 可降低限制，不可提升 Service 上限。
 
-`input.messages` 至少一則，允許 system／user／assistant 的文字；structured output 另由 schema capability 定義，不接受任意 Provider 原生參數；只有宣告支援 `structured_output` 的供應商轉接器會收到 `response_format`，其餘回 422 `unsupported_capability`。限制超出支援範圍回 422。
+`input.messages` 至少一則，允許 system／user／assistant 的文字；structured output 另由 schema capability 定義，不接受任意 Provider 原生參數；只有宣告支援 `structured_output` 的供應商轉接器會收到 `response_format`，其餘回 422 `unsupported_capability`。限制超出支援範圍回 422。結構化輸出（`conformance/contracts.v1.json`、`conformance/tools.v1.json`）：OpenAI Responses 與 Anthropic Messages 現在都宣告 `structured_output`（Gemini 在 Rust、Go 本來就有）。OpenAI 轉成 `text.format`（`type: json_schema`、`name`、`schema`、`description`，且一律 `strict: true`，因為路由器承諾 schema 一定被強制）；Anthropic 轉成 `output_config.format`（`type: json_schema`、`schema`；官方 API 沒有名稱、描述與 strict 的位置，所以只送 schema）。寫法依兩家官方文件確認，但只用固定的測試資料驗證，未對真實上游驗證。OpenAI 的 strict 模式要求每個物件列出全部屬性並關閉 `additionalProperties`，不符的 schema 會被上游以 400 拒絕，對呼叫者就是 `upstream_http_400`（請求本身被拒，不重試）。模型拒答（Anthropic 的 `stop_reason: refusal`）或輸出被 `max_output_tokens` 截斷時，內容不保證符合 schema，仍會照實計費；呼叫者要自己驗證回傳文字。
 
 工具呼叫（TypeScript 參考實作、Go 與 Rust 資料平面）：`input.tools`（最多 64 個，`name`、`description`、`input_schema`）與 `input.tool_choice`（`auto`、`none`、`required` 或 `{ "name": ... }`）。assistant 訊息可帶 `tool_calls`（`id`、`name`、`arguments` 為 JSON 物件字串），結果以 `{ "role": "tool", "tool_call_id": ..., "content": ..., "is_error": ... }` 回傳；每個結果必須對應先前的呼叫，每個呼叫都必須有結果。user 訊息的 `content` 也可以是 `text` 與 `image`（`https:` 或 base64 的 png、jpeg、gif、webp）組成的陣列。音訊與檔案尚不支援。
 

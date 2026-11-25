@@ -27,7 +27,7 @@ storage). Payments and the control plane (members, keys, plans, subscriptions) e
 | Stores | memory, PostgreSQL | memory, PostgreSQL | memory, PostgreSQL | memory, PostgreSQL |
 | Providers | OpenAI Responses, Anthropic Messages | OpenAI, Anthropic, Gemini | OpenAI, Anthropic | OpenAI, Anthropic, Gemini |
 | Tool calling and image input | yes | yes | not yet (refused before reserving) | yes |
-| Structured output (`response_format`) | not yet | yes (Gemini) | not yet | yes (Gemini) |
+| Structured output (`response_format`) | yes (OpenAI, Anthropic) | yes (all three) | yes (OpenAI, Anthropic) | yes (all three) |
 | `RateCard`, `RateSchedule`, `RateTiers` | not yet | yes | not yet | yes |
 | Failure classification (`FailureClass`) of a provider's refusal | yes (OpenAI, Anthropic) | yes (all three) | yes (OpenAI, Anthropic) | yes (all three) |
 | `Retry-After` read from a refusal | yes | yes | yes | yes |

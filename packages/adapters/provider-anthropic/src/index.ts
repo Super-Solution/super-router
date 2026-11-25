@@ -111,10 +111,22 @@ function caching(input: Invocation) {
     ? { cache_control: { type: "ephemeral" } }
     : {};
 }
+/**
+ * Structured output in the Messages API: `output_config.format` with the schema. The API has no place for the format's
+ * name, description or strict flag (a schema is always enforced), so only the schema is sent. A refusal
+ * (`stop_reason: "refusal"`) or an output cut by `max_tokens` need not match the schema: the caller validates the text.
+ */
+function structured(input: Invocation) {
+  const f = input.response_format?.json_schema;
+  return f
+    ? { output_config: { format: { type: "json_schema", schema: f.schema } } }
+    : {};
+}
 export class AnthropicProvider implements Provider {
   capabilities = {
     tools: true,
     images: true,
+    structured_output: true,
     temperature: true,
     top_p: true,
     stop: true,
@@ -155,6 +167,7 @@ export class AnthropicProvider implements Provider {
           ...toolFields(input.input),
           ...sampling(input),
           ...caching(input),
+          ...structured(input),
           stream: true,
         }),
       });

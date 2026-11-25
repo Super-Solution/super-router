@@ -241,7 +241,15 @@ struct Body<'a> {
 impl Provider for Anthropic {
     fn capabilities(&self) -> ProviderCapabilities {
         // The Messages API call here has no seed and no reasoning effort: a request that asks for them is refused before reserving.
-        ProviderCapabilities { tools: true, images: true, temperature: true, top_p: true, stop: true, ..ProviderCapabilities::default() }
+        ProviderCapabilities {
+            tools: true,
+            images: true,
+            temperature: true,
+            top_p: true,
+            stop: true,
+            structured_output: true,
+            ..ProviderCapabilities::default()
+        }
     }
 
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream {
@@ -262,6 +270,11 @@ impl Provider for Anthropic {
             if let Some(stop) = &s.stop {
                 fields.insert("stop_sequences".into(), json!(stop));
             }
+        }
+        if let Some(format) = &input.response_format {
+            // The Messages API has no place for the format's name, description or strict flag (a schema is always
+            // enforced): only the schema is sent. A refusal or an output cut by `max_tokens` need not match it.
+            fields.insert("output_config".into(), json!({"format": {"type": "json_schema", "schema": format.json_schema.schema}}));
         }
         // Automatic prompt caching (5 minutes, written at 1.25 times the input price): only when asked for. Absent and `none`
         // send nothing, so nothing is cached and no write is billed. The Anthropic API only: Amazon Bedrock refuses it.

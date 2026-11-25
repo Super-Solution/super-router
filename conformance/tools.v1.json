@@ -8728,6 +8728,157 @@
     }
    },
    {
+    "name": "structured output",
+    "invocation": {
+     "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+       "name": "weather",
+       "description": "A reading",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         },
+         "temp": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "city",
+         "temp"
+        ],
+        "additionalProperties": false
+       },
+       "strict": true
+      }
+     },
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "input": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "text": {
+      "format": {
+       "type": "json_schema",
+       "name": "weather",
+       "description": "A reading",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         },
+         "temp": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "city",
+         "temp"
+        ],
+        "additionalProperties": false
+       },
+       "strict": true
+      }
+     },
+     "max_output_tokens": 32,
+     "store": false,
+     "stream": true
+    }
+   },
+   {
+    "name": "structured output without description",
+    "invocation": {
+     "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+       "name": "flag",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ok": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "ok"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "input": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "text": {
+      "format": {
+       "type": "json_schema",
+       "name": "flag",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ok": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "ok"
+        ],
+        "additionalProperties": false
+       },
+       "strict": true
+      }
+     },
+     "max_output_tokens": 32,
+     "store": false,
+     "stream": true
+    }
+   },
+   {
     "name": "automatic caching",
     "invocation": {
      "service": "chat",
@@ -10463,6 +10614,150 @@
       "END",
       "\n\n"
      ],
+     "stream": true
+    }
+   },
+   {
+    "name": "structured output",
+    "invocation": {
+     "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+       "name": "weather",
+       "description": "A reading",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         },
+         "temp": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "city",
+         "temp"
+        ],
+        "additionalProperties": false
+       },
+       "strict": true
+      }
+     },
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "max_tokens": 32,
+     "messages": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "output_config": {
+      "format": {
+       "type": "json_schema",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         },
+         "temp": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "city",
+         "temp"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "stream": true
+    }
+   },
+   {
+    "name": "structured output without description",
+    "invocation": {
+     "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+       "name": "flag",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ok": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "ok"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "max_tokens": 32,
+     "messages": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "output_config": {
+      "format": {
+       "type": "json_schema",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ok": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "ok"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
      "stream": true
     }
    },

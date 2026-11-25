@@ -43,8 +43,8 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
   in cloud mode against the TypeScript-managed tables (`SUPERROUTER_AUTH=database`), which is the cheaper path.
 - Providers are tested against fake upstreams only, not the live OpenAI, Anthropic and Gemini APIs.
 - **Language lag** (2026-11-26; table in `backends/README.md`, files in `conformance/README.md`). The TypeScript
-  reference lacks what Rust and Go grew (rate cards, the health book, Gemini, structured output,
-  custom units); Python additionally lacks tool calling and images. Python is allowed to lag Go and Rust; the lag is
+  reference lacks what Rust and Go grew (rate cards, the health book, Gemini, custom units);
+  Python additionally lacks tool calling, images and rate cards. Python is allowed to lag Go and Rust; the lag is
   documented, not hidden. Entries below this list mark what each later change closed.
 - **Prompt caching** (2026-11-26): `cache: {mode: "auto"}` makes the Anthropic adapter send a top-level `cache_control`
   (5 minutes). Off unless asked for; whether it should be the default is the owner's call, because the first write costs

@@ -31,7 +31,7 @@ var _ contracts.CapableProvider = (*Provider)(nil)
 // Capabilities implements contracts.CapableProvider: tool calling and image input.
 func (p *Provider) Capabilities() contracts.ProviderCapabilities {
 	// The Messages API call here has no seed and no reasoning effort: a request that asks for them is refused before reserving.
-	return contracts.ProviderCapabilities{Tools: true, Images: true, Temperature: true, TopP: true, Stop: true}
+	return contracts.ProviderCapabilities{Tools: true, Images: true, Temperature: true, TopP: true, Stop: true, StructuredOutput: true}
 }
 
 // Option configures New.
@@ -115,6 +115,11 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 		if sm.Stop != nil {
 			fields["stop_sequences"] = sm.Stop
 		}
+	}
+	if rf := in.ResponseFormat; rf != nil {
+		// The Messages API has no place for the format's name, description or strict flag (a schema is always enforced):
+		// only the schema is sent. A refusal or an output cut by max_tokens need not match it.
+		fields["output_config"] = map[string]any{"format": map[string]any{"type": "json_schema", "schema": rf.JSONSchema.Schema}}
 	}
 	// Automatic prompt caching (5 minutes, written at 1.25 times the input price): only when asked for. Absent and "none"
 	// send nothing, so nothing is cached and no write is billed. The Anthropic API only: Amazon Bedrock refuses it.

@@ -112,9 +112,9 @@ These match the Rust data plane and are pinned by its conformance copy:
   pricing: the whole call is priced by the card of the tier its prompt reaches (`CardFor`, `Charge`), and `Bound` holds
   the dearest tier a prompt of up to `maxInput` tokens can reach (cases `rate_tiers_charge`, `rate_tiers_bound`).
 - **Structured output.** `response_format` (`json_schema` with a name, a schema object and optional description and
-  `strict`) excludes offerings without the `structured_output` capability as `structured_output_unsupported`. No
-  provider whose `Capabilities()` says `StructuredOutput` receives it (the Gemini provider does and writes
-  `responseJsonSchema`); a request with no such candidate is refused with `422 unsupported_capability` before anything
+  `strict`) excludes offerings without the `structured_output` capability as `structured_output_unsupported`. Only
+  a provider whose `Capabilities()` says `StructuredOutput` receives it (OpenAI writes `text.format`, Anthropic
+  `output_config.format`, Gemini `responseJsonSchema`); a request with no such candidate is refused with `422 unsupported_capability` before anything
   is reserved.
 - **Failure classes and the health book.** `contracts.ClassifyFailure` reads an upstream refusal's status and message and
   returns a `FailureClass`; a failure that belongs to the offering (credentials, model, quota, region, rate limit) is

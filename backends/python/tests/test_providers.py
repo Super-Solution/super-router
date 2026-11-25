@@ -284,6 +284,44 @@ async def test_anthropic_automatic_caching_is_sent_only_when_asked_for(cache, se
     assert seen["body"].get("cache_control") == ({"type": "ephemeral"} if sent else None)
 
 
+RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "flag",
+        "description": "A flag",
+        "schema": {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+        "strict": True,
+    },
+}
+
+
+async def test_structured_output_is_declared_and_written_the_way_each_api_takes_it():
+    assert "structured_output" in OpenAIProvider.capabilities
+    assert "structured_output" in AnthropicProvider.capabilities
+    schema = RESPONSE_FORMAT["json_schema"]["schema"]
+    seen = {}
+
+    def capture(name):
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen[name] = json.loads(request.content)
+            return stream(START, frame('{"type":"message_stop"}'))(request)
+
+        return handler
+
+    inv = invocation()
+    inv["response_format"] = RESPONSE_FORMAT
+    await collect(anthropic(capture("anthropic")), inv)
+    assert seen["anthropic"]["output_config"] == {"format": {"type": "json_schema", "schema": schema}}
+    with pytest.raises(ProviderError):  # the canned reply is not an OpenAI stream; the request is what matters
+        await collect(openai(capture("openai")), inv)
+    assert seen["openai"]["text"] == {
+        "format": {"type": "json_schema", "name": "flag", "description": "A flag", "schema": schema, "strict": True}
+    }
+    plain = invocation()
+    await collect(anthropic(capture("plain")), plain)
+    assert "output_config" not in seen["plain"]
+
+
 async def test_anthropic_max_tokens_is_partial():
     events = await collect(
         anthropic(

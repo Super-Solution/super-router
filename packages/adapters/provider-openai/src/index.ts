@@ -97,10 +97,32 @@ function sampling(input: Invocation) {
       : { reasoning: { effort: input.reasoning_effort } }),
   };
 }
+/**
+ * Structured output in the Responses API: `text.format` with the schema, always `strict` because the router promises the
+ * schema is enforced. Strict mode only takes schemas where every object lists all its properties and closes
+ * `additionalProperties`: the API refuses others with a 400, which reads as a refused request. A model refusal or an
+ * output cut by `max_output_tokens` need not match the schema, so the caller validates the text it gets.
+ */
+function structured(input: Invocation) {
+  const f = input.response_format?.json_schema;
+  if (!f) return {};
+  return {
+    text: {
+      format: {
+        type: "json_schema",
+        name: f.name,
+        ...(f.description === undefined ? {} : { description: f.description }),
+        schema: f.schema,
+        strict: true,
+      },
+    },
+  };
+}
 export class OpenAIProvider implements Provider {
   capabilities = {
     tools: true,
     images: true,
+    structured_output: true,
     temperature: true,
     top_p: true,
     reasoning_effort: true,
@@ -129,6 +151,7 @@ export class OpenAIProvider implements Provider {
           input: toOpenAIInput(input.input.messages),
           ...toolFields(input.input),
           ...sampling(input),
+          ...structured(input),
           max_output_tokens: input.limits.max_output_tokens,
           store: false,
           stream: true,
