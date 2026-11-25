@@ -19,6 +19,7 @@ import (
 	"github.com/Super-Solution/super-router/backends/go/contracts"
 	"github.com/Super-Solution/super-router/backends/go/internal/uuid"
 	"github.com/Super-Solution/super-router/backends/go/router"
+	"github.com/Super-Solution/super-router/backends/go/routing"
 )
 
 // DigestKey keys the idempotency digest in every scenario.
@@ -161,7 +162,17 @@ func runScenario(t *testing.T, data, scenario obj, h *Harness) {
 		mocks[name] = router.NewMockProvider(str(b))
 		providers[name] = mocks[name]
 	}
-	rt, err := router.New(h.Store, providers, DigestKey, router.WithClock(h.Clock))
+	options := []router.Option{router.WithClock(h.Clock)}
+	if own, ok := scenario["health"].(obj); ok {
+		// A scenario that names a health book runs with one (Rust and Go only: the reference has none). Every field
+		// is optional and overrides the default policy, so a scenario can use a cooldown short enough for a real clock.
+		policy := routing.DefaultHealthPolicy()
+		if ms, ok := own["rate_limited_ms"].(float64); ok {
+			policy.RateLimitedMs = int64(ms)
+		}
+		options = append(options, router.WithHealth(routing.NewHealthBook(policy)))
+	}
+	rt, err := router.New(h.Store, providers, DigestKey, options...)
 	if err != nil {
 		t.Fatal(err)
 	}

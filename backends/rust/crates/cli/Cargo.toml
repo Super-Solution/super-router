@@ -18,6 +18,7 @@ path = "src/main.rs"
 [dependencies]
 super-router-contracts.workspace = true
 super-router-router.workspace = true
+super-router-routing.workspace = true
 super-router-server.workspace = true
 super-router-store-memory.workspace = true
 super-router-store-postgres.workspace = true

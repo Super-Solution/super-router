@@ -10,11 +10,14 @@
 //! | `ADDR` | listen address, default `127.0.0.1:3410` |
 //! | `SUPERROUTER_WORKSPACE`, `SUPERROUTER_ENVIRONMENT`, `SUPERROUTER_CUSTOMER` | tenant of the owner key, default `default`, `prod`, `default` |
 //! | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` | enable the `openai`, `anthropic` and `gemini` providers (`offering.provider` names them) |
+//! | `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, `GEMINI_BASE_URL` | where that provider's requests go: the scheme, host and any path prefix, without the trailing `/v1` (or `/v1beta`) the provider adds itself, so `https://llm.internal/openai` becomes `https://llm.internal/openai/v1/responses`. Reaches Azure OpenAI in its v1 form, a gateway or any compatible host. Default: the vendor's own host |
+//! | `SUPERROUTER_HEALTH` | `on` keeps an offering out of routing while its own failure repeats (rejected key, empty account, retired model, blocked region, rate limit) and probes it again with one request when its cooldown ends; every candidate cooling fails open. `off` or unset: nothing is skipped |
+//! | `SUPERROUTER_HEALTH_RATE_LIMITED_MS`, `_QUOTA_EXHAUSTED_MS`, `_CREDENTIALS_REJECTED_MS`, `_MODEL_UNAVAILABLE_MS`, `_REGION_BLOCKED_MS`, `_MAX_MS`, `_PROBE_LEASE_MS` | the cooldown of each class, the ceiling it doubles up to and the probe lease, in milliseconds (1 to 86400000). Defaults: 5000, 300000, 300000, 600000, 600000, 1800000, 30000. Only valid with `SUPERROUTER_HEALTH=on` |
 //! | `SUPERROUTER_MOCK` | `1` enables the deterministic `mock` provider and the scripted `mock-tools` one |
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use super_router_contracts::{Principal, Provider};
@@ -22,6 +25,7 @@ use super_router_provider_anthropic::Anthropic;
 use super_router_provider_gemini::Gemini;
 use super_router_provider_openai::OpenAi;
 use super_router_router::{Authenticator, DataStore, MockProvider, MockToolProvider, Router};
+use super_router_routing::{HealthBook, HealthPolicy};
 use super_router_server::{handler, Key, Options, StaticKeys};
 use super_router_store_memory::MemoryStore;
 use super_router_store_postgres::{KeyRevalidator, Keys, Options as PgOptions, PostgresStore};
@@ -77,7 +81,76 @@ pub struct Config {
     pub openai_key: Option<String>,
     pub anthropic_key: Option<String>,
     pub gemini_key: Option<String>,
+    /// Where each provider's requests go, without the version segment the provider adds; `None` is the vendor's host.
+    pub openai_base_url: Option<String>,
+    pub anthropic_base_url: Option<String>,
+    pub gemini_base_url: Option<String>,
+    /// `Some` when `SUPERROUTER_HEALTH=on`: the cooldowns offerings are kept out for.
+    pub health: Option<HealthPolicy>,
     pub mock: bool,
+}
+
+/// The longest a configured cooldown can be: one day.
+const MAX_HEALTH_MS: i64 = 86_400_000;
+
+/// A provider base URL: `http` or `https`, a host, an optional path prefix and nothing else. The version segment is the
+/// provider's own (`/v1/responses`), so a value that already ends in one is refused instead of producing `/v1/v1/...`.
+/// The value is never echoed: a URL can carry credentials.
+fn valid_base_url(name: &str, value: &str) -> Result<String, String> {
+    let bad =
+        |why: &str| format!("{name} {why} (the scheme, host and any path prefix, without the trailing /v1 or /v1beta; value not logged)");
+    let rest = value
+        .strip_prefix("https://")
+        .or_else(|| value.strip_prefix("http://"))
+        .ok_or_else(|| bad("must start with http:// or https://"))?;
+    if rest.bytes().any(|b| b.is_ascii_control() || b == b' ' || b == b'?' || b == b'#') {
+        return Err(bad("must have no spaces, query or fragment"));
+    }
+    let (authority, path) = rest.split_once('/').map_or((rest, ""), |(a, p)| (a, p));
+    if authority.is_empty() || authority.contains('@') {
+        return Err(bad("must name a host and carry no credentials"));
+    }
+    let path = path.trim_end_matches('/');
+    if path.rsplit('/').next().is_some_and(|last| last == "v1" || last == "v1beta") {
+        return Err(bad("must not end in the version segment, the provider adds it"));
+    }
+    Ok(value.trim_end_matches('/').to_string())
+}
+
+/// `SUPERROUTER_HEALTH` and the policy variables. Policy variables without `on` are an error, not a silent no-op.
+fn health_policy(get: &dyn Fn(&str) -> Option<String>) -> Result<Option<HealthPolicy>, String> {
+    type Field = fn(&mut HealthPolicy) -> &mut i64;
+    let fields: [(&str, Field); 7] = [
+        ("SUPERROUTER_HEALTH_RATE_LIMITED_MS", |p| &mut p.rate_limited_ms),
+        ("SUPERROUTER_HEALTH_QUOTA_EXHAUSTED_MS", |p| &mut p.quota_exhausted_ms),
+        ("SUPERROUTER_HEALTH_CREDENTIALS_REJECTED_MS", |p| &mut p.credentials_rejected_ms),
+        ("SUPERROUTER_HEALTH_MODEL_UNAVAILABLE_MS", |p| &mut p.model_unavailable_ms),
+        ("SUPERROUTER_HEALTH_REGION_BLOCKED_MS", |p| &mut p.region_blocked_ms),
+        ("SUPERROUTER_HEALTH_MAX_MS", |p| &mut p.max_ms),
+        ("SUPERROUTER_HEALTH_PROBE_LEASE_MS", |p| &mut p.probe_lease_ms),
+    ];
+    let on = match get("SUPERROUTER_HEALTH").as_deref() {
+        None | Some("off") => false,
+        Some("on") => true,
+        Some(_) => return Err("SUPERROUTER_HEALTH must be \"on\" or \"off\"".into()),
+    };
+    let mut policy = HealthPolicy::default();
+    let mut set_any = false;
+    for (name, field) in fields {
+        if let Some(raw) = get(name) {
+            set_any = true;
+            let ms: i64 = raw
+                .parse()
+                .ok()
+                .filter(|ms| (1..=MAX_HEALTH_MS).contains(ms))
+                .ok_or_else(|| format!("{name} must be a whole number of milliseconds from 1 to {MAX_HEALTH_MS}"))?;
+            *field(&mut policy) = ms;
+        }
+    }
+    if set_any && !on {
+        return Err("SUPERROUTER_HEALTH_*_MS needs SUPERROUTER_HEALTH=on".into());
+    }
+    Ok(on.then_some(policy))
 }
 
 impl Config {
@@ -110,6 +183,10 @@ impl Config {
             openai_key: get("OPENAI_API_KEY"),
             anthropic_key: get("ANTHROPIC_API_KEY"),
             gemini_key: get("GEMINI_API_KEY"),
+            openai_base_url: get("OPENAI_BASE_URL").map(|v| valid_base_url("OPENAI_BASE_URL", &v)).transpose()?,
+            anthropic_base_url: get("ANTHROPIC_BASE_URL").map(|v| valid_base_url("ANTHROPIC_BASE_URL", &v)).transpose()?,
+            gemini_base_url: get("GEMINI_BASE_URL").map(|v| valid_base_url("GEMINI_BASE_URL", &v)).transpose()?,
+            health: health_policy(&get)?,
             mock: get("SUPERROUTER_MOCK").as_deref() == Some("1"),
         })
     }
@@ -138,14 +215,25 @@ pub async fn run(cfg: Config, shutdown: CancellationToken, ready: Option<oneshot
     };
     let mut providers: HashMap<String, Arc<dyn Provider>> = HashMap::new();
     if let Some(key) = &cfg.openai_key {
-        providers.insert("openai".into(), Arc::new(OpenAi::builder(key.clone()).build().map_err(|e| format!("openai provider: {e}"))?));
+        let mut builder = OpenAi::builder(key.clone());
+        if let Some(base) = &cfg.openai_base_url {
+            builder = builder.base_url(base.clone());
+        }
+        providers.insert("openai".into(), Arc::new(builder.build().map_err(|e| format!("openai provider: {e}"))?));
     }
     if let Some(key) = &cfg.anthropic_key {
-        providers
-            .insert("anthropic".into(), Arc::new(Anthropic::builder(key.clone()).build().map_err(|e| format!("anthropic provider: {e}"))?));
+        let mut builder = Anthropic::builder(key.clone());
+        if let Some(base) = &cfg.anthropic_base_url {
+            builder = builder.base_url(base.clone());
+        }
+        providers.insert("anthropic".into(), Arc::new(builder.build().map_err(|e| format!("anthropic provider: {e}"))?));
     }
     if let Some(key) = &cfg.gemini_key {
-        providers.insert("gemini".into(), Arc::new(Gemini::builder(key.clone()).build().map_err(|e| format!("gemini provider: {e}"))?));
+        let mut builder = Gemini::builder(key.clone());
+        if let Some(base) = &cfg.gemini_base_url {
+            builder = builder.base_url(base.clone());
+        }
+        providers.insert("gemini".into(), Arc::new(builder.build().map_err(|e| format!("gemini provider: {e}"))?));
     }
     if cfg.mock {
         providers.insert("mock".into(), Arc::new(MockProvider::new("success")));
@@ -155,7 +243,11 @@ pub async fn run(cfg: Config, shutdown: CancellationToken, ready: Option<oneshot
         tracing::warn!("no provider is configured: set OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or SUPERROUTER_MOCK=1");
     }
     let provider_count = providers.len();
-    let router = Arc::new(Router::new(store.clone(), providers, &cfg.digest_key).map_err(str::to_string)?);
+    let mut router = Router::new(store.clone(), providers, &cfg.digest_key).map_err(str::to_string)?;
+    if let Some(policy) = &cfg.health {
+        router = router.with_health(Arc::new(Mutex::new(HealthBook::new(policy.clone()))));
+    }
+    let router = Arc::new(router);
     let auth = auth.unwrap_or_else(|| {
         let owner = Principal {
             workspace: cfg.workspace.clone(),
@@ -174,7 +266,7 @@ pub async fn run(cfg: Config, shutdown: CancellationToken, ready: Option<oneshot
     let listener = tokio::net::TcpListener::bind(&cfg.addr).await.map_err(|e| format!("listen on {}: {e}", cfg.addr))?;
     let local = listener.local_addr().map_err(|e| e.to_string())?;
     tokio::spawn(recover_loop(store, shutdown.clone()));
-    tracing::info!(addr = %local, store = if cfg.database_url.is_some() { "postgres" } else { "memory" }, providers = provider_count, "listening");
+    tracing::info!(addr = %local, store = if cfg.database_url.is_some() { "postgres" } else { "memory" }, providers = provider_count, health = cfg.health.is_some(), "listening");
     if let Some(ready) = ready {
         let _ = ready.send(local);
     }

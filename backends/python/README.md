@@ -35,6 +35,8 @@ super-router-server                       # or: python -m super_router
 
 The environment variables are the same as the Go binary's (`ADDR`, `SUPERROUTER_WORKSPACE`,
 `SUPERROUTER_ENVIRONMENT`, `SUPERROUTER_CUSTOMER`; the module docstring of `super_router.__main__` lists them all).
+`OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` point a provider at another host (no trailing `/v1`). The health book
+(`SUPERROUTER_HEALTH=on` in the Go and Rust servers) does not exist here yet, so the server refuses `on` instead of ignoring it.
 
 ## Embed it
 

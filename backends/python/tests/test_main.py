@@ -92,3 +92,31 @@ async def test_database_auth_rejects_unknown_keys():
         assert res.status_code == 401 and res.json()["error"]["code"] == "invalid_key"
     stop.set()
     await asyncio.wait_for(task, 10)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("OPENAI_BASE_URL", "ftp://host"),
+        ("OPENAI_BASE_URL", "llm.internal"),
+        ("OPENAI_BASE_URL", "https://user:secret-pass@llm.internal"),
+        ("OPENAI_BASE_URL", "https://llm.internal/v1"),
+        ("OPENAI_BASE_URL", "https://llm.internal/openai/v1/"),
+        ("ANTHROPIC_BASE_URL", "https://llm.internal/?key=secret-pass"),
+        ("ANTHROPIC_BASE_URL", "https://"),
+        ("SUPERROUTER_HEALTH", "yes"),
+        ("SUPERROUTER_HEALTH", "on"),  # no health book in this server: refused, never a silent no-op
+    ],
+)
+async def test_refuses_bad_provider_options_without_echoing_them(name, value):
+    env = {"SUPERROUTER_API_KEY": API_KEY, "SUPERROUTER_DIGEST_KEY": "d" * 32, "ADDR": "127.0.0.1:0", name: value}
+    with pytest.raises(ConfigError) as raised:
+        await serve(env.get)
+    assert "secret-pass" not in str(raised.value)
+
+
+def test_a_base_url_keeps_its_path_prefix_and_loses_its_trailing_slash():
+    from super_router.__main__ import _base_url
+
+    assert _base_url("OPENAI_BASE_URL", "https://llm.internal/openai/") == "https://llm.internal/openai"
+    assert _base_url("OPENAI_BASE_URL", "http://127.0.0.1:9000") == "http://127.0.0.1:9000"

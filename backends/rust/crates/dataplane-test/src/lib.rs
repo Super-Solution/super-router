@@ -15,6 +15,7 @@ use std::sync::Arc;
 use serde_json::{json, Map, Value};
 use super_router_contracts::{parse_service, Meters, Principal, Provider, Service};
 use super_router_router::{Clock, DataStore, Decision, Leg, MockProvider, Router};
+use super_router_routing::{HealthBook, HealthPolicy};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -149,7 +150,16 @@ async fn run_scenario(data: &Value, scenario: &Value, h: &Harness) -> Vec<String
         providers.insert(name.clone(), mock.clone());
         mocks.insert(name.clone(), mock);
     }
-    let router = Router::new(h.store.clone(), providers, DIGEST_KEY).expect("router").with_clock(h.clock.clone());
+    let mut router = Router::new(h.store.clone(), providers, DIGEST_KEY).expect("router").with_clock(h.clock.clone());
+    if let Some(own) = scenario.get("health").filter(|v| v.is_object()) {
+        // A scenario that names a health book runs with one (Rust and Go only: the reference has none). Every field is
+        // optional and overrides the default policy, so a scenario can use a cooldown short enough for a real clock.
+        let mut policy = HealthPolicy::default();
+        if let Some(ms) = own["rate_limited_ms"].as_i64() {
+            policy.rate_limited_ms = ms;
+        }
+        router = router.with_health(Arc::new(std::sync::Mutex::new(HealthBook::new(policy))));
+    }
     let workspace = format!("ws-{}", Uuid::new_v4());
     let mut principals: HashMap<String, Principal> = HashMap::new();
     for (name, raw) in data["principals"].as_object().expect("principals") {
