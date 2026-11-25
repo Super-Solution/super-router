@@ -31,3 +31,14 @@ TypeScript reference does not have yet (custom billing units, structured output,
 `rate_card_charge` and `rate_card_bound` are written by `node scripts/export-rate-card-conformance.mjs`, which states the rate card rule once in
 plain BigInt arithmetic as an oracle independent of both backends.
 Rust and Go test against that copy; `tools.v1.json` is the same in both places.
+
+## Known lag (read this before trusting a green run)
+
+The files above are what the TypeScript reference and Python run. Four more files live only in
+`backends/rust/conformance` and are run by Rust and Go alone, so TypeScript and Python do not implement what they pin:
+`failure.v1.json` (`classify_failure`), `retry_after.v1.json` (`Retry-After` parsing), `health.v1.json` (the
+`HealthBook` state machine) and `provider-gemini.v1.json` (the Gemini request and stream mapping, plus the usage
+normalisation). The `contracts`, `dataplane`, `pricing` and `routing` files there also carry extra cases for features
+the reference does not have yet. Python additionally has no tool calling, images, structured output or rate cards (it
+refuses them before reserving). `backends/README.md` has the per-language table. Closing this lag is tracked in
+`docs/engineering/improvement-log.md`.

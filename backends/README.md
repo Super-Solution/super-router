@@ -14,3 +14,28 @@ the Rust copy for pricing, contracts, routing and the data plane so it is held t
 
 Go and Python are real servers for the data plane (routing, metering, reserve and settle, provider adapters, swappable
 storage). Payments and the control plane (members, keys, plans, subscriptions) exist only in TypeScript for now.
+
+## What each language has (checked against the code at the commit that last edited this table)
+
+`yes` is code plus tests in this repository; none of it has been run against a live upstream (fixtures and fake upstreams only).
+"Not yet" is a known gap, not a decision: the TypeScript reference is meant to lead, and the lag is listed in
+[`../docs/engineering/improvement-log.md`](../docs/engineering/improvement-log.md) and the conformance README.
+
+| Capability | TypeScript (reference) | Go | Python | Rust |
+| --- | --- | --- | --- | --- |
+| Contracts, `charge`, `bound`, routing, reserve / settle, replay | yes | yes | yes | yes |
+| Stores | memory, PostgreSQL | memory, PostgreSQL | memory, PostgreSQL | memory, PostgreSQL |
+| Providers | OpenAI Responses, Anthropic Messages | OpenAI, Anthropic, Gemini | OpenAI, Anthropic | OpenAI, Anthropic, Gemini |
+| Tool calling and image input | yes | yes | not yet (refused before reserving) | yes |
+| Structured output (`response_format`) | not yet | yes (Gemini) | not yet | yes (Gemini) |
+| `RateCard`, `RateSchedule`, `RateTiers` | not yet | yes | not yet | yes |
+| Failure classification (`FailureClass`) | not yet | yes (Gemini) | not yet | yes (Gemini) |
+| `Retry-After` read into the health book | not yet | yes | not yet | yes |
+| `HealthBook` (offering cooldowns, off by default) | not yet | library; not wired into the binary | not yet | library; not wired into the binary |
+| Custom billing units, downgrade policy, label evidence, quality metadata | not yet | yes | not yet | yes |
+| Usage windows | yes | yes | yes | yes |
+| Control plane (members, keys, plans, subscriptions), payments, recovery worker | yes | not yet | not yet | not yet (database-backed keys are read, not created) |
+| Shipped binary | `apps/server` (demo) | `super-router-server` | `super-router-server` | `super-router-server` (`super-router-cli`, not published) |
+| Published | 13 npm packages | not published | not published | 11 crates on crates.io |
+
+Python is deliberately allowed to lag Go and Rust; the lag is documented here, not hidden.

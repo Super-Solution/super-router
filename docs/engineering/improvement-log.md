@@ -38,7 +38,11 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
 
 - Payments, subscriptions and the control plane (members, keys, plans) exist only in TypeScript. Go and Python can run
   in cloud mode against the TypeScript-managed tables (`SUPERROUTER_AUTH=database`), which is the cheaper path.
-- Providers are tested against fake upstreams only, not the live OpenAI and Anthropic APIs.
+- Providers are tested against fake upstreams only, not the live OpenAI, Anthropic and Gemini APIs.
+- **Language lag** (2026-11-26; table in `backends/README.md`, files in `conformance/README.md`). The TypeScript
+  reference lacks what Rust and Go grew (rate cards, failure classification, the health book, Gemini, structured output,
+  custom units); Python additionally lacks tool calling and images. Python is allowed to lag Go and Rust; the lag is
+  documented, not hidden. Entries below this list mark what each later change closed.
 - No benchmarks for the Go and Python stores yet; the memory stores scan per tenant.
 - Python JSON number text differs from Go and TypeScript for integral floats (`1.0` vs `1`) in the dry-run `score`;
   values are equal.
