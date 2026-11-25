@@ -20,7 +20,8 @@ use reqwest::{redirect, Client, ClientBuilder};
 use serde::{Deserialize, Deserializer};
 use serde_json::{json, Value};
 use super_router_contracts::{
-    parse_retry_after, Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream,
+    refusal as contracts_refusal, Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent,
+    ProviderStream, REFUSAL_BODY_LIMIT,
 };
 
 pub use tools::input;
@@ -172,24 +173,35 @@ fn parse_event(data: &str) -> Result<Event, ProviderError> {
     serde_json::from_value(value).map_err(|_| invalid())
 }
 
-fn classify_status(status: u16, retry_after: Option<u64>) -> ProviderError {
-    let code = format!("upstream_http_{status}");
-    match status {
-        400 | 401 | 403 | 404 | 422 => perr(true, false, &code),
-        429 => perr(true, true, &code),
-        _ => perr(false, false, &code),
+/// The refusal an HTTP error status means: its class (from the status and the error's own message, read from the first
+/// 16 KiB of a client error's body) and the wait its `Retry-After` header asked for.
+async fn refusal(response: reqwest::Response) -> ProviderError {
+    let status = response.status().as_u16();
+    let retry_after = response.headers().get(reqwest::header::RETRY_AFTER).and_then(|v| v.to_str().ok()).map(str::to_string);
+    let mut body = Vec::new();
+    if (400..500).contains(&status) {
+        let mut chunks = response.bytes_stream();
+        while body.len() < REFUSAL_BODY_LIMIT {
+            match chunks.next().await {
+                Some(Ok(chunk)) => body.extend_from_slice(&chunk),
+                _ => break,
+            }
+        }
     }
-    .with_retry_after(retry_after)
-}
-
-/// The wait the provider asked for in its `Retry-After` header, in milliseconds.
-fn retry_after_of(response: &reqwest::Response) -> Option<u64> {
-    response.headers().get(reqwest::header::RETRY_AFTER).and_then(|v| v.to_str().ok()).and_then(parse_retry_after)
+    contracts_refusal(status, retry_after.as_deref(), &body)
 }
 
 impl Provider for OpenAi {
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities { tools: true, images: true, ..ProviderCapabilities::default() }
+        // The Responses API has no stop sequences and no seed: a request that asks for them is refused before reserving.
+        ProviderCapabilities {
+            tools: true,
+            images: true,
+            temperature: true,
+            top_p: true,
+            reasoning_effort: true,
+            ..ProviderCapabilities::default()
+        }
     }
 
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream {
@@ -198,6 +210,15 @@ impl Provider for OpenAi {
         let mut body = serde_json::Map::new();
         body.insert("input".into(), Value::Array(tools::input(&input.input.messages)));
         tools::tool_fields(&mut body, &input.input);
+        if let Some(t) = input.sampling.as_ref().and_then(|s| s.temperature) {
+            body.insert("temperature".into(), json!(t));
+        }
+        if let Some(p) = input.sampling.as_ref().and_then(|s| s.top_p) {
+            body.insert("top_p".into(), json!(p));
+        }
+        if let Some(effort) = &input.reasoning_effort {
+            body.insert("reasoning".into(), json!({ "effort": effort }));
+        }
         let max_output = input.limits.max_output_tokens;
         let timeout = u64::try_from(input.limits.timeout_ms).ok().filter(|ms| *ms > 0).map(Duration::from_millis);
         let model = offering.upstream_model.clone();
@@ -222,9 +243,12 @@ impl Provider for OpenAi {
             }
             let response = request.send().await.map_err(|_| perr(false, false, "transport_unknown"))?;
             let status = response.status().as_u16();
-            if !(200..=299).contains(&status) {
-                Err(classify_status(status, retry_after_of(&response)))?;
-            }
+            let response = if (200..=299).contains(&status) {
+                response
+            } else {
+                Err::<(), _>(refusal(response).await)?;
+                unreachable!("a refusal always ends the stream")
+            };
             let mut frames = Box::pin(super_router_sse::frames(response.bytes_stream()));
             let mut terminal = false;
             // Upstream numbers every output item; tool calls are numbered from zero among themselves.

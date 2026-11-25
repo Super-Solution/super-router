@@ -29,13 +29,38 @@ storage). Payments and the control plane (members, keys, plans, subscriptions) e
 | Tool calling and image input | yes | yes | not yet (refused before reserving) | yes |
 | Structured output (`response_format`) | not yet | yes (Gemini) | not yet | yes (Gemini) |
 | `RateCard`, `RateSchedule`, `RateTiers` | not yet | yes | not yet | yes |
-| Failure classification (`FailureClass`) | not yet | yes (Gemini) | not yet | yes (Gemini) |
-| `Retry-After` read into the health book | not yet | yes | not yet | yes |
-| `HealthBook` (offering cooldowns, off by default) | not yet | library; not wired into the binary | not yet | library; not wired into the binary |
+| Failure classification (`FailureClass`) of a provider's refusal | yes (OpenAI, Anthropic) | yes (all three) | yes (OpenAI, Anthropic) | yes (all three) |
+| `Retry-After` read from a refusal | yes | yes | yes | yes |
+| `HealthBook` (offering cooldowns, off by default) | not yet | yes; `SUPERROUTER_HEALTH=on` in the binary | not yet (the binary refuses `on`) | yes; `SUPERROUTER_HEALTH=on` in the binary |
+| Provider base URL in the binary (`OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, `GEMINI_BASE_URL`) | not applicable (demo server) | yes | yes (OpenAI, Anthropic) | yes |
 | Custom billing units, downgrade policy, label evidence, quality metadata | not yet | yes | not yet | yes |
 | Usage windows | yes | yes | yes | yes |
 | Control plane (members, keys, plans, subscriptions), payments, recovery worker | yes | not yet | not yet | not yet (database-backed keys are read, not created) |
 | Shipped binary | `apps/server` (demo) | `super-router-server` | `super-router-server` | `super-router-server` (`super-router-cli`, not published) |
 | Published | 13 npm packages | not published | not published | 11 crates on crates.io |
+
+### The shipped binaries: provider hosts, the health book and key pools
+
+`OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` and `GEMINI_BASE_URL` (Python: the first two) say where a provider's requests go:
+the scheme, host and any path prefix, **without** the trailing `/v1` (or `/v1beta`), which the provider adds itself. A value
+that ends in one is refused at startup (the official OpenAI SDKs' `OPENAI_BASE_URL` includes `/v1`; ours does not), and a
+value is never echoed in an error because a URL can carry credentials. The OpenAI provider speaks the Responses API, so a
+host must implement `/v1/responses`; a Chat Completions-only host (vLLM, most gateways) needs the Chat provider, which does
+not exist yet.
+
+`SUPERROUTER_HEALTH=on` (Go and Rust) gives the router a `HealthBook`: an offering whose own failure repeats (rejected key,
+empty account, retired model, blocked region, rate limit) is skipped until its cooldown ends, then one request probes it.
+Without it every request pays one failed attempt on the bad offering before falling through. The cooldowns are the book's
+defaults; `SUPERROUTER_HEALTH_*_MS` changes them (see the binary's header comment). The Python binary refuses `on` instead of
+ignoring it.
+
+A key is a property of an offering, so a pool of keys for one model is several offerings, each naming a provider that holds
+one key. The binaries register one provider per vendor, so today a pool spreads over **different vendors or hosts**
+(offering `a` on `openai`, offering `b` on `anthropic`); the end-to-end test in each binary
+(`a_rejected_key_is_skipped_only_when_the_health_book_is_on`, `TestARejectedKeyIsSkippedOnlyWhenTheHealthBookIsOn`) shows
+a rejected key costing one attempt and then nothing. Two keys on the *same* vendor need the library (one provider instance
+per key) until the binaries can register more than one provider per vendor. The Rust and Go copies of the data-plane
+scenarios include one that runs with a health book (`health` in the scenario) and shows only the failing offering being
+skipped, then probed after its cooldown.
 
 Python is deliberately allowed to lag Go and Rust; the lag is documented here, not hidden.

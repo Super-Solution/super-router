@@ -141,8 +141,58 @@ export const InputMessage = z.union([
     .strict(),
 ]);
 export type InputMessage = z.infer<typeof InputMessage>;
+/** The largest output a single model call may be asked for: wide enough for today's long-output models (128,000). */
+export const MAX_OUTPUT_TOKENS = 131072;
+/** The longest a request may run, in milliseconds: long enough for a slow reasoning stream. */
+export const MAX_TIMEOUT_MS = 600000;
+const noControlCharacters = (text: string): boolean =>
+  !/[\u0000-\u001f\u007f]/.test(text);
+/**
+ * Sampling controls. Every field is optional and a provider that cannot carry one refuses the request before anything
+ * is reserved (`unsupported_capability`) rather than ignoring it.
+ */
+export const Sampling = z
+  .object({
+    temperature: z.number().min(0).max(2).optional(),
+    top_p: z.number().gt(0).max(1).optional(),
+    stop: z.array(z.string().min(1).max(64)).min(1).max(4).optional(),
+    seed: z.number().int().safe().optional(),
+  })
+  .strict()
+  .refine((s) => Object.keys(s).length > 0);
+export type Sampling = z.infer<typeof Sampling>;
+export const ReasoningEffort = z.enum(["low", "medium", "high"]);
+export type ReasoningEffort = z.infer<typeof ReasoningEffort>;
+/** Free-form labels for attribution: one to sixteen name/value pairs, never interpreted by the router. */
+export const Tags = z
+  .record(
+    z.string().regex(/^[A-Za-z0-9_.:-]{1,64}$/),
+    z.string().min(1).max(256).refine(noControlCharacters),
+  )
+  .refine((t) => {
+    const n = Object.keys(t).length;
+    return n >= 1 && n <= 16;
+  });
+export type Tags = z.infer<typeof Tags>;
+/** An enforced JSON Schema response: the answer is a JSON document that follows `schema`. */
+export const ResponseFormat = z
+  .object({
+    type: z.literal("json_schema"),
+    json_schema: z
+      .object({
+        name: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
+        description: z.string().max(1024).optional(),
+        schema: z.record(z.string(), z.unknown()),
+        // A schema is always enforced: `false` would ask for a best effort the router cannot promise.
+        strict: z.literal(true).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type ResponseFormat = z.infer<typeof ResponseFormat>;
 export const Invocation = z
   .object({
+    response_format: ResponseFormat.optional(),
     service: id,
     service_version: z.number().int().positive().optional(),
     customer_id: id,
@@ -161,15 +211,29 @@ export const Invocation = z
       .strict(),
     limits: z
       .object({
-        max_output_tokens: z.number().int().min(1).max(8192).default(1),
+        max_output_tokens: z
+          .number()
+          .int()
+          .min(1)
+          .max(MAX_OUTPUT_TOKENS)
+          .default(1),
         max_usage: MediaMeters.optional(),
-        timeout_ms: z.number().int().min(100).max(120000).default(30000),
+        timeout_ms: z
+          .number()
+          .int()
+          .min(100)
+          .max(MAX_TIMEOUT_MS)
+          .default(30000),
         max_charge: z
           .object({ asset: id, atoms, scale: z.literal(9) })
           .strict()
           .optional(),
       })
       .strict(),
+    // No defaults on these three: a request without them keeps its exact canonical form and idempotency digest.
+    sampling: Sampling.optional(),
+    reasoning_effort: ReasoningEffort.optional(),
+    tags: Tags.optional(),
     stream: z.boolean().default(false),
   })
   .strict()
@@ -179,6 +243,8 @@ export const Invocation = z
     const names = new Set(tools?.map((t) => t.name));
     if (tools && names.size !== tools.length) issue("duplicate tool name");
     if (task && (tools || choice)) issue("a task cannot declare tools");
+    if (task && value.response_format)
+      issue("a task cannot ask for structured output");
     if (choice !== undefined && !tools) issue("tool_choice requires tools");
     if (typeof choice === "object" && !names.has(choice.name))
       issue("tool_choice names an undeclared tool");
@@ -203,10 +269,18 @@ export const Invocation = z
   });
 export type Invocation = z.infer<typeof Invocation>;
 /** What a request needs from a provider beyond plain text. */
-export function invocationNeeds(input: Invocation): {
+export interface Needs {
   tools: boolean;
   images: boolean;
-} {
+  /** The request carries a `response_format`: the answer must follow a JSON Schema. */
+  structured_output: boolean;
+  temperature: boolean;
+  top_p: boolean;
+  stop: boolean;
+  seed: boolean;
+  reasoning_effort: boolean;
+}
+export function invocationNeeds(input: Invocation): Needs {
   const messages = input.input.messages;
   return {
     tools:
@@ -216,6 +290,12 @@ export function invocationNeeds(input: Invocation): {
       (m) =>
         Array.isArray(m.content) && m.content.some((p) => p.type === "image"),
     ),
+    structured_output: input.response_format !== undefined,
+    temperature: input.sampling?.temperature !== undefined,
+    top_p: input.sampling?.top_p !== undefined,
+    stop: input.sampling?.stop !== undefined,
+    seed: input.sampling?.seed !== undefined,
+    reasoning_effort: input.reasoning_effort !== undefined,
   };
 }
 export const Offering = z
@@ -231,7 +311,7 @@ export const Offering = z
     enabled: z.boolean(),
     source: z.enum(["platform", "byok"]),
     max_input_tokens: z.number().int().min(1).max(1000000),
-    max_output_tokens: z.number().int().min(1).max(8192),
+    max_output_tokens: z.number().int().min(1).max(MAX_OUTPUT_TOKENS),
     price: Price,
     latency_ms: z.number().nonnegative().optional(),
     reliability: z.number().min(0).max(1).optional(),
@@ -255,7 +335,7 @@ export const Service = z
     requires_subscription: z.boolean().optional(),
     max_attempts: z.number().int().min(1).max(5),
     max_provider_cost: atoms,
-    max_output_tokens: z.number().int().positive().max(8192),
+    max_output_tokens: z.number().int().positive().max(MAX_OUTPUT_TOKENS),
     weights: z
       .object({
         cost: z.number().min(0),
@@ -309,6 +389,14 @@ export type ProviderEvent =
 export interface ProviderCapabilities {
   tools?: boolean;
   images?: boolean;
+  /** Writes a request's `response_format` schema into its call. A provider that does not say so is never sent one. */
+  structured_output?: boolean;
+  /** Each sampling control and the reasoning effort is carried only when the provider says so. */
+  temperature?: boolean;
+  top_p?: boolean;
+  stop?: boolean;
+  seed?: boolean;
+  reasoning_effort?: boolean;
 }
 export interface Provider {
   capabilities?: ProviderCapabilities;
@@ -336,10 +424,160 @@ export class ProviderError extends Error {
     public definitive: boolean,
     public retryable: boolean,
     public code = "upstream_failed",
+    /** How long the provider asked callers to wait (its `Retry-After`), in milliseconds. Only a hint. */
+    public retry_after_ms?: number,
   ) {
     super(code);
     this.name = "ProviderError";
   }
+}
+/**
+ * What an upstream refusal means for the next offering. A failure of the **request** (malformed, too large) would be
+ * refused by every offering, so the call stops. A failure of the **offering** (its key was rejected, its model is gone,
+ * its account is empty, its region is blocked, it is rate limited) is certain to have done no work and another offering
+ * may serve the request. Server errors and unknown statuses are neither: the provider may have started work, so the
+ * reservation stays held and the call is never retried for free.
+ */
+export type FailureClass =
+  | "rate_limited"
+  | "quota_exhausted"
+  | "credentials_rejected"
+  | "model_unavailable"
+  | "region_blocked"
+  | "request_rejected"
+  | "unknown";
+// Phrases are written with spaces: the message is lower-cased and its underscores and hyphens read as spaces first.
+const CREDENTIAL_PHRASES = [
+  "api key not valid",
+  "api key expired",
+  "api key invalid",
+  "invalid api key",
+  "incorrect api key",
+  "invalid x api key",
+];
+const QUOTA_PHRASES = [
+  "insufficient quota",
+  "exceeded your current quota",
+  "credit balance is too low",
+  "credits are depleted",
+  "spend limit",
+  "spending cap",
+  "requires billing to be enabled",
+  "billing account",
+  "per day",
+];
+const REGION_PHRASES = [
+  "user location is not supported",
+  "not available in your country",
+  "not available in your region",
+  "not supported in your region",
+];
+const MODEL_PHRASES = [
+  "model not found",
+  "is not found for api version",
+  "does not exist or you do not have access",
+];
+/** Classifies a refusal from its HTTP status and the error's own message (may be empty). */
+export function classifyFailure(status: number, message: string): FailureClass {
+  const text = message.toLowerCase().replace(/[_-]/g, " ");
+  const said = (phrases: string[]) => phrases.some((p) => text.includes(p));
+  if (said(CREDENTIAL_PHRASES)) return "credentials_rejected";
+  if (said(REGION_PHRASES)) return "region_blocked";
+  if (status === 401) return "credentials_rejected";
+  if (status === 402) return "quota_exhausted";
+  if (
+    (status === 403 || status === 429 || status === 400) &&
+    said(QUOTA_PHRASES)
+  )
+    return "quota_exhausted";
+  if (status === 403) return "credentials_rejected";
+  if (status === 404) return "model_unavailable";
+  if (status === 429) return "rate_limited";
+  if (status === 400 && said(MODEL_PHRASES)) return "model_unavailable";
+  // Any other client error is the request's: 408 (a timeout the provider may have acted on) is not.
+  if (status >= 400 && status < 500 && status !== 408)
+    return "request_rejected";
+  return "unknown";
+}
+/** Whether a failure belongs to the offering, so another may be tried and this one avoided for a while. */
+export function isOfferingScoped(c: FailureClass): boolean {
+  return (
+    c === "rate_limited" ||
+    c === "quota_exhausted" ||
+    c === "credentials_rejected" ||
+    c === "model_unavailable" ||
+    c === "region_blocked"
+  );
+}
+/** The provider error for a class: offering-scoped is definitive and retryable, a rejected request is definitive and not, anything else keeps the hold. */
+export function failureError(
+  c: FailureClass,
+  status: number,
+  retryAfterMs?: number,
+): ProviderError {
+  if (isOfferingScoped(c))
+    return new ProviderError(true, true, c, retryAfterMs);
+  return new ProviderError(
+    c === "request_rejected",
+    false,
+    `upstream_http_${status}`,
+    retryAfterMs,
+  );
+}
+/** The longest wait a `Retry-After` can ask for, in milliseconds: a hostile or broken value cannot park an offering for days. */
+export const RETRY_AFTER_MAX_MS = 86_400_000;
+/**
+ * Reads the value of a `Retry-After` header as milliseconds. Only the delta-seconds form is read: a non-negative number
+ * of seconds, whole or with a fraction, surrounding spaces ignored, milliseconds rounded down, capped at a day. The
+ * HTTP-date form is not read (`undefined`).
+ */
+export function parseRetryAfter(value: string | null): number | undefined {
+  // JavaScript's trim also strips characters (U+FEFF, U+2028) that the other languages' trim does not; the header
+  // grammar allows only spaces and tabs around the value.
+  const v = (value ?? "").replace(/^[ \t]+|[ \t]+$/g, "");
+  const m = /^([0-9]+)(?:\.([0-9]+))?$/.exec(v);
+  if (!m) return undefined;
+  const seconds = m[1].length > 9 ? RETRY_AFTER_MAX_MS / 1000 : Number(m[1]);
+  const millis = Number((m[2] ?? "").slice(0, 3).padEnd(3, "0"));
+  return Math.min(seconds * 1000 + millis, RETRY_AFTER_MAX_MS);
+}
+/**
+ * The provider error for an HTTP refusal: the status, the first 16 KiB of a client error's body (only its
+ * `error.message` is read, nothing of it is passed on) and the `Retry-After` header. Server errors are not read: the
+ * class cannot change what they mean.
+ */
+export async function refusal(response: Response): Promise<ProviderError> {
+  const status = response.status;
+  const retryAfter = parseRetryAfter(response.headers.get("retry-after"));
+  let message = "";
+  if (status >= 400 && status < 500 && response.body) {
+    try {
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      while (size < 16384) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        size += value.length;
+      }
+      await reader.cancel().catch(() => undefined);
+      const bytes = new Uint8Array(size);
+      let at = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, at);
+        at += chunk.length;
+      }
+      const text = new TextDecoder().decode(bytes.subarray(0, 16384));
+      const parsed: unknown = JSON.parse(text);
+      const m = (parsed as { error?: { message?: unknown } } | null)?.error
+        ?.message;
+      if (typeof m === "string") message = m;
+    } catch {
+      // A body that is not JSON says nothing; the status alone decides.
+    }
+  } else await response.body?.cancel().catch(() => undefined);
+  return failureError(classifyFailure(status, message), status, retryAfter);
 }
 export interface StreamEvent {
   type: string;

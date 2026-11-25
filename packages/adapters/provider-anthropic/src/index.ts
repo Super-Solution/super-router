@@ -2,6 +2,7 @@ import {
   Meters,
   ProviderError,
   parseSSE,
+  refusal,
   type Provider,
   type Invocation,
   type Offering,
@@ -86,8 +87,28 @@ function toolFields(input: Invocation["input"]) {
         }),
   };
 }
+/** Messages API sampling fields. It has no seed and no reasoning effort in this contract, so those are refused before reserving. */
+function sampling(input: Invocation) {
+  return {
+    ...(input.sampling?.temperature === undefined
+      ? {}
+      : { temperature: input.sampling.temperature }),
+    ...(input.sampling?.top_p === undefined
+      ? {}
+      : { top_p: input.sampling.top_p }),
+    ...(input.sampling?.stop === undefined
+      ? {}
+      : { stop_sequences: input.sampling.stop }),
+  };
+}
 export class AnthropicProvider implements Provider {
-  capabilities = { tools: true, images: true };
+  capabilities = {
+    tools: true,
+    images: true,
+    temperature: true,
+    top_p: true,
+    stop: true,
+  };
   constructor(
     private key: () => string,
     private transport: typeof fetch = fetch,
@@ -122,20 +143,14 @@ export class AnthropicProvider implements Provider {
           ...(system ? { system } : {}),
           messages,
           ...toolFields(input.input),
+          ...sampling(input),
           stream: true,
         }),
       });
     } catch {
       throw new ProviderError(false, false, "transport_unknown");
     }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new ProviderError(
-        [400, 401, 403, 404, 422, 429].includes(response.status),
-        response.status === 429,
-        "upstream_http_" + response.status,
-      );
-    }
+    if (!response.ok) throw await refusal(response);
     if (!response.body) throw new ProviderError(false, false, "empty_stream");
     let usage: Record<string, any> | null = null,
       id: string | undefined,

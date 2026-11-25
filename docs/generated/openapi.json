@@ -208,6 +208,49 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "response_format": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "json_schema"
+              },
+              "json_schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_-]{1,64}$"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "schema": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "strict": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "name",
+                  "schema"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "type",
+              "json_schema"
+            ],
+            "additionalProperties": false
+          },
           "service": {
             "type": "string",
             "minLength": 1,
@@ -499,7 +542,7 @@
                 "default": 1,
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 8192
+                "maximum": 131072
               },
               "max_usage": {
                 "type": "object",
@@ -531,7 +574,7 @@
                 "default": 30000,
                 "type": "integer",
                 "minimum": 100,
-                "maximum": 120000
+                "maximum": 600000
               },
               "max_charge": {
                 "type": "object",
@@ -564,6 +607,57 @@
               "timeout_ms"
             ],
             "additionalProperties": false
+          },
+          "sampling": {
+            "type": "object",
+            "properties": {
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "top_p": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              "stop": {
+                "minItems": 1,
+                "maxItems": 4,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "tags": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
           },
           "stream": {
             "default": false,
@@ -723,7 +817,7 @@
                 "max_output_tokens": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 8192
+                  "maximum": 131072
                 },
                 "price": {
                   "type": "object",
@@ -1163,7 +1257,7 @@
           "max_output_tokens": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "maximum": 8192
+            "maximum": 131072
           },
           "weights": {
             "type": "object",

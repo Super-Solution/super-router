@@ -19,6 +19,9 @@ class OpenAIProvider:
     """``key`` is a string or a function read on every call, so it can rotate; an empty key is a definitive failure.
     ``base_url`` points at an OpenAI-compatible server. Pass ``client`` for proxies, tracing or tests."""
 
+    # The Responses API has no stop sequences and no seed: a request that asks for them is refused before reserving.
+    capabilities = frozenset({"temperature", "top_p", "reasoning_effort"})
+
     def __init__(
         self,
         key: KeySource | None,
@@ -46,6 +49,12 @@ class OpenAIProvider:
             "store": False,
             "stream": True,
         }
+        sampling = invocation.get("sampling", {})
+        for name in ("temperature", "top_p"):
+            if name in sampling:
+                body[name] = sampling[name]
+        if "reasoning_effort" in invocation:
+            body["reasoning"] = {"effort": invocation["reasoning_effort"]}
         async with open_stream(
             self._client, f"{self._base}/v1/responses", {"Authorization": f"Bearer {key}"}, body
         ) as frames:

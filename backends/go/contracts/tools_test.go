@@ -92,6 +92,32 @@ func TestInvocationNeeds(t *testing.T) {
 	}
 }
 
+func TestSamplingAndReasoningEffortAreNeeds(t *testing.T) {
+	parse := func(extra string) Invocation {
+		t.Helper()
+		in, err := ParseInvocation([]byte(`{"service":"s","customer_id":"c","input":{"messages":[{"role":"user","content":"hi"}]},"limits":{}` + extra + `}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return in
+	}
+	if got := InvocationNeeds(parse(``)); got != (Needs{}) {
+		t.Errorf("a plain request needs %+v", got)
+	}
+	if got := InvocationNeeds(parse(`,"sampling":{"temperature":0.5}`)); got != (Needs{Temperature: true}) {
+		t.Errorf("temperature: %+v", got)
+	}
+	got := InvocationNeeds(parse(`,"sampling":{"top_p":0.5,"stop":["x"],"seed":3},"reasoning_effort":"low"`))
+	if want := (Needs{TopP: true, Stop: true, Seed: true, ReasoningEffort: true}); got != want {
+		t.Errorf("%+v, want %+v", got, want)
+	}
+	// A provider that carries only some of them does not cover a request that needs another.
+	caps := ProviderCapabilities{Temperature: true, TopP: true}
+	if !caps.Can(Needs{Temperature: true}) || caps.Can(Needs{Temperature: true, Seed: true}) {
+		t.Error("capabilities must cover every need, not any")
+	}
+}
+
 func TestFormatJSNumber(t *testing.T) {
 	for f, want := range map[float64]string{
 		0: "0", math.Copysign(0, -1): "0", 1: "1", -1.5: "-1.5", 0.1: "0.1", 1e21: "1e+21", 1e20: "100000000000000000000",

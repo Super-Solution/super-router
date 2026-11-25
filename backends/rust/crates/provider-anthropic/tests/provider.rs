@@ -218,11 +218,11 @@ async fn failures_are_classified() {
     only_system.input.messages.truncate(1);
     let ok = invocation();
     let cases: Vec<Case> = vec![
-        ("rate limited", Box::new(status(429)), "k", ok.clone(), (true, true, "upstream_http_429")),
+        ("rate limited", Box::new(status(429)), "k", ok.clone(), (true, true, "rate_limited")),
         ("bad request", Box::new(status(400)), "k", ok.clone(), (true, false, "upstream_http_400")),
-        ("unauthorized", Box::new(status(401)), "k", ok.clone(), (true, false, "upstream_http_401")),
-        ("forbidden", Box::new(status(403)), "k", ok.clone(), (true, false, "upstream_http_403")),
-        ("not found", Box::new(status(404)), "k", ok.clone(), (true, false, "upstream_http_404")),
+        ("unauthorized", Box::new(status(401)), "k", ok.clone(), (true, true, "credentials_rejected")),
+        ("forbidden", Box::new(status(403)), "k", ok.clone(), (true, true, "credentials_rejected")),
+        ("not found", Box::new(status(404)), "k", ok.clone(), (true, true, "model_unavailable")),
         ("unprocessable", Box::new(status(422)), "k", ok.clone(), (true, false, "upstream_http_422")),
         ("overloaded is unknown", Box::new(status(529)), "k", ok.clone(), (false, false, "upstream_http_529")),
         ("server error is unknown", Box::new(status(500)), "k", ok.clone(), (false, false, "upstream_http_500")),
@@ -603,6 +603,44 @@ async fn a_retry_after_on_a_refusal_is_carried_in_milliseconds() {
         let (events, error) = collect(&provider(&base, "k"), &invocation()).await;
         let error = error.expect("a refusal");
         assert!(events.is_empty());
-        assert_eq!((shape(&error), error.retry_after_ms), ((true, true, "upstream_http_429"), want), "{header:?}");
+        assert_eq!((shape(&error), error.retry_after_ms), ((true, true, "rate_limited"), want), "{header:?}");
+    }
+}
+
+/// Every response in `conformance/failure.v1.json` (`provider_responses`), served as a real HTTP refusal: the status,
+/// the `Retry-After` header and the body as the provider sent them, read back as the error the router sees.
+#[tokio::test]
+async fn refusals_match_the_shared_provider_responses() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../conformance/failure.v1.json");
+    let data: Value = serde_json::from_slice(&std::fs::read(path).expect("read failure.v1.json")).expect("parse failure.v1.json");
+    let cases = data["provider_responses"].as_array().expect("provider_responses");
+    assert!(cases.len() >= 15, "only {} cases", cases.len());
+    for c in cases {
+        let name = c["name"].as_str().unwrap().to_string();
+        let status = c["status"].as_u64().unwrap() as u16;
+        let retry_after = c["retry_after"].as_str().map(str::to_string);
+        let body = c["body"].as_str().unwrap().to_string();
+        let base = upstream(move || {
+            let mut r = Response::builder().status(status);
+            if let Some(h) = &retry_after {
+                r = r.header("retry-after", h);
+            }
+            r.body(Body::from(body.clone())).unwrap()
+        })
+        .await;
+        let (events, error) = collect(&provider(&base, "k"), &invocation()).await;
+        let error = error.unwrap_or_else(|| panic!("{name}: no error"));
+        assert!(events.is_empty(), "{name}");
+        let want = &c["expect"];
+        assert_eq!(
+            (error.definitive, error.retryable, error.code.as_str(), error.retry_after_ms),
+            (
+                want["definitive"].as_bool().unwrap(),
+                want["retryable"].as_bool().unwrap(),
+                want["code"].as_str().unwrap(),
+                want["retry_after_ms"].as_u64()
+            ),
+            "{name}"
+        );
     }
 }

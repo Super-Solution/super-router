@@ -10,7 +10,7 @@ import (
 )
 
 func TestRetryAfterConformance(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "rust", "conformance", "retry_after.v1.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "conformance", "retry_after.v1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

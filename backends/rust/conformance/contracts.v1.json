@@ -1031,6 +1031,114 @@
    }
   },
   {
+   "name": "long output service and offering",
+   "input": {
+    "id": "chat",
+    "version": 1,
+    "mode": "tier",
+    "tier": "chat/low",
+    "regions": [
+     "test"
+    ],
+    "required_labels": [],
+    "price": {
+     "asset": "credit:demo",
+     "input": "2",
+     "cached": "1",
+     "cache_write": "2",
+     "output": "3",
+     "per": 1
+    },
+    "max_attempts": 2,
+    "max_provider_cost": "10000",
+    "max_output_tokens": 131072,
+    "weights": {
+     "cost": 1,
+     "latency": 0,
+     "reliability": 0,
+     "quality": 0
+    },
+    "cost_scale": "10000",
+    "latency_scale_ms": 1000,
+    "offerings": [
+     {
+      "id": "a",
+      "provider": "ok",
+      "model": "mock-model",
+      "upstream_model": "mock-model",
+      "region": "test",
+      "labels": [],
+      "enabled": true,
+      "source": "byok",
+      "max_input_tokens": 1024,
+      "max_output_tokens": 131072,
+      "price": {
+       "asset": "USD",
+       "input": "1",
+       "cached": "1",
+       "cache_write": "1",
+       "output": "1",
+       "per": 1
+      }
+     }
+    ]
+   },
+   "expect": {
+    "ok": {
+     "id": "chat",
+     "version": 1,
+     "mode": "tier",
+     "tier": "chat/low",
+     "offerings": [
+      {
+       "id": "a",
+       "provider": "ok",
+       "model": "mock-model",
+       "upstream_model": "mock-model",
+       "region": "test",
+       "labels": [],
+       "enabled": true,
+       "source": "byok",
+       "max_input_tokens": 1024,
+       "max_output_tokens": 131072,
+       "price": {
+        "asset": "USD",
+        "input": "1",
+        "cached": "1",
+        "cache_write": "1",
+        "output": "1",
+        "per": 1
+       }
+      }
+     ],
+     "regions": [
+      "test"
+     ],
+     "required_labels": [],
+     "price": {
+      "asset": "credit:demo",
+      "input": "2",
+      "cached": "1",
+      "cache_write": "2",
+      "output": "3",
+      "per": 1
+     },
+     "max_attempts": 2,
+     "max_provider_cost": "10000",
+     "max_output_tokens": 131072,
+     "weights": {
+      "cost": 1,
+      "latency": 0,
+      "reliability": 0,
+      "quality": 0
+     },
+     "cost_scale": "10000",
+     "latency_scale_ms": 1000,
+     "unknown_score": 0
+    }
+   }
+  },
+  {
    "name": "unknown top-level key",
    "input": {
     "id": "chat",
@@ -2758,6 +2866,63 @@
    }
   },
   {
+   "name": "max output tokens 131073",
+   "input": {
+    "id": "chat",
+    "version": 1,
+    "mode": "tier",
+    "tier": "chat/low",
+    "regions": [
+     "test"
+    ],
+    "required_labels": [],
+    "price": {
+     "asset": "credit:demo",
+     "input": "2",
+     "cached": "1",
+     "cache_write": "2",
+     "output": "3",
+     "per": 1
+    },
+    "max_attempts": 2,
+    "max_provider_cost": "10000",
+    "max_output_tokens": 131073,
+    "weights": {
+     "cost": 1,
+     "latency": 0,
+     "reliability": 0,
+     "quality": 0
+    },
+    "cost_scale": "10000",
+    "latency_scale_ms": 1000,
+    "offerings": [
+     {
+      "id": "a",
+      "provider": "ok",
+      "model": "mock-model",
+      "upstream_model": "mock-model",
+      "region": "test",
+      "labels": [],
+      "enabled": true,
+      "source": "byok",
+      "max_input_tokens": 1024,
+      "max_output_tokens": 128,
+      "price": {
+       "asset": "USD",
+       "input": "1",
+       "cached": "1",
+       "cache_write": "1",
+       "output": "1",
+       "per": 1
+      }
+     }
+    ]
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
    "name": "task kind unknown",
    "input": {
     "id": "chat",
@@ -3456,7 +3621,7 @@
    }
   },
   {
-   "name": "offering output tokens 8193",
+   "name": "offering output tokens 131073",
    "input": {
     "id": "chat",
     "version": 1,
@@ -3496,7 +3661,7 @@
       "enabled": true,
       "source": "byok",
       "max_input_tokens": 1024,
-      "max_output_tokens": 8193,
+      "max_output_tokens": 131073,
       "price": {
        "asset": "USD",
        "input": "1",
@@ -5853,6 +6018,474 @@
    }
   },
   {
+   "name": "long output and long timeout",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 131072,
+     "timeout_ms": 600000
+    },
+    "stream": false
+   },
+   "expect": {
+    "ok": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 131072,
+      "timeout_ms": 600000
+     },
+     "stream": false
+    },
+    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":131072,\"timeout_ms\":600000},\"payer_mode\":\"developer\",\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
+   "name": "sampling",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "temperature": 0.2,
+     "top_p": 0.9,
+     "stop": [
+      "END",
+      "\n\n"
+     ],
+     "seed": -7
+    }
+   },
+   "expect": {
+    "ok": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "sampling": {
+      "temperature": 0.2,
+      "top_p": 0.9,
+      "stop": [
+       "END",
+       "\n\n"
+      ],
+      "seed": -7
+     },
+     "stream": false
+    },
+    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"sampling\":{\"seed\":-7,\"stop\":[\"END\",\"\\n\\n\"],\"temperature\":0.2,\"top_p\":0.9},\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
+   "name": "sampling single field",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "top_p": 1
+    }
+   },
+   "expect": {
+    "ok": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "sampling": {
+      "top_p": 1
+     },
+     "stream": false
+    },
+    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"sampling\":{\"top_p\":1},\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
+   "name": "sampling temperature bounds",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "temperature": 0
+    }
+   },
+   "expect": {
+    "ok": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "sampling": {
+      "temperature": 0
+     },
+     "stream": false
+    },
+    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"sampling\":{\"temperature\":0},\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
+   "name": "reasoning effort",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "reasoning_effort": "high"
+   },
+   "expect": {
+    "ok": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "reasoning_effort": "high",
+     "stream": false
+    },
+    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"reasoning_effort\":\"high\",\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
+   "name": "tags",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {
+     "team": "search",
+     "env:stage": "ünï 🙂 ok",
+     "a.b_c-d": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   },
+   "expect": {
+    "ok": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "tags": {
+      "team": "search",
+      "env:stage": "ünï 🙂 ok",
+      "a.b_c-d": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     },
+     "stream": false
+    },
+    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"service\":\"chat\",\"stream\":false,\"tags\":{\"a.b_c-d\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"env:stage\":\"ünï 🙂 ok\",\"team\":\"search\"}}"
+   }
+  },
+  {
+   "name": "structured output",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "answer",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "default": null
+        }
+       },
+       "required": [
+        "answer"
+       ],
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   "expect": {
+    "ok": {
+     "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+       "name": "answer",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "answer": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "default": null
+         }
+        },
+        "required": [
+         "answer"
+        ],
+        "additionalProperties": false
+       },
+       "strict": true
+      }
+     },
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"response_format\":{\"json_schema\":{\"name\":\"answer\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"answer\":{\"default\":null,\"type\":[\"string\",\"null\"]}},\"required\":[\"answer\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
+   "name": "structured strict omitted",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "answer",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "default": null
+        }
+       },
+       "required": [
+        "answer"
+       ],
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   "expect": {
+    "ok": {
+     "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+       "name": "answer",
+       "schema": {
+        "type": "object",
+        "properties": {
+         "answer": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "default": null
+         }
+        },
+        "required": [
+         "answer"
+        ],
+        "additionalProperties": false
+       }
+      }
+     },
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Hello"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"response_format\":{\"json_schema\":{\"name\":\"answer\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"answer\":{\"default\":null,\"type\":[\"string\",\"null\"]}},\"required\":[\"answer\"],\"type\":\"object\"}},\"type\":\"json_schema\"},\"service\":\"chat\",\"stream\":false}"
+   }
+  },
+  {
    "name": "unicode content",
    "input": {
     "service": "chat",
@@ -6813,6 +7446,345 @@
    }
   },
   {
+   "name": "structured schema invalid",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "answer",
+      "strict": true,
+      "schema": []
+     }
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "structured strict false",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "answer",
+      "strict": false,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "default": null
+        }
+       },
+       "required": [
+        "answer"
+       ],
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "structured unknown key",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "answer",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "default": null
+        }
+       },
+       "required": [
+        "answer"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "extra": true
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "structured on task",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "task": {
+      "kind": "image",
+      "prompt": "p"
+     }
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "answer",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "default": null
+        }
+       },
+       "required": [
+        "answer"
+       ],
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "structured name with space",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "a b",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "default": null
+        }
+       },
+       "required": [
+        "answer"
+       ],
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "structured description 1025 characters",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "json_schema",
+     "json_schema": {
+      "name": "answer",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "default": null
+        }
+       },
+       "required": [
+        "answer"
+       ],
+       "additionalProperties": false
+      },
+      "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+     }
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "structured type text",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": {
+     "type": "text",
+     "json_schema": {
+      "name": "answer",
+      "strict": true,
+      "schema": {
+       "type": "object",
+       "properties": {
+        "answer": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "default": null
+        }
+       },
+       "required": [
+        "answer"
+       ],
+       "additionalProperties": false
+      }
+     }
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "structured null",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "response_format": null
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
    "name": "unknown key",
    "input": {
     "service": "chat",
@@ -7618,7 +8590,7 @@
    }
   },
   {
-   "name": "max output 8193",
+   "name": "max output 131073",
    "input": {
     "service": "chat",
     "customer_id": "c1",
@@ -7632,7 +8604,7 @@
      ]
     },
     "limits": {
-     "max_output_tokens": 8193,
+     "max_output_tokens": 131073,
      "timeout_ms": 30000
     },
     "stream": false
@@ -7690,7 +8662,7 @@
    }
   },
   {
-   "name": "timeout 120001",
+   "name": "timeout 600001",
    "input": {
     "service": "chat",
     "customer_id": "c1",
@@ -7705,9 +8677,673 @@
     },
     "limits": {
      "max_output_tokens": 32,
-     "timeout_ms": 120001
+     "timeout_ms": 600001
     },
     "stream": false
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling empty",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {}
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling unknown key",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "top_k": 4
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling temperature 2.1",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "temperature": 2.1
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling temperature negative",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "temperature": -0.1
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling top_p zero",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "top_p": 0
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling top_p above one",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "top_p": 1.01
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling stop empty list",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "stop": []
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling stop five",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "stop": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e"
+     ]
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling stop empty string",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "stop": [
+      ""
+     ]
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling stop 65 characters",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "stop": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ]
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling seed fractional",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "seed": 1.5
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling seed above safe",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": {
+     "seed": 9007199254740992
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "sampling null",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "sampling": null
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "reasoning effort unknown",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "reasoning_effort": "max"
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "reasoning effort null",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "reasoning_effort": null
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags empty",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {}
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags seventeen",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {
+     "k0": "v",
+     "k1": "v",
+     "k2": "v",
+     "k3": "v",
+     "k4": "v",
+     "k5": "v",
+     "k6": "v",
+     "k7": "v",
+     "k8": "v",
+     "k9": "v",
+     "k10": "v",
+     "k11": "v",
+     "k12": "v",
+     "k13": "v",
+     "k14": "v",
+     "k15": "v",
+     "k16": "v"
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags key with space",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {
+     "a b": "v"
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags key 65 characters",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {
+     "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk": "v"
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags empty value",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {
+     "k": ""
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags value 257 characters",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {
+     "k": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags value with newline",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {
+     "k": "a\nb"
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags value not a string",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": {
+     "k": 1
+    }
+   },
+   "expect": {
+    "error": "invalid_request"
+   }
+  },
+  {
+   "name": "tags as list",
+   "input": {
+    "service": "chat",
+    "customer_id": "c1",
+    "payer_mode": "developer",
+    "input": {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hello"
+      }
+     ]
+    },
+    "limits": {
+     "max_output_tokens": 32,
+     "timeout_ms": 30000
+    },
+    "stream": false,
+    "tags": [
+     "a"
+    ]
    },
    "expect": {
     "error": "invalid_request"
@@ -7868,352 +9504,6 @@
      "timeout_ms": 30000
     },
     "stream": null
-   },
-   "expect": {
-    "error": "invalid_request"
-   }
-  },
-  {
-   "name": "structured output",
-   "input": {
-    "service": "chat",
-    "customer_id": "c1",
-    "payer_mode": "developer",
-    "input": {
-     "messages": [
-      {
-       "role": "user",
-       "content": "Hello"
-      }
-     ]
-    },
-    "limits": {
-     "max_output_tokens": 32,
-     "timeout_ms": 30000
-    },
-    "stream": false,
-    "response_format": {
-     "type": "json_schema",
-     "json_schema": {
-      "name": "answer",
-      "strict": true,
-      "schema": {
-       "type": "object",
-       "properties": {
-        "answer": {
-         "type": [
-          "string",
-          "null"
-         ],
-         "default": null
-        }
-       },
-       "required": [
-        "answer"
-       ],
-       "additionalProperties": false
-      }
-     }
-    }
-   },
-   "expect": {
-    "ok": {
-     "service": "chat",
-     "customer_id": "c1",
-     "payer_mode": "developer",
-     "input": {
-      "messages": [
-       {
-        "role": "user",
-        "content": "Hello"
-       }
-      ]
-     },
-     "response_format": {
-      "type": "json_schema",
-      "json_schema": {
-       "name": "answer",
-       "schema": {
-        "type": "object",
-        "properties": {
-         "answer": {
-          "type": [
-           "string",
-           "null"
-          ],
-          "default": null
-         }
-        },
-        "required": [
-         "answer"
-        ],
-        "additionalProperties": false
-       },
-       "strict": true
-      }
-     },
-     "limits": {
-      "max_output_tokens": 32,
-      "timeout_ms": 30000
-     },
-     "stream": false
-    },
-    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"response_format\":{\"json_schema\":{\"name\":\"answer\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"answer\":{\"default\":null,\"type\":[\"string\",\"null\"]}},\"required\":[\"answer\"],\"type\":\"object\"},\"strict\":true},\"type\":\"json_schema\"},\"service\":\"chat\",\"stream\":false}"
-   }
-  },
-  {
-   "name": "structured strict omitted",
-   "input": {
-    "service": "chat",
-    "customer_id": "c1",
-    "payer_mode": "developer",
-    "input": {
-     "messages": [
-      {
-       "role": "user",
-       "content": "Hello"
-      }
-     ]
-    },
-    "limits": {
-     "max_output_tokens": 32,
-     "timeout_ms": 30000
-    },
-    "stream": false,
-    "response_format": {
-     "type": "json_schema",
-     "json_schema": {
-      "name": "answer",
-      "schema": {
-       "type": "object",
-       "properties": {
-        "answer": {
-         "type": [
-          "string",
-          "null"
-         ],
-         "default": null
-        }
-       },
-       "required": [
-        "answer"
-       ],
-       "additionalProperties": false
-      }
-     }
-    }
-   },
-   "expect": {
-    "ok": {
-     "service": "chat",
-     "customer_id": "c1",
-     "payer_mode": "developer",
-     "input": {
-      "messages": [
-       {
-        "role": "user",
-        "content": "Hello"
-       }
-      ]
-     },
-     "response_format": {
-      "type": "json_schema",
-      "json_schema": {
-       "name": "answer",
-       "schema": {
-        "type": "object",
-        "properties": {
-         "answer": {
-          "type": [
-           "string",
-           "null"
-          ],
-          "default": null
-         }
-        },
-        "required": [
-         "answer"
-        ],
-        "additionalProperties": false
-       }
-      }
-     },
-     "limits": {
-      "max_output_tokens": 32,
-      "timeout_ms": 30000
-     },
-     "stream": false
-    },
-    "canonical": "{\"customer_id\":\"c1\",\"input\":{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}]},\"limits\":{\"max_output_tokens\":32,\"timeout_ms\":30000},\"payer_mode\":\"developer\",\"response_format\":{\"json_schema\":{\"name\":\"answer\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"answer\":{\"default\":null,\"type\":[\"string\",\"null\"]}},\"required\":[\"answer\"],\"type\":\"object\"}},\"type\":\"json_schema\"},\"service\":\"chat\",\"stream\":false}"
-   }
-  },
-  {
-   "name": "structured schema invalid",
-   "input": {
-    "service": "chat",
-    "customer_id": "c1",
-    "payer_mode": "developer",
-    "input": {
-     "messages": [
-      {
-       "role": "user",
-       "content": "Hello"
-      }
-     ]
-    },
-    "limits": {
-     "max_output_tokens": 32,
-     "timeout_ms": 30000
-    },
-    "stream": false,
-    "response_format": {
-     "type": "json_schema",
-     "json_schema": {
-      "name": "answer",
-      "strict": true,
-      "schema": []
-     }
-    }
-   },
-   "expect": {
-    "error": "invalid_request"
-   }
-  },
-  {
-   "name": "structured strict false",
-   "input": {
-    "service": "chat",
-    "customer_id": "c1",
-    "payer_mode": "developer",
-    "input": {
-     "messages": [
-      {
-       "role": "user",
-       "content": "Hello"
-      }
-     ]
-    },
-    "limits": {
-     "max_output_tokens": 32,
-     "timeout_ms": 30000
-    },
-    "stream": false,
-    "response_format": {
-     "type": "json_schema",
-     "json_schema": {
-      "name": "answer",
-      "strict": false,
-      "schema": {
-       "type": "object",
-       "properties": {
-        "answer": {
-         "type": [
-          "string",
-          "null"
-         ],
-         "default": null
-        }
-       },
-       "required": [
-        "answer"
-       ],
-       "additionalProperties": false
-      }
-     }
-    }
-   },
-   "expect": {
-    "error": "invalid_request"
-   }
-  },
-  {
-   "name": "structured unknown key",
-   "input": {
-    "service": "chat",
-    "customer_id": "c1",
-    "payer_mode": "developer",
-    "input": {
-     "messages": [
-      {
-       "role": "user",
-       "content": "Hello"
-      }
-     ]
-    },
-    "limits": {
-     "max_output_tokens": 32,
-     "timeout_ms": 30000
-    },
-    "stream": false,
-    "response_format": {
-     "type": "json_schema",
-     "json_schema": {
-      "name": "answer",
-      "strict": true,
-      "schema": {
-       "type": "object",
-       "properties": {
-        "answer": {
-         "type": [
-          "string",
-          "null"
-         ],
-         "default": null
-        }
-       },
-       "required": [
-        "answer"
-       ],
-       "additionalProperties": false
-      }
-     },
-     "extra": true
-    }
-   },
-   "expect": {
-    "error": "invalid_request"
-   }
-  },
-  {
-   "name": "structured on task",
-   "input": {
-    "service": "chat",
-    "customer_id": "c1",
-    "payer_mode": "developer",
-    "input": {
-     "task": {
-      "kind": "image",
-      "prompt": "p"
-     }
-    },
-    "limits": {
-     "max_output_tokens": 32,
-     "timeout_ms": 30000
-    },
-    "stream": false,
-    "response_format": {
-     "type": "json_schema",
-     "json_schema": {
-      "name": "answer",
-      "strict": true,
-      "schema": {
-       "type": "object",
-       "properties": {
-        "answer": {
-         "type": [
-          "string",
-          "null"
-         ],
-         "default": null
-        }
-       },
-       "required": [
-        "answer"
-       ],
-       "additionalProperties": false
-      }
-     }
-    }
    },
    "expect": {
     "error": "invalid_request"

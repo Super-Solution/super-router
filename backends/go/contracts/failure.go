@@ -3,6 +3,7 @@
 package contracts
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 )
@@ -148,4 +149,33 @@ func ClassifyFailure(status int, message string) FailureClass {
 		return FailureRequestRejected
 	}
 	return FailureUnknown
+}
+
+// RefusalBodyLimit is how much of a client error's body is read for its message.
+const RefusalBodyLimit = 16384
+
+// RefusalFrom is the provider error for an HTTP refusal: the status, a client error's body (only the first
+// RefusalBodyLimit bytes, and only its error.message is read; nothing of it is passed on) and the Retry-After header.
+// Callers do not read a server error's body: the class cannot change what it means. Providers whose error bodies carry
+// the message at error.message (OpenAI, Anthropic, Gemini) share this.
+func RefusalFrom(status int, retryAfter string, body []byte) *ProviderError {
+	var message string
+	if status >= 400 && status < 500 {
+		if len(body) > RefusalBodyLimit {
+			body = body[:RefusalBodyLimit]
+		}
+		var e struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if json.Unmarshal(body, &e) == nil {
+			message = e.Error.Message
+		}
+	}
+	err := ClassifyFailure(status, message).ProviderError(status)
+	if ms, ok := ParseRetryAfter(retryAfter); ok {
+		err.RetryAfterMs = ms
+	}
+	return err
 }

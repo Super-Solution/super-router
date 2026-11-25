@@ -30,8 +30,11 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
 - `conformance/*.json` is normative. Change behaviour there first, then in every backend.
 - Postgres migrations are byte-identical in `packages/adapters/storage-postgres/migrations`,
   `backends/go/store/postgres/migrations` and `backends/python/src/super_router/stores/migrations`; tests enforce it.
-- Provider failure classification: definitive `{400,401,403,404,422}`, retryable `429`, everything else unknown;
-  redirects are never followed; usage must be complete or the outcome is unknown.
+- Provider failure classification is one table (`conformance/failure.v1.json`): a client error other than `408` is
+  definitive (the offering's own faults, 401/402/403/404/429 and the key, credit, region and model messages, are also
+  retryable on another offering; the rest are the request's) and everything else, every 5xx and `408` included, is
+  unknown and keeps the reservation held; redirects are never followed; usage must be complete or the outcome is
+  unknown.
 - Money is decimal strings and exact integers. No floats in pricing or settlement.
 
 ## Open
@@ -40,7 +43,7 @@ issued by the TypeScript control plane); Python data plane and ASGI server; tran
   in cloud mode against the TypeScript-managed tables (`SUPERROUTER_AUTH=database`), which is the cheaper path.
 - Providers are tested against fake upstreams only, not the live OpenAI, Anthropic and Gemini APIs.
 - **Language lag** (2026-11-26; table in `backends/README.md`, files in `conformance/README.md`). The TypeScript
-  reference lacks what Rust and Go grew (rate cards, failure classification, the health book, Gemini, structured output,
+  reference lacks what Rust and Go grew (rate cards, the health book, Gemini, structured output,
   custom units); Python additionally lacks tool calling and images. Python is allowed to lag Go and Rust; the lag is
   documented, not hidden. Entries below this list mark what each later change closed.
 - No benchmarks for the Go and Python stores yet; the memory stores scan per tenant.

@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from ..contracts import ProviderError
+from ..failure import BODY_LIMIT, refusal
 from ._sse import Frame, FrameTooLarge, read_sse
 
 KeySource = str | Callable[[], str]
@@ -51,8 +52,10 @@ async def open_stream(
 ) -> AsyncIterator[AsyncIterator[Frame]]:
     """POST and yield the event stream, or raise the ProviderError the status deserves.
 
-    A definitive status (400, 401, 403, 404, 422, 429) means the provider did no work; 429 may be retried on another
-    offering. Everything else, including a redirect (never followed) and a lost connection, is an unknown outcome."""
+    A refusal is classified by ``super_router.failure``: a failure of the offering (rejected key, retired model, empty
+    account, blocked region, rate limit) is definitive and may be retried on another offering, a refused request is
+    definitive, and everything else, including a server error, a redirect (never followed) and a lost connection, is an
+    unknown outcome that keeps the hold."""
     try:
         request = client.build_request("POST", url, headers={**headers, "Content-Type": "application/json"}, json=body)
         response = await client.send(request, stream=True, follow_redirects=False)
@@ -61,11 +64,16 @@ async def open_stream(
     try:
         status = response.status_code
         if not 200 <= status <= 299:
-            if status in (400, 401, 403, 404, 422):
-                raise ProviderError(True, False, f"upstream_http_{status}")
-            if status == 429:
-                raise ProviderError(True, True, "upstream_http_429")
-            raise ProviderError(False, False, f"upstream_http_{status}")
+            detail = b""
+            if 400 <= status < 500:
+                try:
+                    async for chunk in response.aiter_bytes():
+                        detail += chunk
+                        if len(detail) >= BODY_LIMIT:
+                            break
+                except httpx.HTTPError:
+                    detail = b""
+            raise refusal(status, response.headers.get("retry-after"), detail)
         yield _frames(response)
     finally:
         await response.aclose()

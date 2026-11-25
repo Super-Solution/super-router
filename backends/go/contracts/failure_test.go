@@ -10,7 +10,7 @@ import (
 )
 
 func TestFailureConformance(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "rust", "conformance", "failure.v1.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "conformance", "failure.v1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

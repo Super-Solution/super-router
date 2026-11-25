@@ -408,12 +408,41 @@ fn developer() -> String {
     "developer".to_string()
 }
 
+/// The largest output one model call may be asked for: wide enough for today's long-output models (128,000).
+pub const MAX_OUTPUT_TOKENS: i64 = 131_072;
+/// The longest a request may run, in milliseconds: long enough for a slow reasoning stream.
+pub const MAX_TIMEOUT_MS: i64 = 600_000;
+
+/// Sampling controls. Every field is optional; a provider that cannot carry one refuses the request before anything
+/// is reserved (`unsupported_capability`) rather than ignoring it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Sampling {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<i64>,
+}
+
 /// One request to run a service.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Invocation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResponseFormat>,
+    /// `None` when absent, so a request without it keeps its exact canonical form and digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sampling: Option<Sampling>,
+    /// `low`, `medium` or `high`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
+    /// Attribution labels: one to sixteen name/value pairs, never interpreted by the router.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<BTreeMap<String, String>>,
     pub service: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_version: Option<i64>,

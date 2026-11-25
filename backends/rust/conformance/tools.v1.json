@@ -8652,6 +8652,115 @@
     }
    },
    {
+    "name": "sampling temperature and top_p",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "sampling": {
+      "temperature": 0.3,
+      "top_p": 0.8
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "input": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "temperature": 0.3,
+     "top_p": 0.8,
+     "max_output_tokens": 32,
+     "store": false,
+     "stream": true
+    }
+   },
+   {
+    "name": "reasoning effort",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "reasoning_effort": "medium",
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "input": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "reasoning": {
+      "effort": "medium"
+     },
+     "max_output_tokens": 32,
+     "store": false,
+     "stream": true
+    }
+   },
+   {
+    "name": "long output limit",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 128000,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "input": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "max_output_tokens": 128000,
+     "store": false,
+     "stream": true
+    }
+   },
+   {
     "name": "images",
     "invocation": {
      "service": "chat",
@@ -10200,6 +10309,118 @@
          "q"
         ]
        }
+      }
+     ],
+     "stream": true
+    }
+   },
+   {
+    "name": "sampling temperature and top_p",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "sampling": {
+      "temperature": 0.3,
+      "top_p": 0.8
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "max_tokens": 32,
+     "messages": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "temperature": 0.3,
+     "top_p": 0.8,
+     "stream": true
+    }
+   },
+   {
+    "name": "sampling stop sequences",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "sampling": {
+      "stop": [
+       "END",
+       "\n\n"
+      ]
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "max_tokens": 32,
+     "messages": [
+      {
+       "role": "user",
+       "content": "Find it"
+      }
+     ],
+     "stop_sequences": [
+      "END",
+      "\n\n"
+     ],
+     "stream": true
+    }
+   },
+   {
+    "name": "long output limit",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 128000,
+      "timeout_ms": 30000
+     },
+     "stream": false
+    },
+    "body": {
+     "model": "upstream-model",
+     "max_tokens": 128000,
+     "messages": [
+      {
+       "role": "user",
+       "content": "Find it"
       }
      ],
      "stream": true

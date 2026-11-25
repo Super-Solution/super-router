@@ -296,16 +296,38 @@ type Limits struct {
 	MaxCharge *ChargeLimit `json:"max_charge,omitempty"`
 }
 
+// MaxOutputTokens is the largest output one model call may be asked for: wide enough for today's long-output models
+// (128,000). MaxTimeoutMs is the longest a request may run, in milliseconds.
+const (
+	MaxOutputTokens = 131072
+	MaxTimeoutMs    = 600000
+)
+
+// Sampling holds the sampling controls. Every field is optional; a provider that cannot carry one refuses the request
+// before anything is reserved (unsupported_capability) rather than ignoring it.
+type Sampling struct {
+	Temperature *float64 `json:"temperature,omitempty"`
+	TopP        *float64 `json:"top_p,omitempty"`
+	Stop        []string `json:"stop,omitempty"`
+	Seed        *int64   `json:"seed,omitempty"`
+}
+
 // Invocation is one request to run a service.
 type Invocation struct {
 	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
-	Service        string          `json:"service"`
-	ServiceVersion *int64          `json:"service_version,omitempty"`
-	CustomerID     string          `json:"customer_id"`
-	PayerMode      string          `json:"payer_mode"`
-	Input          Input           `json:"input"`
-	Limits         Limits          `json:"limits"`
-	Stream         bool            `json:"stream"`
+	// Sampling, ReasoningEffort and Tags are nil when absent, so a request without them keeps its exact canonical form
+	// and digest. ReasoningEffort is low, medium or high; Tags are one to sixteen attribution labels the router never
+	// interprets.
+	Sampling        *Sampling         `json:"sampling,omitempty"`
+	ReasoningEffort *string           `json:"reasoning_effort,omitempty"`
+	Tags            map[string]string `json:"tags,omitempty"`
+	Service         string            `json:"service"`
+	ServiceVersion  *int64            `json:"service_version,omitempty"`
+	CustomerID      string            `json:"customer_id"`
+	PayerMode       string            `json:"payer_mode"`
+	Input           Input             `json:"input"`
+	Limits          Limits            `json:"limits"`
+	Stream          bool              `json:"stream"`
 }
 
 // Input is what an invocation asks for: chat messages (optionally with tools), or a bounded task. Tools and

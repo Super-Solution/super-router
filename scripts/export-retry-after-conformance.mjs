@@ -1,4 +1,4 @@
-// Writes backends/rust/conformance/retry_after.v1.json: how the value of a Retry-After header is read.
+// Writes conformance/retry_after.v1.json: how the value of a Retry-After header is read.
 //
 // The expected answers come from the small model below, written independently of the Rust and Go readers: only
 // the delta-seconds form (a non-negative number, whole or with a fraction) is read, in milliseconds rounded down and
@@ -9,7 +9,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const file = join(dirname(fileURLToPath(import.meta.url)), "..", "backends", "rust", "conformance", "retry_after.v1.json");
+const file = join(dirname(fileURLToPath(import.meta.url)), "..", "conformance", "retry_after.v1.json");
 const CAP = 86_400_000;
 
 function read(value) {
@@ -30,6 +30,6 @@ const inputs = [
 const cases = inputs.map((header) => ({ header, expect_ms: read(header) }));
 writeFileSync(
   file,
-  JSON.stringify({ version: 1, description: "Retry-After header (delta-seconds form) to milliseconds, or null. Written by scripts/export-retry-after-conformance.mjs; Rust and Go only.", cases }, null, 1) + "\n",
+  JSON.stringify({ version: 1, description: "Retry-After header (delta-seconds form) to milliseconds, or null. Written by scripts/export-retry-after-conformance.mjs; Shared by every backend that implements it (see conformance/README.md).", cases }, null, 1) + "\n",
 );
 console.log(`retry_after: ${cases.length} cases`);

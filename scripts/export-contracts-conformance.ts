@@ -74,6 +74,10 @@ service("optional scores", (s) => {
   Object.assign(o(s), { latency_ms: 120.5, reliability: 0.99, quality: 0 });
 });
 service("max safe integer version", (s) => (s.version = 9007199254740991));
+service("long output service and offering", (s) => {
+  s.max_output_tokens = 131072;
+  o(s).max_output_tokens = 131072;
+});
 const serviceMutations: Record<string, (s: Json) => unknown> = {
   "unknown top-level key": (s: Json) => (s.extra = 1),
   "missing id": (s: Json) => delete s.id,
@@ -120,6 +124,7 @@ const serviceMutations: Record<string, (s: Json) => unknown> = {
   "unknown score above one": (s: Json) => (s.unknown_score = 1.5),
   "unknown score null": (s: Json) => (s.unknown_score = null),
   "max output tokens zero": (s: Json) => (s.max_output_tokens = 0),
+  "max output tokens 131073": (s: Json) => (s.max_output_tokens = 131073),
   "task kind unknown": (s: Json) => (s.task_kind = "pdf"),
   "price missing asset": (s: Json) => delete s.price.asset,
   "price per zero": (s: Json) => (s.price.per = 0),
@@ -135,7 +140,8 @@ const serviceMutations: Record<string, (s: Json) => unknown> = {
   "offering input tokens zero": (s: Json) => (o(s).max_input_tokens = 0),
   "offering input tokens too large": (s: Json) =>
     (o(s).max_input_tokens = 1_000_001),
-  "offering output tokens 8193": (s: Json) => (o(s).max_output_tokens = 8193),
+  "offering output tokens 131073": (s: Json) =>
+    (o(s).max_output_tokens = 131073),
   "offering reliability above one": (s: Json) => (o(s).reliability = 1.1),
   "offering latency negative": (s: Json) => (o(s).latency_ms = -1),
   "offering enabled missing": (s: Json) => delete o(s).enabled,
@@ -164,6 +170,59 @@ invocation("task", (i) => {
   i.limits.max_usage = { images: 2 };
 });
 invocation("stream flag", (i) => (i.stream = true));
+invocation("long output and long timeout", (i) => {
+  i.limits.max_output_tokens = 131072;
+  i.limits.timeout_ms = 600000;
+});
+invocation("sampling", (i) => {
+  i.sampling = {
+    temperature: 0.2,
+    top_p: 0.9,
+    stop: ["END", "\n\n"],
+    seed: -7,
+  };
+});
+invocation("sampling single field", (i) => (i.sampling = { top_p: 1 }));
+invocation("sampling temperature bounds", (i) => {
+  i.sampling = { temperature: 0 };
+});
+invocation("reasoning effort", (i) => (i.reasoning_effort = "high"));
+invocation("tags", (i) => {
+  i.tags = {
+    team: "search",
+    "env:stage": "ünï 🙂 ok",
+    "a.b_c-d": "x".repeat(256),
+  };
+});
+invocation("structured output", (i) => {
+  i.response_format = {
+    type: "json_schema",
+    json_schema: {
+      name: "answer",
+      strict: true,
+      schema: {
+        type: "object",
+        properties: { answer: { type: ["string", "null"], default: null } },
+        required: ["answer"],
+        additionalProperties: false,
+      },
+    },
+  };
+});
+invocation("structured strict omitted", (i) => {
+  i.response_format = {
+    type: "json_schema",
+    json_schema: {
+      name: "answer",
+      schema: {
+        type: "object",
+        properties: { answer: { type: ["string", "null"], default: null } },
+        required: ["answer"],
+        additionalProperties: false,
+      },
+    },
+  };
+});
 invocation("unicode content", (i) => {
   i.input.messages = [{ role: "user", content: 'héllo   "q" \\ \n 🙂 <&>' }];
 });
@@ -179,7 +238,43 @@ invocation("content 32000 UTF-16 units", (i) => {
 invocation("content 16000 emoji (32000 units)", (i) => {
   i.input.messages = [{ role: "user", content: "😀".repeat(16000) }];
 });
+const schemaOf = (): Json => ({
+  type: "object",
+  properties: { answer: { type: ["string", "null"], default: null } },
+  required: ["answer"],
+  additionalProperties: false,
+});
+const format = (edit?: (j: Json) => void) => {
+  const json_schema: Json = {
+    name: "answer",
+    strict: true,
+    schema: schemaOf(),
+  };
+  edit?.(json_schema);
+  return { type: "json_schema", json_schema };
+};
 const invocationMutations: Record<string, (s: Json) => unknown> = {
+  "structured schema invalid": (i: Json) =>
+    (i.response_format = format((j) => (j.schema = []))),
+  "structured strict false": (i: Json) =>
+    (i.response_format = format((j) => (j.strict = false))),
+  "structured unknown key": (i: Json) => {
+    i.response_format = format();
+    i.response_format.extra = true;
+  },
+  "structured on task": (i: Json) => {
+    i.input = { task: { kind: "image", prompt: "p" } };
+    i.response_format = format();
+  },
+  "structured name with space": (i: Json) =>
+    (i.response_format = format((j) => (j.name = "a b"))),
+  "structured description 1025 characters": (i: Json) =>
+    (i.response_format = format((j) => (j.description = "d".repeat(1025)))),
+  "structured type text": (i: Json) => {
+    i.response_format = format();
+    i.response_format.type = "text";
+  },
+  "structured null": (i: Json) => (i.response_format = null),
   "unknown key": (i: Json) => (i.extra = 1),
   "payer mode platform": (i: Json) => (i.payer_mode = "platform"),
   "missing service": (i: Json) => delete i.service,
@@ -206,10 +301,41 @@ const invocationMutations: Record<string, (s: Json) => unknown> = {
   "task empty prompt": (i: Json) =>
     (i.input = { task: { kind: "image", prompt: "" } }),
   "max output zero": (i: Json) => (i.limits.max_output_tokens = 0),
-  "max output 8193": (i: Json) => (i.limits.max_output_tokens = 8193),
+  "max output 131073": (i: Json) => (i.limits.max_output_tokens = 131073),
   "max output fractional": (i: Json) => (i.limits.max_output_tokens = 1.5),
   "timeout 99": (i: Json) => (i.limits.timeout_ms = 99),
-  "timeout 120001": (i: Json) => (i.limits.timeout_ms = 120001),
+  "timeout 600001": (i: Json) => (i.limits.timeout_ms = 600001),
+  "sampling empty": (i: Json) => (i.sampling = {}),
+  "sampling unknown key": (i: Json) => (i.sampling = { top_k: 4 }),
+  "sampling temperature 2.1": (i: Json) => (i.sampling = { temperature: 2.1 }),
+  "sampling temperature negative": (i: Json) =>
+    (i.sampling = { temperature: -0.1 }),
+  "sampling top_p zero": (i: Json) => (i.sampling = { top_p: 0 }),
+  "sampling top_p above one": (i: Json) => (i.sampling = { top_p: 1.01 }),
+  "sampling stop empty list": (i: Json) => (i.sampling = { stop: [] }),
+  "sampling stop five": (i: Json) =>
+    (i.sampling = { stop: ["a", "b", "c", "d", "e"] }),
+  "sampling stop empty string": (i: Json) => (i.sampling = { stop: [""] }),
+  "sampling stop 65 characters": (i: Json) =>
+    (i.sampling = { stop: ["a".repeat(65)] }),
+  "sampling seed fractional": (i: Json) => (i.sampling = { seed: 1.5 }),
+  "sampling seed above safe": (i: Json) =>
+    (i.sampling = { seed: 9007199254740992 }),
+  "sampling null": (i: Json) => (i.sampling = null),
+  "reasoning effort unknown": (i: Json) => (i.reasoning_effort = "max"),
+  "reasoning effort null": (i: Json) => (i.reasoning_effort = null),
+  "tags empty": (i: Json) => (i.tags = {}),
+  "tags seventeen": (i: Json) =>
+    (i.tags = Object.fromEntries(
+      Array.from({ length: 17 }, (_, n) => [`k${n}`, "v"]),
+    )),
+  "tags key with space": (i: Json) => (i.tags = { "a b": "v" }),
+  "tags key 65 characters": (i: Json) => (i.tags = { ["k".repeat(65)]: "v" }),
+  "tags empty value": (i: Json) => (i.tags = { k: "" }),
+  "tags value 257 characters": (i: Json) => (i.tags = { k: "v".repeat(257) }),
+  "tags value with newline": (i: Json) => (i.tags = { k: "a\nb" }),
+  "tags value not a string": (i: Json) => (i.tags = { k: 1 }),
+  "tags as list": (i: Json) => (i.tags = ["a"]),
   "max charge scale 8": (i: Json) =>
     (i.limits.max_charge = { asset: "a", atoms: "1", scale: 8 }),
   "max charge atoms leading zero": (i: Json) =>
@@ -222,19 +348,41 @@ const invocationMutations: Record<string, (s: Json) => unknown> = {
 for (const [name, edit] of Object.entries(invocationMutations))
   invocation(name, edit);
 
-writeFileSync(
-  new URL("../conformance/contracts.v1.json", import.meta.url),
+const rootUrl = new URL("../conformance/contracts.v1.json", import.meta.url);
+const rustUrl = new URL(
+  "../backends/rust/conformance/contracts.v1.json",
+  import.meta.url,
+);
+// The Rust copy is the reference's cases first, then the cases for features the reference does not have yet. Read both
+// files as they are before writing: a case the previous root file had is regenerated, anything else in the Rust copy is
+// an extra and is kept, in order, unless the reference now has a case of the same name.
+const previousRoot = JSON.parse(readFileSync(rootUrl, "utf8"));
+const previousRust = JSON.parse(readFileSync(rustUrl, "utf8"));
+const merge = (kind: "service" | "invocation", fresh: Json[]) => {
+  const generated = new Set<string>(
+    previousRoot[kind].map((c: Json) => c.name),
+  );
+  const names = new Set(fresh.map((c) => c.name));
+  const extras = previousRust[kind].filter(
+    (c: Json) => !generated.has(c.name) && !names.has(c.name),
+  );
+  return [...fresh, ...extras];
+};
+const document = (service: Json[], invocation: Json[]) =>
   JSON.stringify(
     {
       version: 1,
-      description:
-        "Parsing untrusted JSON into a service or an invocation. Generated from the TypeScript reference by scripts/export-contracts-conformance.ts.",
-      service: services,
-      invocation: invocations,
+      description: previousRoot.description,
+      service,
+      invocation,
     },
     null,
     1,
-  ) + "\n",
+  ) + "\n";
+writeFileSync(rootUrl, document(services, invocations));
+writeFileSync(
+  rustUrl,
+  document(merge("service", services), merge("invocation", invocations)),
 );
 console.log(
   `contracts.v1.json: ${services.length} service and ${invocations.length} invocation cases`,

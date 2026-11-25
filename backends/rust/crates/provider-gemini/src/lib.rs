@@ -280,7 +280,16 @@ fn retry_after_of(response: &reqwest::Response) -> Option<u64> {
 
 impl Provider for Gemini {
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities { tools: true, images: true, structured_output: true }
+        // No seed (the API's is a 32-bit integer; the contract's is wider) and no reasoning effort (its thinking controls differ by model).
+        ProviderCapabilities {
+            tools: true,
+            images: true,
+            structured_output: true,
+            temperature: true,
+            top_p: true,
+            stop: true,
+            ..ProviderCapabilities::default()
+        }
     }
 
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream {
@@ -294,6 +303,7 @@ impl Provider for Gemini {
         let max_output = input.limits.max_output_tokens;
         // The schema goes in as JSON Schema; the API has no place for its name or description, and a schema is always
         // enforced (the contract refuses `strict: false`).
+        let sampling = input.sampling.clone();
         let response_schema = input.response_format.as_ref().map(|f| Value::Object(f.json_schema.schema.clone()));
         let timeout = u64::try_from(input.limits.timeout_ms).ok().filter(|ms| *ms > 0).map(Duration::from_millis);
         let model = model_segment(&offering.upstream_model).map(str::to_string);
@@ -325,6 +335,17 @@ impl Provider for Gemini {
             if let Some(schema) = response_schema {
                 config["responseMimeType"] = json!("application/json");
                 config["responseJsonSchema"] = schema;
+            }
+            if let Some(s) = &sampling {
+                if let Some(t) = s.temperature {
+                    config["temperature"] = json!(t);
+                }
+                if let Some(p) = s.top_p {
+                    config["topP"] = json!(p);
+                }
+                if let Some(stop) = &s.stop {
+                    config["stopSequences"] = json!(stop);
+                }
             }
             body.insert("generationConfig".into(), config);
             let url = format!("{}{}/models/{model}:streamGenerateContent?alt=sse", this.base, this.prefix);

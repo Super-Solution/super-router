@@ -109,7 +109,18 @@ test("a request without tools keeps its exact canonical form", () => {
   const parsed = Invocation.parse(demoInput);
   assert.equal("tools" in parsed.input, false);
   assert.equal("tool_choice" in parsed.input, false);
-  assert.deepEqual(invocationNeeds(parsed), { tools: false, images: false });
+  assert.deepEqual(invocationNeeds(parsed), {
+    tools: false,
+    images: false,
+    structured_output: false,
+    temperature: false,
+    top_p: false,
+    stop: false,
+    seed: false,
+    reasoning_effort: false,
+  });
+  for (const key of ["sampling", "reasoning_effort", "tags", "response_format"])
+    assert.equal(canonical(parsed).includes(key), false, key);
   assert.equal(canonical(parsed).includes("tool"), false);
 });
 
@@ -630,4 +641,33 @@ test("inference bodies may exceed the general limit, up to their own", async () 
   assert.equal(accepted.status, 200);
   const refused = await post(JSON.stringify({ pad: "x".repeat(4_000_001) }));
   assert.equal(refused.status, 413);
+});
+
+test("sampling, reasoning effort and tags are needs a provider must declare", () => {
+  const parsed = Invocation.parse({
+    ...demoInput,
+    sampling: { temperature: 0.2, stop: ["END"], seed: 1 },
+    reasoning_effort: "low",
+    tags: { team: "search" },
+  });
+  const needs = invocationNeeds(parsed);
+  assert.deepEqual(
+    Object.entries(needs)
+      .filter(([, wanted]) => wanted)
+      .map(([name]) => name),
+    ["temperature", "stop", "seed", "reasoning_effort"],
+  );
+  // The shipped providers carry what their upstream takes and nothing they would drop.
+  const openai = new OpenAIProvider(() => "k").capabilities;
+  const anthropic = new AnthropicProvider(() => "k").capabilities;
+  assert.deepEqual(
+    [openai.temperature, openai.top_p, openai.reasoning_effort],
+    [true, true, true],
+  );
+  assert.equal("stop" in openai || "seed" in openai, false);
+  assert.deepEqual(
+    [anthropic.temperature, anthropic.top_p, anthropic.stop],
+    [true, true, true],
+  );
+  assert.equal("seed" in anthropic || "reasoning_effort" in anthropic, false);
 });

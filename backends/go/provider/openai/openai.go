@@ -10,8 +10,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/Super-Solution/super-router/backends/go/contracts"
 	"github.com/Super-Solution/super-router/backends/go/internal/sse"
@@ -30,7 +30,8 @@ var _ contracts.CapableProvider = (*Provider)(nil)
 
 // Capabilities implements contracts.CapableProvider: tool calling and image input.
 func (p *Provider) Capabilities() contracts.ProviderCapabilities {
-	return contracts.ProviderCapabilities{Tools: true, Images: true}
+	// The Responses API has no stop sequences and no seed: a request that asks for them is refused before reserving.
+	return contracts.ProviderCapabilities{Tools: true, Images: true, Temperature: true, TopP: true, ReasoningEffort: true}
 }
 
 // Option configures New.
@@ -86,16 +87,6 @@ func perr(definitive, retryable bool, code string) error {
 	return &contracts.ProviderError{Definitive: definitive, Retryable: retryable, Code: code}
 }
 
-// withRetryAfter adds the wait the provider asked for in its Retry-After header, in milliseconds, to a refusal.
-func withRetryAfter(err error, res *http.Response) error {
-	if pe, ok := err.(*contracts.ProviderError); ok {
-		if ms, ok := contracts.ParseRetryAfter(res.Header.Get("Retry-After")); ok {
-			pe.RetryAfterMs = ms
-		}
-	}
-	return err
-}
-
 // Invoke implements contracts.Provider.
 func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering contracts.Offering, emit func(contracts.ProviderEvent) error) error {
 	if in.Input.Task != nil {
@@ -110,6 +101,17 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 		"store": false, "stream": true,
 	}
 	toolFields(fields, in.Input)
+	if sm := in.Sampling; sm != nil {
+		if sm.Temperature != nil {
+			fields["temperature"] = *sm.Temperature
+		}
+		if sm.TopP != nil {
+			fields["top_p"] = *sm.TopP
+		}
+	}
+	if in.ReasoningEffort != nil {
+		fields["reasoning"] = map[string]any{"effort": *in.ReasoningEffort}
+	}
 	body, _ := json.Marshal(fields)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.base+"/v1/responses", bytes.NewReader(body))
 	if err != nil {
@@ -123,13 +125,11 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		switch res.StatusCode {
-		case 400, 401, 403, 404, 422:
-			return withRetryAfter(perr(true, false, "upstream_http_"+strconv.Itoa(res.StatusCode)), res)
-		case 429:
-			return withRetryAfter(perr(true, true, "upstream_http_429"), res)
+		var body []byte
+		if res.StatusCode >= 400 && res.StatusCode < 500 {
+			body, _ = io.ReadAll(io.LimitReader(res.Body, contracts.RefusalBodyLimit))
 		}
-		return withRetryAfter(perr(false, false, "upstream_http_"+strconv.Itoa(res.StatusCode)), res)
+		return contracts.RefusalFrom(res.StatusCode, res.Header.Get("Retry-After"), body)
 	}
 	terminal := false
 	// Upstream numbers every output item; tool calls are numbered from zero among themselves.

@@ -8,7 +8,10 @@ use serde_json::Value;
 use super_router_pricing::{valid_atoms, valid_id, valid_unit_name, Price};
 
 use crate::datetime::valid_datetime;
-use crate::types::{is_media, kind_meter, safe_non_neg, Invocation, MeterLimits, Offering, RouterError, Service, MAX_SAFE};
+use crate::types::{
+    is_media, kind_meter, safe_non_neg, Invocation, MeterLimits, Offering, RouterError, Sampling, Service, MAX_OUTPUT_TOKENS, MAX_SAFE,
+    MAX_TIMEOUT_MS,
+};
 
 /// The error every `parse_*` function returns for input the reference would reject.
 pub fn invalid_request() -> RouterError {
@@ -84,7 +87,7 @@ fn valid_offering(o: &Offering) -> bool {
     if o.source != "platform" && o.source != "byok" {
         return false;
     }
-    if !(1..=1_000_000).contains(&o.max_input_tokens) || !(1..=8192).contains(&o.max_output_tokens) || !valid_price(&o.price) {
+    if !(1..=1_000_000).contains(&o.max_input_tokens) || !(1..=MAX_OUTPUT_TOKENS).contains(&o.max_output_tokens) || !valid_price(&o.price) {
         return false;
     }
     if o.latency_ms.is_some_and(|l| l.partial_cmp(&0.0).is_none_or(|c| c.is_lt())) {
@@ -134,7 +137,7 @@ fn valid_service(s: &Service) -> bool {
     if !valid_price(&s.price) || s.platform_price.as_ref().is_some_and(|p| !valid_price(p)) {
         return false;
     }
-    if !(1..=5).contains(&s.max_attempts) || !(1..=8192).contains(&s.max_output_tokens) {
+    if !(1..=5).contains(&s.max_attempts) || !(1..=MAX_OUTPUT_TOKENS).contains(&s.max_output_tokens) {
         return false;
     }
     if !valid_atoms(&s.max_provider_cost) || !valid_atoms(&s.cost_scale) || s.cost_scale.bytes().all(|b| b == b'0') {
@@ -171,7 +174,33 @@ fn valid_schema_name(s: &str) -> bool {
     (1..=64).contains(&s.len()) && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
 }
 
+/// Whether a value is in `lo..=hi` (a NaN is in no range; JSON cannot carry one, but a caller may build the type).
+fn within(x: f64, lo: f64, hi: f64) -> bool {
+    x >= lo && x <= hi
+}
+
+fn valid_sampling(s: &Sampling) -> bool {
+    let any = s.temperature.is_some() || s.top_p.is_some() || s.stop.is_some() || s.seed.is_some();
+    any && s.temperature.is_none_or(|t| within(t, 0.0, 2.0))
+        && s.top_p.is_none_or(|p| p > 0.0 && p <= 1.0)
+        && s.stop.as_ref().is_none_or(|stop| (1..=4).contains(&stop.len()) && stop.iter().all(|x| in_range(x, 1, 64)))
+        && s.seed.is_none_or(|n| n.abs() <= MAX_SAFE)
+}
+
+fn valid_tags(tags: &std::collections::BTreeMap<String, String>) -> bool {
+    let key_ok =
+        |k: &str| (1..=64).contains(&k.len()) && k.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'.' | b':' | b'-'));
+    let value_ok = |v: &str| in_range(v, 1, 256) && !v.chars().any(|c| c < ' ' || c == '\u{7f}');
+    (1..=16).contains(&tags.len()) && tags.iter().all(|(k, v)| key_ok(k) && value_ok(v))
+}
+
 fn valid_invocation(i: &Invocation) -> bool {
+    if i.sampling.as_ref().is_some_and(|s| !valid_sampling(s))
+        || i.reasoning_effort.as_deref().is_some_and(|e| !matches!(e, "low" | "medium" | "high"))
+        || i.tags.as_ref().is_some_and(|t| !valid_tags(t))
+    {
+        return false;
+    }
     if !valid_id(&i.service) || !valid_id(&i.customer_id) || i.payer_mode != "developer" {
         return false;
     }
@@ -200,7 +229,7 @@ fn valid_invocation(i: &Invocation) -> bool {
         }
     }
     let l = &i.limits;
-    if !(1..=8192).contains(&l.max_output_tokens) || !(100..=120_000).contains(&l.timeout_ms) {
+    if !(1..=MAX_OUTPUT_TOKENS).contains(&l.max_output_tokens) || !(100..=MAX_TIMEOUT_MS).contains(&l.timeout_ms) {
         return false;
     }
     if l.max_usage.as_ref().is_some_and(|m| !valid_meter_limits(m)) {

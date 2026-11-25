@@ -30,6 +30,8 @@ export SUPERROUTER_API_KEY=sr_$(openssl rand -hex 32)
 export SUPERROUTER_DIGEST_KEY=$(openssl rand -hex 32)
 export SUPERROUTER_MOCK=1                 # or OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY
 export DATABASE_URL=postgres://...        # optional: unset means the in-memory store
+export SUPERROUTER_HEALTH=on              # optional: skip offerings whose own failure repeats
+export OPENAI_BASE_URL=https://llm.internal/openai   # optional: another host, without /v1
 go run ./cmd/super-router-server
 ```
 
@@ -118,7 +120,7 @@ These match the Rust data plane and are pinned by its conformance copy:
   returns a `FailureClass`; a failure that belongs to the offering (credentials, model, quota, region, rate limit) is
   definitive and retryable, so the router tries the next offering. `routing.HealthBook` (with `router.WithHealth`)
   skips offerings whose own failure is repeating, with class-based cooldowns and one half-open probe, and fails open
-  when every candidate is cooling. Off by default. Cases: `failure.v1.json`, `health.v1.json`.
+  when every candidate is cooling. Off by default. Cases: `failure.v1.json` (shared by every backend, the three providers read their refusals through it) and `health.v1.json` (Rust and Go only).
 - **Finish reasons.** A provider that ends an answer by content policy emits completion `filtered`: stored as partial,
   reported as `finish_reason: content_filter`.
 - **Downgrade policy.** A tier service may name a lower tier and its offerings. They pass the same hard limits, are

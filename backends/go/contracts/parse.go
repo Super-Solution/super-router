@@ -250,7 +250,7 @@ func validOffering(o *Offering) bool {
 	if o.Source != "platform" && o.Source != "byok" {
 		return false
 	}
-	if o.MaxInputTokens < 1 || o.MaxInputTokens > 1_000_000 || o.MaxOutputTokens < 1 || o.MaxOutputTokens > 8192 {
+	if o.MaxInputTokens < 1 || o.MaxInputTokens > 1_000_000 || o.MaxOutputTokens < 1 || o.MaxOutputTokens > MaxOutputTokens {
 		return false
 	}
 	if !validPrice(o.Price) {
@@ -337,7 +337,7 @@ func validService(s *Service) bool {
 	if !validPrice(s.Price) || s.PlatformPrice != nil && !validPrice(*s.PlatformPrice) {
 		return false
 	}
-	if s.MaxAttempts < 1 || s.MaxAttempts > 5 || s.MaxOutputTokens < 1 || s.MaxOutputTokens > 8192 {
+	if s.MaxAttempts < 1 || s.MaxAttempts > 5 || s.MaxOutputTokens < 1 || s.MaxOutputTokens > MaxOutputTokens {
 		return false
 	}
 	if !atomsRe.MatchString(s.MaxProviderCost) || !atomsRe.MatchString(s.CostScale) || strings.Trim(s.CostScale, "0") == "" {
@@ -387,7 +387,56 @@ func ParseInvocation(data []byte) (Invocation, error) {
 	return in, nil
 }
 
+func validSampling(s *Sampling) bool {
+	if s.Temperature == nil && s.TopP == nil && s.Stop == nil && s.Seed == nil {
+		return false
+	}
+	if s.Temperature != nil && !(*s.Temperature >= 0 && *s.Temperature <= 2) {
+		return false
+	}
+	if s.TopP != nil && !(*s.TopP > 0 && *s.TopP <= 1) {
+		return false
+	}
+	if s.Stop != nil {
+		if len(s.Stop) < 1 || len(s.Stop) > 4 {
+			return false
+		}
+		for _, x := range s.Stop {
+			if n := length(x); n < 1 || n > 64 {
+				return false
+			}
+		}
+	}
+	return s.Seed == nil || *s.Seed >= -maxSafe && *s.Seed <= maxSafe
+}
+
+func validTags(tags map[string]string) bool {
+	if len(tags) < 1 || len(tags) > 16 {
+		return false
+	}
+	for k, v := range tags {
+		if !tagKeyRe.MatchString(k) {
+			return false
+		}
+		if n := length(v); n < 1 || n > 256 {
+			return false
+		}
+		for _, r := range v {
+			if r < ' ' || r == 0x7f {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func validInvocation(in *Invocation) bool {
+	if in.Sampling != nil && !validSampling(in.Sampling) || in.Tags != nil && !validTags(in.Tags) {
+		return false
+	}
+	if e := in.ReasoningEffort; e != nil && *e != "low" && *e != "medium" && *e != "high" {
+		return false
+	}
 	if !validID(in.Service) || !validID(in.CustomerID) || in.PayerMode != "developer" {
 		return false
 	}
@@ -410,7 +459,7 @@ func validInvocation(in *Invocation) bool {
 		}
 	}
 	l := in.Limits
-	if l.MaxOutputTokens < 1 || l.MaxOutputTokens > 8192 || l.TimeoutMs < 100 || l.TimeoutMs > 120000 {
+	if l.MaxOutputTokens < 1 || l.MaxOutputTokens > MaxOutputTokens || l.TimeoutMs < 100 || l.TimeoutMs > MaxTimeoutMs {
 		return false
 	}
 	if l.MaxUsage != nil && !validMeterLimits(l.MaxUsage) {
@@ -421,6 +470,8 @@ func validInvocation(in *Invocation) bool {
 	}
 	return true
 }
+
+var tagKeyRe = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,64}$`)
 
 func validContent(s string) bool { n := length(s); return n >= 1 && n <= 32000 }
 

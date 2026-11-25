@@ -37,9 +37,11 @@ type Provider struct {
 
 var _ contracts.CapableProvider = (*Provider)(nil)
 
-// Capabilities implements contracts.CapableProvider: tool calling and image input (inline data only).
+// Capabilities implements contracts.CapableProvider: tool calling, image input (inline data only), structured output and
+// the temperature, top_p and stop controls. No seed (the API's is a 32-bit integer; the contract's is wider) and no
+// reasoning effort (its thinking controls differ by model).
 func (p *Provider) Capabilities() contracts.ProviderCapabilities {
-	return contracts.ProviderCapabilities{Tools: true, Images: true, StructuredOutput: true}
+	return contracts.ProviderCapabilities{Tools: true, Images: true, StructuredOutput: true, Temperature: true, TopP: true, Stop: true}
 }
 
 // Option configures New.
@@ -168,6 +170,17 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	if f := in.ResponseFormat; f != nil {
 		config["responseMimeType"] = "application/json"
 		config["responseJsonSchema"] = f.JSONSchema.Schema
+	}
+	if s := in.Sampling; s != nil {
+		if s.Temperature != nil {
+			config["temperature"] = *s.Temperature
+		}
+		if s.TopP != nil {
+			config["topP"] = *s.TopP
+		}
+		if s.Stop != nil {
+			config["stopSequences"] = s.Stop
+		}
 	}
 	fields := map[string]any{"contents": turns, "generationConfig": config}
 	// Omitted rather than sent empty when there is no system message.

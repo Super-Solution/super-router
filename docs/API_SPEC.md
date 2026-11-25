@@ -69,6 +69,10 @@
 
 沒有宣告 tools 的請求，其 canonical JSON 與冪等摘要完全不變。Provider 必須宣告 `capabilities.tools`／`capabilities.images`；沒有任何可用 offering 時回 422 `unsupported_capability`，且不會預留任何款項。`POST /v1/inferences` 的請求本文上限為 4 MB（驗證身分後才讀取），其他路由維持 256 KB。Go 與 Rust 資料平面以 `conformance/tools.v1.json` 對照參考實作（合約解析、canonical JSON、OpenAI／Anthropic 的請求本文與串流解析）；Python 資料平面尚未實作工具呼叫，收到這些欄位會以 `invalid_request` 拒絕。
 
+取樣、推理與標籤（四種語言的資料平面皆解析，`conformance/contracts.v1.json`）：請求頂層可帶 `sampling`（`temperature` 0 到 2、`top_p` 大於 0 且至多 1、`stop` 最多 4 個各 1 到 64 字元的字串、`seed` 安全整數；至少一項）、`reasoning_effort`（`low`、`medium`、`high`）與 `tags`（1 到 16 組名稱／值，名稱 `[A-Za-z0-9_.:-]{1,64}`，值 1 到 256 字元且不含控制字元）。省略這些欄位時 canonical JSON 與冪等摘要完全不變。每個控制項都是 provider 的一項 `capabilities`（`temperature`、`top_p`、`stop`、`seed`、`reasoning_effort`）：沒有任何可用 offering 能承載時回 422 `unsupported_capability`，且不預留款項，不會默默忽略。目前 OpenAI Responses 承載 `temperature`、`top_p`、`reasoning_effort`（沒有 `stop` 與 `seed`）；Anthropic Messages 承載 `temperature`、`top_p`、`stop`；Gemini（Rust、Go）承載 `temperature`、`top_p`、`stop`；`seed` 與 Anthropic／Gemini 的 `reasoning_effort` 尚無 provider 承載。以上都只用固定的測試資料（fixtures）驗證，未對真實上游驗證。`tags` 目前只會被驗證並納入冪等摘要，尚未寫入請求紀錄或用於限額；它們是給 Observer（尚未提供）與日後的歸因查詢用的。
+
+輸出與逾時上限：`limits.max_output_tokens`、offering 與 Service 的 `max_output_tokens` 上限為 131072（原為 8192，無法上架 128,000 token 輸出的模型）；`limits.timeout_ms` 上限為 600000（原為 120000，超過兩分鐘的推理串流會被切斷）。實際生效的仍是 Service 與 offering 自己設定的值，這只是契約的天花板。
+
 ### 3.2 成功回應
 
 ```json

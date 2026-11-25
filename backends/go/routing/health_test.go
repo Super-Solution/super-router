@@ -13,7 +13,7 @@ import (
 )
 
 func TestHealthConformance(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "rust", "conformance", "health.v1.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "conformance", "health.v1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

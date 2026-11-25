@@ -156,3 +156,64 @@ func generic(t *testing.T, raw []byte) any {
 	}
 	return v
 }
+
+type refusalCase struct {
+	Name       string  `json:"name"`
+	Status     int     `json:"status"`
+	RetryAfter *string `json:"retry_after"`
+	Body       string  `json:"body"`
+	Expect     struct {
+		Definitive   bool   `json:"definitive"`
+		Retryable    bool   `json:"retryable"`
+		Code         string `json:"code"`
+		RetryAfterMs *int64 `json:"retry_after_ms"`
+	} `json:"expect"`
+}
+
+// RunRefusals serves every `provider_responses` case of conformance/failure.v1.json as a real HTTP refusal (the
+// status, the Retry-After header and the body as the provider sent them) and checks the error the provider returns:
+// whether the provider certainly did no work, whether another offering may be tried, the class code and the wait.
+func RunRefusals(t *testing.T, make func(baseURL string) contracts.Provider) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "conformance", "failure.v1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data struct {
+		Cases []refusalCase `json:"provider_responses"`
+	}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Cases) < 15 {
+		t.Fatalf("only %d provider responses", len(data.Cases))
+	}
+	var in contracts.Invocation
+	in.Service, in.CustomerID, in.PayerMode = "s", "c", "developer"
+	in.Input.Messages = []contracts.Message{{Role: "user", Content: "hi"}}
+	in.Limits.MaxOutputTokens = 16
+	for _, c := range data.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if c.RetryAfter != nil {
+					w.Header().Set("Retry-After", *c.RetryAfter)
+				}
+				w.WriteHeader(c.Status)
+				_, _ = w.Write([]byte(c.Body))
+			}))
+			defer srv.Close()
+			err := make(srv.URL).Invoke(context.Background(), in, contracts.Offering{UpstreamModel: "m"}, func(contracts.ProviderEvent) error { return nil })
+			var pe *contracts.ProviderError
+			if !errors.As(err, &pe) {
+				t.Fatalf("not a provider error: %v", err)
+			}
+			var wait int64
+			if c.Expect.RetryAfterMs != nil {
+				wait = *c.Expect.RetryAfterMs
+			}
+			if pe.Definitive != c.Expect.Definitive || pe.Retryable != c.Expect.Retryable || pe.Code != c.Expect.Code || pe.RetryAfterMs != wait {
+				t.Fatalf("got definitive=%v retryable=%v code=%s wait=%d, want %+v", pe.Definitive, pe.Retryable, pe.Code, pe.RetryAfterMs, c.Expect)
+			}
+		})
+	}
+}

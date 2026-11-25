@@ -649,6 +649,11 @@ const inv = (input: Json, edit?: (v: Json) => void) => {
   return Invocation.parse(v);
 };
 
+/** Cases only the providers that carry the control are asked: the others refuse it before reserving (capabilities). */
+const onlyFor: Record<string, string[]> = {
+  "sampling stop sequences": ["anthropic"],
+  "reasoning effort": ["openai"],
+};
 const requestInputs: Record<string, Json> = {
   "plain text": inv({
     messages: [{ role: "system", content: "Be brief" }, user],
@@ -714,6 +719,18 @@ const requestInputs: Record<string, Json> = {
       { role: "tool", tool_call_id: "c", content: "", is_error: false },
     ],
     tools: [lookup],
+  }),
+  "sampling temperature and top_p": inv({ messages: [user] }, (v) => {
+    v.sampling = { temperature: 0.3, top_p: 0.8 };
+  }),
+  "sampling stop sequences": inv({ messages: [user] }, (v) => {
+    v.sampling = { stop: ["END", "\n\n"] };
+  }),
+  "reasoning effort": inv({ messages: [user] }, (v) => {
+    v.reasoning_effort = "medium";
+  }),
+  "long output limit": inv({ messages: [user] }, (v) => {
+    v.limits.max_output_tokens = 128000;
   }),
   images: inv({
     messages: [
@@ -1127,6 +1144,7 @@ const out: Json = {
 for (const [name, make] of Object.entries(providers)) {
   const requests: Json[] = [];
   for (const [caseName, input] of Object.entries(requestInputs)) {
+    if (onlyFor[caseName] && !onlyFor[caseName].includes(name)) continue;
     const r = await capture(make, input, []);
     requests.push({ name: caseName, invocation: input, body: r.body });
   }
@@ -1146,10 +1164,15 @@ for (const [name, make] of Object.entries(providers)) {
   }
   out[name] = { requests, streams };
 }
-writeFileSync(
-  new URL("../conformance/tools.v1.json", import.meta.url),
-  JSON.stringify(out, null, 1) + "\n",
-);
+// The reference's file and the Rust copy (which Rust and Go read) are the same bytes.
+for (const path of [
+  "../conformance/tools.v1.json",
+  "../backends/rust/conformance/tools.v1.json",
+])
+  writeFileSync(
+    new URL(path, import.meta.url),
+    JSON.stringify(out, null, 1) + "\n",
+  );
 console.log(
   `tools.v1.json: ${invocations.length} invocations, ${Object.keys(requestInputs).length} requests and ${Object.keys(streamCases).length} streams per provider`,
 );

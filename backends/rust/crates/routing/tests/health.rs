@@ -22,7 +22,7 @@ fn policy(v: Option<&Value>) -> HealthPolicy {
 
 #[test]
 fn incidents_match_the_shared_cases() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/health.v1.json");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../conformance/health.v1.json");
     let data: Value = serde_json::from_slice(&std::fs::read(path).expect("read health.v1.json")).expect("parse health.v1.json");
     let cases = data["cases"].as_array().unwrap();
     assert!(cases.len() >= 12, "only {} cases", cases.len());

@@ -141,8 +141,8 @@ def redirect(request: httpx.Request) -> httpx.Response:
 @pytest.mark.parametrize(
     ("name", "handler", "key", "expected"),
     [
-        ("rate limited", status(429), "k", (True, True, "upstream_http_429")),
-        ("unauthorized", status(401), "k", (True, False, "upstream_http_401")),
+        ("rate limited", status(429), "k", (True, True, "rate_limited")),
+        ("unauthorized", status(401), "k", (True, True, "credentials_rejected")),
         ("server error is unknown", status(500), "k", (False, False, "upstream_http_500")),
         ("redirect is refused", redirect, "k", (False, False, "upstream_http_302")),
         ("no credentials", status(200), "", (True, False, "credentials_missing")),
@@ -279,7 +279,7 @@ async def test_anthropic_max_tokens_is_partial():
 @pytest.mark.parametrize(
     ("name", "handler", "key", "expected"),
     [
-        ("rate limited", status(429), "k", (True, True, "upstream_http_429")),
+        ("rate limited", status(429), "k", (True, True, "rate_limited")),
         ("bad request", status(400), "k", (True, False, "upstream_http_400")),
         ("overloaded is unknown", status(529), "k", (False, False, "upstream_http_529")),
         ("no credentials", status(200), "", (True, False, "credentials_missing")),

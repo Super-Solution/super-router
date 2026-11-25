@@ -20,6 +20,9 @@ class AnthropicProvider:
     """``key`` is a string or a function read on every call, so it can rotate; an empty key is a definitive failure.
     ``base_url`` points at an Anthropic-compatible server. Pass ``client`` for proxies, tracing or tests."""
 
+    # No seed and no reasoning effort in this contract: a request that asks for them is refused before reserving.
+    capabilities = frozenset({"temperature", "top_p", "stop"})
+
     def __init__(
         self,
         key: KeySource | None,
@@ -52,6 +55,12 @@ class AnthropicProvider:
             "messages": rest,
             "stream": True,
         }
+        sampling = invocation.get("sampling", {})
+        for name in ("temperature", "top_p"):
+            if name in sampling:
+                body[name] = sampling[name]
+        if "stop" in sampling:
+            body["stop_sequences"] = sampling["stop"]
         headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
         current: dict[str, int | None] | None = None
         upstream_id: str | None = None
