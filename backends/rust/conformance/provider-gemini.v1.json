@@ -725,6 +725,95 @@
     }
    },
    {
+    "name": "sampling",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false,
+     "sampling": {
+      "temperature": 0.3,
+      "top_p": 0.8,
+      "stop": [
+       "END",
+       "\n\n"
+      ]
+     }
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32,
+      "temperature": 0.3,
+      "topP": 0.8,
+      "stopSequences": [
+       "END",
+       "\n\n"
+      ]
+     }
+    }
+   },
+   {
+    "name": "cache is a hint Gemini does not need",
+    "invocation": {
+     "service": "chat",
+     "customer_id": "c1",
+     "payer_mode": "developer",
+     "input": {
+      "messages": [
+       {
+        "role": "user",
+        "content": "Find it"
+       }
+      ]
+     },
+     "limits": {
+      "max_output_tokens": 32,
+      "timeout_ms": 30000
+     },
+     "stream": false,
+     "cache": {
+      "mode": "auto"
+     }
+    },
+    "body": {
+     "contents": [
+      {
+       "role": "user",
+       "parts": [
+        {
+         "text": "Find it"
+        }
+       ]
+      }
+     ],
+     "generationConfig": {
+      "maxOutputTokens": 32
+     }
+    }
+   },
+   {
     "name": "history with text and calls",
     "invocation": {
      "service": "chat",

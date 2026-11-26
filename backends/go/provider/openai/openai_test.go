@@ -107,8 +107,8 @@ func TestFailures(t *testing.T) {
 		definitive, retry bool
 		code              string
 	}{
-		{"rate limited", status(429), "k", invocation(), true, true, "upstream_http_429"},
-		{"unauthorized", status(401), "k", invocation(), true, false, "upstream_http_401"},
+		{"rate limited", status(429), "k", invocation(), true, true, "rate_limited"},
+		{"unauthorized", status(401), "k", invocation(), true, true, "credentials_rejected"},
 		{"server error is unknown", status(500), "k", invocation(), false, false, "upstream_http_500"},
 		{"redirect is refused", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "http://127.0.0.1:1/", 302) }, "k", invocation(), false, false, "upstream_http_302"},
 		{"no credentials", status(200), "", invocation(), true, false, "credentials_missing"},
@@ -165,6 +165,12 @@ func TestCancelledContext(t *testing.T) {
 
 func TestToolsConformance(t *testing.T) {
 	providertest.Run(t, "openai", func(base string) contracts.Provider {
+		return openai.New(func() string { return "test-key" }, openai.WithBaseURL(base))
+	})
+}
+
+func TestRefusalsConformance(t *testing.T) {
+	providertest.RunRefusals(t, func(base string) contracts.Provider {
 		return openai.New(func() string { return "test-key" }, openai.WithBaseURL(base))
 	})
 }

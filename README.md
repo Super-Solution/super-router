@@ -4,7 +4,7 @@
 
 AI routing, billing and serving infrastructure that you embed as a set of packages. Define a **Service** (an AI capability you sell), pick the models behind it, set prices, subscriptions and credits, and let SuperRouter route each request, meter the usage and settle the books.
 
-> **Status: development release (0.3.0).** The local core runs end to end: service versions, model routing, PostgreSQL reserve/settle accounting, HTTP + SSE, an SDK, a recovery worker, multi-tenant roles and keys, subscriptions and scoped credits. The OpenAI and Anthropic adapters are tested against official-format fixtures but have not been accepted against live upstreams, and the three hosted-payment adapters have not been run with real merchant accounts. There is no hosted Cloud and no production-readiness claim.
+> **Status: development release (0.5.0).** The local core runs end to end: service versions, model routing, PostgreSQL reserve/settle accounting, HTTP + SSE, an SDK, a recovery worker, multi-tenant roles and keys, subscriptions and scoped credits. The OpenAI, Anthropic and Gemini adapters are tested against official-format fixtures and fake upstreams but have not been accepted against live upstreams, and the three hosted-payment adapters have not been run with real merchant accounts. There is no hosted Cloud and no production-readiness claim.
 
 ## What it does
 
@@ -32,10 +32,10 @@ Folders group packages by role: `packages/` holds libraries (`adapters/` plug th
 | `packages/bindings/react` | React components: pricing table, checkout status, credit balance, paywall, usage summary |
 | `backends/typescript/server` | HTTP + SSE server: `createRouterServer`, payment integration wiring |
 | `backends/typescript/worker` | Recovery worker library and `super-router-worker` binary |
-| `backends/go`, `backends/python` | Data-plane servers (`net/http` handler, ASGI app) with providers and swappable storage, tested against `conformance/` (see [backends/README.md](backends/README.md)) |
+| `backends/go`, `backends/python`, `backends/rust` | Data-plane servers (`net/http` handler, ASGI app, axum) with providers and swappable storage, tested against the shared `conformance/` data (see [backends/README.md](backends/README.md), which has a table of what each language implements). Go and Rust also carry a Gemini provider, the rate card and failure classification; the Rust backend is published as eleven `super-router-*` crates on crates.io |
 | `apps/server`, `apps/worker` | Local demo entry points (mock model, demo workspace) |
 
-Packages are published under the `@supersolutions` scope, for example `@supersolutions/super-router-core` and `@supersolutions/super-router-sdk`.
+Packages are published under the `@supersolutions` scope, for example `@supersolutions/super-router-core` and `@supersolutions/super-router-sdk`. The Rust data plane is published to crates.io as `super-router-*` (pricing, sse, contracts, routing, router, store-memory, store-postgres, provider-openai, provider-anthropic, provider-gemini, server), versioned separately from npm; the Go and Python backends are not published.
 
 ## Quick start
 

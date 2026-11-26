@@ -1,6 +1,6 @@
 {
   "name": "@supersolutions/super-router-worker",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "Recovery worker for SuperRouter: releases expired reservations, re-settles usage, advances subscription periods.",
   "license": "Apache-2.0",
   "type": "module",
@@ -22,7 +22,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@supersolutions/super-router-storage-postgres": "0.3.0"
+    "@supersolutions/super-router-storage-postgres": "0.5.0"
   },
   "author": "SUPER SOLUTION LABS INC",
   "repository": {

@@ -4,7 +4,7 @@ The Super Router data plane HTTP API as an axum Router.
 
 ```toml
 [dependencies]
-super-router-server = "0.4"
+super-router-server = "0.5"
 ```
 
 `handler(Options)` returns a plain `axum::Router` that mounts on any axum, hyper or tower stack. Authentication is the

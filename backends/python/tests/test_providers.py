@@ -141,8 +141,8 @@ def redirect(request: httpx.Request) -> httpx.Response:
 @pytest.mark.parametrize(
     ("name", "handler", "key", "expected"),
     [
-        ("rate limited", status(429), "k", (True, True, "upstream_http_429")),
-        ("unauthorized", status(401), "k", (True, False, "upstream_http_401")),
+        ("rate limited", status(429), "k", (True, True, "rate_limited")),
+        ("unauthorized", status(401), "k", (True, True, "credentials_rejected")),
         ("server error is unknown", status(500), "k", (False, False, "upstream_http_500")),
         ("redirect is refused", redirect, "k", (False, False, "upstream_http_302")),
         ("no credentials", status(200), "", (True, False, "credentials_missing")),
@@ -262,6 +262,66 @@ async def test_anthropic_streams_text_and_merges_usage():
     ]
 
 
+@pytest.mark.parametrize(
+    ("cache", "sent"),
+    [
+        (None, False),
+        ({"mode": "none"}, False),
+        ({"mode": "auto"}, True),
+    ],
+)
+async def test_anthropic_automatic_caching_is_sent_only_when_asked_for(cache, sent):
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return stream(START, frame('{"type":"message_stop"}'))(request)
+
+    inv = invocation()
+    if cache is not None:
+        inv["cache"] = cache
+    await collect(anthropic(handler), inv)
+    assert seen["body"].get("cache_control") == ({"type": "ephemeral"} if sent else None)
+
+
+RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "flag",
+        "description": "A flag",
+        "schema": {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+        "strict": True,
+    },
+}
+
+
+async def test_structured_output_is_declared_and_written_the_way_each_api_takes_it():
+    assert "structured_output" in OpenAIProvider.capabilities
+    assert "structured_output" in AnthropicProvider.capabilities
+    schema = RESPONSE_FORMAT["json_schema"]["schema"]
+    seen = {}
+
+    def capture(name):
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen[name] = json.loads(request.content)
+            return stream(START, frame('{"type":"message_stop"}'))(request)
+
+        return handler
+
+    inv = invocation()
+    inv["response_format"] = RESPONSE_FORMAT
+    await collect(anthropic(capture("anthropic")), inv)
+    assert seen["anthropic"]["output_config"] == {"format": {"type": "json_schema", "schema": schema}}
+    with pytest.raises(ProviderError):  # the canned reply is not an OpenAI stream; the request is what matters
+        await collect(openai(capture("openai")), inv)
+    assert seen["openai"]["text"] == {
+        "format": {"type": "json_schema", "name": "flag", "description": "A flag", "schema": schema, "strict": True}
+    }
+    plain = invocation()
+    await collect(anthropic(capture("plain")), plain)
+    assert "output_config" not in seen["plain"]
+
+
 async def test_anthropic_max_tokens_is_partial():
     events = await collect(
         anthropic(
@@ -279,7 +339,7 @@ async def test_anthropic_max_tokens_is_partial():
 @pytest.mark.parametrize(
     ("name", "handler", "key", "expected"),
     [
-        ("rate limited", status(429), "k", (True, True, "upstream_http_429")),
+        ("rate limited", status(429), "k", (True, True, "rate_limited")),
         ("bad request", status(400), "k", (True, False, "upstream_http_400")),
         ("overloaded is unknown", status(529), "k", (False, False, "upstream_http_529")),
         ("no credentials", status(200), "", (True, False, "credentials_missing")),

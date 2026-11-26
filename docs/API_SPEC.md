@@ -61,13 +61,19 @@
 
 `service` 必填 ID；`service_version` 省略時解析 active version 並固定。`customer_id` 在 Service 有 customer_sale 時必填，且只允許可信伺服器代理或綁定該 customer 的 key。`max_charge` 限制 customer_sale；不改寫平台價目、供應預算或 routing policy。App 可降低限制，不可提升 Service 上限。
 
-`input.messages` 至少一則，允許 system／user／assistant 的文字；structured output 另由 schema capability 定義，不接受任意 Provider 原生參數；只有宣告支援 `structured_output` 的供應商轉接器會收到 `response_format`，其餘回 422 `unsupported_capability`。限制超出支援範圍回 422。
+`input.messages` 至少一則，允許 system／user／assistant 的文字；structured output 另由 schema capability 定義，不接受任意 Provider 原生參數；只有宣告支援 `structured_output` 的供應商轉接器會收到 `response_format`，其餘回 422 `unsupported_capability`。限制超出支援範圍回 422。結構化輸出（`conformance/contracts.v1.json`、`conformance/tools.v1.json`）：OpenAI Responses 與 Anthropic Messages 現在都宣告 `structured_output`（Gemini 在 Rust、Go 本來就有）。OpenAI 轉成 `text.format`（`type: json_schema`、`name`、`schema`、`description`，且一律 `strict: true`，因為路由器承諾 schema 一定被強制）；Anthropic 轉成 `output_config.format`（`type: json_schema`、`schema`；官方 API 沒有名稱、描述與 strict 的位置，所以只送 schema）。寫法依兩家官方文件確認，但只用固定的測試資料驗證，未對真實上游驗證。OpenAI 的 strict 模式要求每個物件列出全部屬性並關閉 `additionalProperties`，不符的 schema 會被上游以 400 拒絕，對呼叫者就是 `upstream_http_400`（請求本身被拒，不重試）。模型拒答（Anthropic 的 `stop_reason: refusal`）或輸出被 `max_output_tokens` 截斷時，內容不保證符合 schema，仍會照實計費；呼叫者要自己驗證回傳文字。
 
 工具呼叫（TypeScript 參考實作、Go 與 Rust 資料平面）：`input.tools`（最多 64 個，`name`、`description`、`input_schema`）與 `input.tool_choice`（`auto`、`none`、`required` 或 `{ "name": ... }`）。assistant 訊息可帶 `tool_calls`（`id`、`name`、`arguments` 為 JSON 物件字串），結果以 `{ "role": "tool", "tool_call_id": ..., "content": ..., "is_error": ... }` 回傳；每個結果必須對應先前的呼叫，每個呼叫都必須有結果。user 訊息的 `content` 也可以是 `text` 與 `image`（`https:` 或 base64 的 png、jpeg、gif、webp）組成的陣列。音訊與檔案尚不支援。
 
 串流事件新增 `output.tool_call.delta`（`index`、首個事件帶 `id` 與 `name`、`arguments_delta`）與 `output.tool_call.completed`（完整的呼叫，僅在模型正常結束時送出，被截斷的呼叫不會送出）。`request.completed`／`request.failed` 新增 `finish_reason`（`stop`、`length`、`tool_calls`，以及 Rust／Go 的 `content_filter`：供應商的內容政策中止了回答）與 `usage`。非串流回應的 `output.tool_calls` 與 `finish_reason` 語意相同。
 
 沒有宣告 tools 的請求，其 canonical JSON 與冪等摘要完全不變。Provider 必須宣告 `capabilities.tools`／`capabilities.images`；沒有任何可用 offering 時回 422 `unsupported_capability`，且不會預留任何款項。`POST /v1/inferences` 的請求本文上限為 4 MB（驗證身分後才讀取），其他路由維持 256 KB。Go 與 Rust 資料平面以 `conformance/tools.v1.json` 對照參考實作（合約解析、canonical JSON、OpenAI／Anthropic 的請求本文與串流解析）；Python 資料平面尚未實作工具呼叫，收到這些欄位會以 `invalid_request` 拒絕。
+
+取樣、推理與標籤（四種語言的資料平面皆解析，`conformance/contracts.v1.json`）：請求頂層可帶 `sampling`（`temperature` 0 到 2、`top_p` 大於 0 且至多 1、`stop` 最多 4 個各 1 到 64 字元的字串、`seed` 安全整數；至少一項）、`reasoning_effort`（`low`、`medium`、`high`）與 `tags`（1 到 16 組名稱／值，名稱 `[A-Za-z0-9_.:-]{1,64}`，值 1 到 256 字元且不含控制字元）。省略這些欄位時 canonical JSON 與冪等摘要完全不變。每個控制項都是 provider 的一項 `capabilities`（`temperature`、`top_p`、`stop`、`seed`、`reasoning_effort`）：沒有任何可用 offering 能承載時回 422 `unsupported_capability`，且不預留款項，不會默默忽略。目前 OpenAI Responses 承載 `temperature`、`top_p`、`reasoning_effort`（沒有 `stop` 與 `seed`）；Anthropic Messages 承載 `temperature`、`top_p`、`stop`；Gemini（Rust、Go）承載 `temperature`、`top_p`、`stop`；`seed` 與 Anthropic／Gemini 的 `reasoning_effort` 尚無 provider 承載。以上都只用固定的測試資料（fixtures）驗證，未對真實上游驗證。`tags` 目前只會被驗證並納入冪等摘要，尚未寫入請求紀錄或用於限額；它們是給 Observer（尚未提供）與日後的歸因查詢用的。
+
+提示快取（`conformance/contracts.v1.json`、`conformance/tools.v1.json`）：請求可帶 `cache: {"mode": "auto" | "none"}`（不接受其他欄位，沒有 `ttl`）。這是提示，不是 capability：`auto` 只對有明確開關的 provider 生效，目前只有 Anthropic Messages，它會在上游請求頂層加 `cache_control: {"type": "ephemeral"}`（5 分鐘；依 Anthropic 官方文件，快取至最後一個可快取區塊，首次寫入為輸入價的 1.25 倍、讀取為 0.1 倍）；OpenAI 與 Gemini 本來就自動快取，不送任何東西。省略 `cache` 或 `none` 時完全不送，**預設為關閉**，因此沒有人會在不知情下付寫入費；這個預設值（開或關）是 owner 的決定，改它不需要改契約。計費沿用既有的 `cache_write` 與 `cached` meter（預留上限本來就取輸入、快取讀取、快取寫入三者的最高費率，所以預留夠用）。**不含** 1 小時快取（它需要第五個 meter，會動 `Meters`、`charge()` 與 `pricing.v1.json`，等 owner 決定）。自動快取在 Amazon Bedrock 上會被上游以 400 拒絕，所以只適用 Anthropic 自家 API。以上同樣只用固定的測試資料驗證，未對真實上游驗證。
+
+輸出與逾時上限：`limits.max_output_tokens`、offering 與 Service 的 `max_output_tokens` 上限為 131072（原為 8192，無法上架 128,000 token 輸出的模型）；`limits.timeout_ms` 上限為 600000（原為 120000，超過兩分鐘的推理串流會被切斷）。實際生效的仍是 Service 與 offering 自己設定的值，這只是契約的天花板。
 
 ### 3.2 成功回應
 

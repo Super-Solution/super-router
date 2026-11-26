@@ -2,6 +2,7 @@ import {
   Meters,
   ProviderError,
   parseSSE,
+  refusal,
   type Provider,
   type Invocation,
   type Offering,
@@ -86,8 +87,50 @@ function toolFields(input: Invocation["input"]) {
         }),
   };
 }
+/** Messages API sampling fields. It has no seed and no reasoning effort in this contract, so those are refused before reserving. */
+function sampling(input: Invocation) {
+  return {
+    ...(input.sampling?.temperature === undefined
+      ? {}
+      : { temperature: input.sampling.temperature }),
+    ...(input.sampling?.top_p === undefined
+      ? {}
+      : { top_p: input.sampling.top_p }),
+    ...(input.sampling?.stop === undefined
+      ? {}
+      : { stop_sequences: input.sampling.stop }),
+  };
+}
+/**
+ * Automatic prompt caching: a top-level `cache_control` makes the API cache everything up to the last cacheable block
+ * (5 minutes, written at 1.25 times the input price, read at 0.1). Sent only for `cache.mode = "auto"`: absent and
+ * `none` send nothing, so nothing is cached and no write is billed. The Anthropic API only: Amazon Bedrock refuses it.
+ */
+function caching(input: Invocation) {
+  return input.cache?.mode === "auto"
+    ? { cache_control: { type: "ephemeral" } }
+    : {};
+}
+/**
+ * Structured output in the Messages API: `output_config.format` with the schema. The API has no place for the format's
+ * name, description or strict flag (a schema is always enforced), so only the schema is sent. A refusal
+ * (`stop_reason: "refusal"`) or an output cut by `max_tokens` need not match the schema: the caller validates the text.
+ */
+function structured(input: Invocation) {
+  const f = input.response_format?.json_schema;
+  return f
+    ? { output_config: { format: { type: "json_schema", schema: f.schema } } }
+    : {};
+}
 export class AnthropicProvider implements Provider {
-  capabilities = { tools: true, images: true };
+  capabilities = {
+    tools: true,
+    images: true,
+    structured_output: true,
+    temperature: true,
+    top_p: true,
+    stop: true,
+  };
   constructor(
     private key: () => string,
     private transport: typeof fetch = fetch,
@@ -122,20 +165,16 @@ export class AnthropicProvider implements Provider {
           ...(system ? { system } : {}),
           messages,
           ...toolFields(input.input),
+          ...sampling(input),
+          ...caching(input),
+          ...structured(input),
           stream: true,
         }),
       });
     } catch {
       throw new ProviderError(false, false, "transport_unknown");
     }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new ProviderError(
-        [400, 401, 403, 404, 422, 429].includes(response.status),
-        response.status === 429,
-        "upstream_http_" + response.status,
-      );
-    }
+    if (!response.ok) throw await refusal(response);
     if (!response.body) throw new ProviderError(false, false, "empty_stream");
     let usage: Record<string, any> | null = null,
       id: string | undefined,

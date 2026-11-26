@@ -1,4 +1,4 @@
-// Writes backends/rust/conformance/health.v1.json: the cooldown book, as scripted incidents.
+// Writes conformance/health.v1.json: the cooldown book, as scripted incidents.
 //
 // A case is a sequence of steps against one book: `admit` (what the caller is told), `fail` (an attempt failed with a
 // class) and `succeed`. The expected answers come from the small model below, written here in plain JavaScript with
@@ -11,7 +11,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const file = join(dirname(fileURLToPath(import.meta.url)), "..", "backends", "rust", "conformance", "health.v1.json");
+const file = join(dirname(fileURLToPath(import.meta.url)), "..", "conformance", "health.v1.json");
 
 const defaults = {
   rate_limited_ms: 5000,
@@ -117,7 +117,7 @@ const cases = scenarios.map(([name, policy, steps]) => {
 
 const doc = {
   version: 1,
-  description: "Offering health book: scripted incidents of admit / fail / succeed with the expected answers. Written by scripts/export-health-conformance.mjs; Rust and Go only.",
+  description: "Offering health book: scripted incidents of admit / fail / succeed with the expected answers. Written by scripts/export-health-conformance.mjs; Shared by every backend that implements it (see conformance/README.md).",
   cases,
 };
 writeFileSync(file, JSON.stringify(doc, null, 1) + "\n");

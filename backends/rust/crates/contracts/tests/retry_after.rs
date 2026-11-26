@@ -7,7 +7,7 @@ use super_router_contracts::{parse_retry_after, RETRY_AFTER_MAX_MS};
 
 #[test]
 fn headers_read_as_the_shared_cases_say() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/retry_after.v1.json");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../conformance/retry_after.v1.json");
     let data: Value = serde_json::from_slice(&std::fs::read(path).expect("read retry_after.v1.json")).expect("parse retry_after.v1.json");
     let cases = data["cases"].as_array().unwrap();
     assert!(cases.len() >= 30, "only {} cases", cases.len());

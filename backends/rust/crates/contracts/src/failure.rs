@@ -154,6 +154,26 @@ pub fn parse_retry_after(value: &str) -> Option<u64> {
     Some(seconds.saturating_mul(1000).saturating_add(millis).min(RETRY_AFTER_MAX_MS))
 }
 
+/// How much of a client error's body is read for its message.
+pub const REFUSAL_BODY_LIMIT: usize = 16_384;
+
+/// The provider error for an HTTP refusal: the status, the first [`REFUSAL_BODY_LIMIT`] bytes of a client error's body
+/// (only its `error.message` is read, nothing of it is passed on) and the `Retry-After` header. Server errors' bodies are
+/// not read by the caller: the class cannot change what they mean. Providers whose error bodies carry the message at
+/// `error.message` (OpenAI, Anthropic, Gemini) share this.
+pub fn refusal(status: u16, retry_after: Option<&str>, body: &[u8]) -> ProviderError {
+    let message = if (400..500).contains(&status) {
+        let body = &body[..body.len().min(REFUSAL_BODY_LIMIT)];
+        serde_json::from_slice::<serde_json::Value>(body)
+            .ok()
+            .and_then(|v| v["error"]["message"].as_str().map(str::to_string))
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    classify(status, &message).provider_error(status).with_retry_after(retry_after.and_then(parse_retry_after))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -15,6 +15,19 @@
 //	                         tenant of the owner key, default default, prod, default
 //	OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY
 //	                         enable the "openai", "anthropic" and "gemini" providers (offering.provider names them)
+//	OPENAI_BASE_URL, ANTHROPIC_BASE_URL, GEMINI_BASE_URL
+//	                         where that provider's requests go: the scheme, host and any path prefix, without the
+//	                         trailing /v1 (or /v1beta) the provider adds itself, so https://llm.internal/openai becomes
+//	                         https://llm.internal/openai/v1/responses. Reaches Azure OpenAI in its v1 form, a gateway
+//	                         or any compatible host. Default: the vendor's own host
+//	SUPERROUTER_HEALTH       "on" keeps an offering out of routing while its own failure repeats (rejected key, empty
+//	                         account, retired model, blocked region, rate limit) and probes it again with one request
+//	                         when its cooldown ends; every candidate cooling fails open. "off" or unset: nothing is skipped
+//	SUPERROUTER_HEALTH_RATE_LIMITED_MS, _QUOTA_EXHAUSTED_MS, _CREDENTIALS_REJECTED_MS, _MODEL_UNAVAILABLE_MS,
+//	_REGION_BLOCKED_MS, _MAX_MS, _PROBE_LEASE_MS
+//	                         the cooldown of each class, the ceiling it doubles up to and the probe lease, in
+//	                         milliseconds (1 to 86400000). Defaults: 5000, 300000, 300000, 600000, 600000, 1800000,
+//	                         30000. Only valid with SUPERROUTER_HEALTH=on
 //	SUPERROUTER_MOCK=1       enable the deterministic "mock" provider and the scripted "mock-tools" one
 package main
 
@@ -39,6 +52,7 @@ import (
 	"github.com/Super-Solution/super-router/backends/go/provider/gemini"
 	"github.com/Super-Solution/super-router/backends/go/provider/openai"
 	"github.com/Super-Solution/super-router/backends/go/router"
+	"github.com/Super-Solution/super-router/backends/go/routing"
 	"github.com/Super-Solution/super-router/backends/go/server"
 	"github.com/Super-Solution/super-router/backends/go/store/memory"
 	"github.com/Super-Solution/super-router/backends/go/store/postgres"
@@ -100,15 +114,41 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, r
 		logger.Warn("DATABASE_URL is not set: using the in-memory store, state is lost on restart")
 		store = memory.New(nil)
 	}
+	var bases [3]string
+	for i, name := range []string{"OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "GEMINI_BASE_URL"} {
+		if v := getenv(name); v != "" {
+			b, err := baseURL(name, v)
+			if err != nil {
+				return err
+			}
+			bases[i] = b
+		}
+	}
+	health, err := healthPolicy(getenv)
+	if err != nil {
+		return err
+	}
 	providers := map[string]contracts.Provider{}
 	if k := getenv("OPENAI_API_KEY"); k != "" {
-		providers["openai"] = openai.New(func() string { return k })
+		var opts []openai.Option
+		if bases[0] != "" {
+			opts = append(opts, openai.WithBaseURL(bases[0]))
+		}
+		providers["openai"] = openai.New(func() string { return k }, opts...)
 	}
 	if k := getenv("ANTHROPIC_API_KEY"); k != "" {
-		providers["anthropic"] = anthropic.New(func() string { return k })
+		var opts []anthropic.Option
+		if bases[1] != "" {
+			opts = append(opts, anthropic.WithBaseURL(bases[1]))
+		}
+		providers["anthropic"] = anthropic.New(func() string { return k }, opts...)
 	}
 	if k := getenv("GEMINI_API_KEY"); k != "" {
-		providers["gemini"] = gemini.New(func() string { return k })
+		var opts []gemini.Option
+		if bases[2] != "" {
+			opts = append(opts, gemini.WithBaseURL(bases[2]))
+		}
+		providers["gemini"] = gemini.New(func() string { return k }, opts...)
 	}
 	if getenv("SUPERROUTER_MOCK") == "1" {
 		providers["mock"] = router.NewMockProvider("success")
@@ -118,7 +158,11 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, r
 	if len(providers) == 0 {
 		logger.Warn("no provider is configured: set OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or SUPERROUTER_MOCK=1")
 	}
-	rt, err := router.New(store, providers, digestKey)
+	var routerOptions []router.Option
+	if health != nil {
+		routerOptions = append(routerOptions, router.WithHealth(routing.NewHealthBook(*health)))
+	}
+	rt, err := router.New(store, providers, digestKey, routerOptions...)
 	if err != nil {
 		return err
 	}
@@ -142,7 +186,7 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger, r
 		// No WriteTimeout: streaming responses legitimately stay open.
 	}
 	go recoverLoop(ctx, store, logger)
-	logger.Info("listening", "addr", listener.Addr().String(), "store", fmt.Sprintf("%T", store), "providers", len(providers))
+	logger.Info("listening", "addr", listener.Addr().String(), "store", fmt.Sprintf("%T", store), "providers", len(providers), "health", health != nil)
 	if ready != nil {
 		ready <- listener.Addr().String()
 	}

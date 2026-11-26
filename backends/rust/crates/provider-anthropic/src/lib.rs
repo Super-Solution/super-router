@@ -17,7 +17,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::value::RawValue;
 use serde_json::{json, Map, Value};
 use super_router_contracts::{
-    parse_retry_after, Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent, ProviderStream,
+    refusal as contracts_refusal, Invocation, Meters, Offering, Provider, ProviderCapabilities, ProviderError, ProviderEvent,
+    ProviderStream, REFUSAL_BODY_LIMIT,
 };
 
 const DEFAULT_BASE: &str = "https://api.anthropic.com";
@@ -211,19 +212,22 @@ fn apply_delta_usage(current: &mut Usage, fields: &Map<String, Value>) -> Result
     Ok(())
 }
 
-fn classify_status(status: u16, retry_after: Option<u64>) -> ProviderError {
-    let code = format!("upstream_http_{status}");
-    match status {
-        400 | 401 | 403 | 404 | 422 => perr(true, false, &code),
-        429 => perr(true, true, &code),
-        _ => perr(false, false, &code),
+/// The refusal an HTTP error status means: its class (from the status and the error's own message, read from the first
+/// 16 KiB of a client error's body) and the wait its `Retry-After` header asked for.
+async fn refusal(response: reqwest::Response) -> ProviderError {
+    let status = response.status().as_u16();
+    let retry_after = response.headers().get(reqwest::header::RETRY_AFTER).and_then(|v| v.to_str().ok()).map(str::to_string);
+    let mut body = Vec::new();
+    if (400..500).contains(&status) {
+        let mut chunks = response.bytes_stream();
+        while body.len() < REFUSAL_BODY_LIMIT {
+            match chunks.next().await {
+                Some(Ok(chunk)) => body.extend_from_slice(&chunk),
+                _ => break,
+            }
+        }
     }
-    .with_retry_after(retry_after)
-}
-
-/// The wait the provider asked for in its `Retry-After` header, in milliseconds.
-fn retry_after_of(response: &reqwest::Response) -> Option<u64> {
-    response.headers().get(reqwest::header::RETRY_AFTER).and_then(|v| v.to_str().ok()).and_then(parse_retry_after)
+    contracts_refusal(status, retry_after.as_deref(), &body)
 }
 
 /// A request body: the plain fields, then the messages.
@@ -236,7 +240,16 @@ struct Body<'a> {
 
 impl Provider for Anthropic {
     fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities { tools: true, images: true, ..ProviderCapabilities::default() }
+        // The Messages API call here has no seed and no reasoning effort: a request that asks for them is refused before reserving.
+        ProviderCapabilities {
+            tools: true,
+            images: true,
+            temperature: true,
+            top_p: true,
+            stop: true,
+            structured_output: true,
+            ..ProviderCapabilities::default()
+        }
     }
 
     fn invoke(&self, input: &Invocation, offering: &Offering) -> ProviderStream {
@@ -247,6 +260,27 @@ impl Provider for Anthropic {
         let turns = tools::messages(&input.input.messages);
         let mut fields = Map::new();
         tools::tool_fields(&mut fields, &input.input);
+        if let Some(s) = &input.sampling {
+            if let Some(t) = s.temperature {
+                fields.insert("temperature".into(), json!(t));
+            }
+            if let Some(p) = s.top_p {
+                fields.insert("top_p".into(), json!(p));
+            }
+            if let Some(stop) = &s.stop {
+                fields.insert("stop_sequences".into(), json!(stop));
+            }
+        }
+        if let Some(format) = &input.response_format {
+            // The Messages API has no place for the format's name, description or strict flag (a schema is always
+            // enforced): only the schema is sent. A refusal or an output cut by `max_tokens` need not match it.
+            fields.insert("output_config".into(), json!({"format": {"type": "json_schema", "schema": format.json_schema.schema}}));
+        }
+        // Automatic prompt caching (5 minutes, written at 1.25 times the input price): only when asked for. Absent and `none`
+        // send nothing, so nothing is cached and no write is billed. The Anthropic API only: Amazon Bedrock refuses it.
+        if input.cache.as_ref().is_some_and(|c| c.mode == "auto") {
+            fields.insert("cache_control".into(), json!({"type": "ephemeral"}));
+        }
         let max_tokens = input.limits.max_output_tokens;
         let timeout = u64::try_from(input.limits.timeout_ms).ok().filter(|ms| *ms > 0).map(Duration::from_millis);
         let model = offering.upstream_model.clone();
@@ -286,9 +320,12 @@ impl Provider for Anthropic {
             }
             let response = request.send().await.map_err(|_| perr(false, false, "transport_unknown"))?;
             let status = response.status().as_u16();
-            if !(200..=299).contains(&status) {
-                Err(classify_status(status, retry_after_of(&response)))?;
-            }
+            let response = if (200..=299).contains(&status) {
+                response
+            } else {
+                Err::<(), _>(refusal(response).await)?;
+                unreachable!("a refusal always ends the stream")
+            };
             let mut frames = Box::pin(super_router_sse::frames(response.bytes_stream()));
             let mut current: Option<Usage> = None;
             let mut id = String::new();

@@ -364,6 +364,11 @@ pub struct Needs {
     pub images: bool,
     /// The request carries a `response_format`: the answer must follow a JSON Schema.
     pub structured_output: bool,
+    pub temperature: bool,
+    pub top_p: bool,
+    pub stop: bool,
+    pub seed: bool,
+    pub reasoning_effort: bool,
 }
 
 /// Whether a request declares tools or carries tool history, whether it carries images, and whether it asks for
@@ -374,6 +379,11 @@ pub fn invocation_needs(i: &Invocation) -> Needs {
         tools: i.input.tools.is_some() || messages.iter().any(|m| m.role == "tool" || m.tool_calls.is_some()),
         images: messages.iter().flat_map(|m| m.parts.iter().flatten()).any(|p| matches!(p, ContentPart::Image { .. })),
         structured_output: i.response_format.is_some(),
+        temperature: i.sampling.as_ref().is_some_and(|s| s.temperature.is_some()),
+        top_p: i.sampling.as_ref().is_some_and(|s| s.top_p.is_some()),
+        stop: i.sampling.as_ref().is_some_and(|s| s.stop.is_some()),
+        seed: i.sampling.as_ref().is_some_and(|s| s.seed.is_some()),
+        reasoning_effort: i.reasoning_effort.is_some(),
     }
 }
 
@@ -386,12 +396,26 @@ pub struct ProviderCapabilities {
     /// The provider writes a request's `response_format` schema into its call. A provider that does not say so is
     /// never sent one: the answer would silently ignore the schema.
     pub structured_output: bool,
+    /// Each sampling control and the reasoning effort is carried only when the provider says so: otherwise the request
+    /// is refused before reserving, never sent without it.
+    pub temperature: bool,
+    pub top_p: bool,
+    pub stop: bool,
+    pub seed: bool,
+    pub reasoning_effort: bool,
 }
 
 impl ProviderCapabilities {
     /// Whether these capabilities cover a request's needs.
     pub fn can(&self, n: Needs) -> bool {
-        (!n.tools || self.tools) && (!n.images || self.images) && (!n.structured_output || self.structured_output)
+        (!n.tools || self.tools)
+            && (!n.images || self.images)
+            && (!n.structured_output || self.structured_output)
+            && (!n.temperature || self.temperature)
+            && (!n.top_p || self.top_p)
+            && (!n.stop || self.stop)
+            && (!n.seed || self.seed)
+            && (!n.reasoning_effort || self.reasoning_effort)
     }
 }
 

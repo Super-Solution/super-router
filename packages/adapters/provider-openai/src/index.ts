@@ -2,6 +2,7 @@ import {
   Meters,
   ProviderError,
   parseSSE,
+  refusal,
   type Provider,
   type Invocation,
   type Offering,
@@ -79,8 +80,53 @@ function toolFields(input: Invocation["input"]) {
         }),
   };
 }
+/**
+ * What the Responses API takes from the request's sampling controls. It has no stop sequences and no seed, so a request
+ * that asks for them is refused before reserving (`capabilities`), never sent without them.
+ */
+function sampling(input: Invocation) {
+  return {
+    ...(input.sampling?.temperature === undefined
+      ? {}
+      : { temperature: input.sampling.temperature }),
+    ...(input.sampling?.top_p === undefined
+      ? {}
+      : { top_p: input.sampling.top_p }),
+    ...(input.reasoning_effort === undefined
+      ? {}
+      : { reasoning: { effort: input.reasoning_effort } }),
+  };
+}
+/**
+ * Structured output in the Responses API: `text.format` with the schema, always `strict` because the router promises the
+ * schema is enforced. Strict mode only takes schemas where every object lists all its properties and closes
+ * `additionalProperties`: the API refuses others with a 400, which reads as a refused request. A model refusal or an
+ * output cut by `max_output_tokens` need not match the schema, so the caller validates the text it gets.
+ */
+function structured(input: Invocation) {
+  const f = input.response_format?.json_schema;
+  if (!f) return {};
+  return {
+    text: {
+      format: {
+        type: "json_schema",
+        name: f.name,
+        ...(f.description === undefined ? {} : { description: f.description }),
+        schema: f.schema,
+        strict: true,
+      },
+    },
+  };
+}
 export class OpenAIProvider implements Provider {
-  capabilities = { tools: true, images: true };
+  capabilities = {
+    tools: true,
+    images: true,
+    structured_output: true,
+    temperature: true,
+    top_p: true,
+    reasoning_effort: true,
+  };
   constructor(
     private key: () => string,
     private transport: typeof fetch = fetch,
@@ -104,6 +150,8 @@ export class OpenAIProvider implements Provider {
           model: offering.upstream_model,
           input: toOpenAIInput(input.input.messages),
           ...toolFields(input.input),
+          ...sampling(input),
+          ...structured(input),
           max_output_tokens: input.limits.max_output_tokens,
           store: false,
           stream: true,
@@ -112,14 +160,7 @@ export class OpenAIProvider implements Provider {
     } catch {
       throw new ProviderError(false, false, "transport_unknown");
     }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new ProviderError(
-        [400, 401, 403, 404, 422, 429].includes(response.status),
-        response.status === 429,
-        "upstream_http_" + response.status,
-      );
-    }
+    if (!response.ok) throw await refusal(response);
     if (!response.body) throw new ProviderError(false, false, "empty_stream");
     let terminal = false;
     // Upstream numbers every output item; tool calls are numbered from zero among themselves.

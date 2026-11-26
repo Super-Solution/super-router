@@ -4,7 +4,7 @@ PostgreSQL DataStore for Super Router on its own schema, with database-backed AP
 
 ```toml
 [dependencies]
-super-router-store-postgres = "0.4"
+super-router-store-postgres = "0.5"
 ```
 
 `PostgresStore` implements `super_router_router::DataStore` on sqlx. Queries are plain runtime SQL (no database is

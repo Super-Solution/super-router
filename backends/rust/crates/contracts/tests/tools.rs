@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use serde_json::{Number, Value};
-use super_router_contracts::{canonical, invocation_needs, js_stringify, js_trim, parse_invocation, Needs};
+use super_router_contracts::{canonical, invocation_needs, js_stringify, js_trim, parse_invocation, Needs, ProviderCapabilities};
 
 fn load() -> Value {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/tools.v1.json");
@@ -79,6 +79,26 @@ fn needs_follow_what_the_invocation_carries() {
     for (input, want) in cases {
         assert_eq!(invocation_needs(&parse(input)), want, "{input}");
     }
+}
+
+#[test]
+fn sampling_and_reasoning_effort_are_needs() {
+    let parse = |extra: &str| {
+        let raw = format!(
+            r#"{{"service":"s","customer_id":"c","input":{{"messages":[{{"role":"user","content":"hi"}}]}},"limits":{{}}{extra}}}"#
+        );
+        parse_invocation(raw.as_bytes()).unwrap()
+    };
+    assert_eq!(invocation_needs(&parse("")), Needs::default());
+    assert_eq!(invocation_needs(&parse(r#","sampling":{"temperature":0.5}"#)), Needs { temperature: true, ..Needs::default() });
+    assert_eq!(
+        invocation_needs(&parse(r#","sampling":{"top_p":0.5,"stop":["x"],"seed":3},"reasoning_effort":"low""#)),
+        Needs { top_p: true, stop: true, seed: true, reasoning_effort: true, ..Needs::default() }
+    );
+    // A provider that carries only some of them does not cover a request that needs another.
+    let caps = ProviderCapabilities { temperature: true, top_p: true, ..ProviderCapabilities::default() };
+    assert!(caps.can(Needs { temperature: true, ..Needs::default() }));
+    assert!(!caps.can(Needs { temperature: true, seed: true, ..Needs::default() }));
 }
 
 #[test]

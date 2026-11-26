@@ -15,6 +15,12 @@ Configured through environment variables, as the Go binary is:
                              tenant of the owner key, default default, prod, default
     OPENAI_API_KEY, ANTHROPIC_API_KEY
                              enable the "openai" and "anthropic" providers (offering.provider names them)
+    OPENAI_BASE_URL, ANTHROPIC_BASE_URL
+                             where that provider's requests go: the scheme, host and any path prefix, without the
+                             trailing /v1 the provider adds itself, so https://llm.internal/openai becomes
+                             https://llm.internal/openai/v1/responses. Default: the vendor's own host
+    SUPERROUTER_HEALTH       "off" or unset. "on" (and the SUPERROUTER_HEALTH_*_MS policy variables the Go and Rust
+                             servers read) is refused: this server has no health book yet
     SUPERROUTER_MOCK=1       enable the deterministic "mock" provider
 
 Needs ``pip install super-router[server]`` (uvicorn, httpx, psycopg).
@@ -42,6 +48,29 @@ _log = logging.getLogger("super_router")
 
 class ConfigError(Exception):
     pass
+
+
+def _base_url(name: str, value: str) -> str:
+    """A provider base URL: http or https, a host, an optional path prefix and nothing else. The version segment is the
+    provider's own (/v1/responses), so a value that already ends in one is refused instead of producing /v1/v1/...
+    The value is never echoed: a URL can carry credentials."""
+
+    def bad(why: str) -> ConfigError:
+        return ConfigError(
+            f"{name} {why} (the scheme, host and any path prefix, without the trailing /v1; value not logged)"
+        )
+
+    rest = value.removeprefix("https://") if value.startswith("https://") else value.removeprefix("http://")
+    if rest == value:
+        raise bad("must start with http:// or https://")
+    if any(ord(c) < 0x20 or c in " ?#\x7f" for c in rest):
+        raise bad("must have no spaces, query or fragment")
+    authority, _, path = rest.partition("/")
+    if not authority or "@" in authority:
+        raise bad("must name a host and carry no credentials")
+    if path.rstrip("/").rpartition("/")[2] in ("v1", "v1beta"):
+        raise bad("must not end in the version segment, the provider adds it")
+    return value.rstrip("/")
 
 
 async def _recover_loop(store: DataStore, every: float) -> None:
@@ -83,6 +112,13 @@ async def serve(
     if not host or not (port.isascii() and port.isdigit()):
         raise ConfigError("ADDR must be host:port")
 
+    health = env("SUPERROUTER_HEALTH")
+    if health not in ("", "off", "on"):
+        raise ConfigError('SUPERROUTER_HEALTH must be "on" or "off"')
+    if health == "on":
+        raise ConfigError("SUPERROUTER_HEALTH=on: the Python server has no health book yet, use the Go or Rust server")
+    bases = {name: _base_url(name, env(name)) for name in ("OPENAI_BASE_URL", "ANTHROPIC_BASE_URL") if env(name)}
+
     closers: list[Callable[[], Any]] = []
     store: DataStore
     auth: Authenticator | None = None
@@ -106,13 +142,13 @@ async def serve(
     if key := env("OPENAI_API_KEY"):
         from .providers import OpenAIProvider
 
-        openai = OpenAIProvider(key)
+        openai = OpenAIProvider(key, bases.get("OPENAI_BASE_URL", "https://api.openai.com"))
         closers.append(openai.aclose)
         providers["openai"] = openai
     if key := env("ANTHROPIC_API_KEY"):
         from .providers import AnthropicProvider
 
-        anthropic = AnthropicProvider(key)
+        anthropic = AnthropicProvider(key, bases.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com"))
         closers.append(anthropic.aclose)
         providers["anthropic"] = anthropic
     if env("SUPERROUTER_MOCK") == "1":

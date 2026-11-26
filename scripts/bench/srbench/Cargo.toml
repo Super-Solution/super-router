@@ -1,0 +1,30 @@
+[package]
+name = "srbench"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+super-router-contracts.workspace = true
+super-router-router.workspace = true
+super-router-server.workspace = true
+super-router-store-memory.workspace = true
+super-router-store-postgres.workspace = true
+super-router-provider-openai.workspace = true
+tokio = { workspace = true, features = ["net", "signal", "rt-multi-thread", "macros", "time"] }
+axum = "0.8"
+serde_json.workspace = true
+futures-util.workspace = true
+async-stream.workspace = true
+bytes = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream"] }
+
+[[bin]]
+name = "fake-upstream"
+path = "src/bin/fake_upstream.rs"
+[[bin]]
+name = "router-server"
+path = "src/bin/router_server.rs"
+[[bin]]
+name = "loadgen"
+path = "src/bin/loadgen.rs"

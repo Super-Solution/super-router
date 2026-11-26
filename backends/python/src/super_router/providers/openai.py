@@ -19,6 +19,9 @@ class OpenAIProvider:
     """``key`` is a string or a function read on every call, so it can rotate; an empty key is a definitive failure.
     ``base_url`` points at an OpenAI-compatible server. Pass ``client`` for proxies, tracing or tests."""
 
+    # The Responses API has no stop sequences and no seed: a request that asks for them is refused before reserving.
+    capabilities = frozenset({"temperature", "top_p", "reasoning_effort", "structured_output"})
+
     def __init__(
         self,
         key: KeySource | None,
@@ -46,6 +49,25 @@ class OpenAIProvider:
             "store": False,
             "stream": True,
         }
+        sampling = invocation.get("sampling", {})
+        for name in ("temperature", "top_p"):
+            if name in sampling:
+                body[name] = sampling[name]
+        if "reasoning_effort" in invocation:
+            body["reasoning"] = {"effort": invocation["reasoning_effort"]}
+        if "response_format" in invocation:
+            # Always strict: the router promises the schema is enforced. Strict mode only takes schemas that list every
+            # property and close additionalProperties; the API refuses others with a 400 (a refused request).
+            spec = invocation["response_format"]["json_schema"]
+            text_format: dict[str, Any] = {
+                "type": "json_schema",
+                "name": spec["name"],
+                "schema": spec["schema"],
+                "strict": True,
+            }
+            if "description" in spec:
+                text_format["description"] = spec["description"]
+            body["text"] = {"format": text_format}
         async with open_stream(
             self._client, f"{self._base}/v1/responses", {"Authorization": f"Bearer {key}"}, body
         ) as frames:

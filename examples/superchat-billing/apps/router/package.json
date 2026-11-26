@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "@supersolutions/example-superchat-shared": "0.1.0",
-    "@supersolutions/super-router-contracts": "0.3.0",
-    "@supersolutions/super-router-core": "0.3.0",
-    "@supersolutions/super-router-server": "0.3.0",
-    "@supersolutions/super-router-storage-postgres": "0.3.0"
+    "@supersolutions/super-router-contracts": "0.5.0",
+    "@supersolutions/super-router-core": "0.5.0",
+    "@supersolutions/super-router-server": "0.5.0",
+    "@supersolutions/super-router-storage-postgres": "0.5.0"
   },
   "license": "Apache-2.0",
   "author": "SUPER SOLUTION LABS INC"

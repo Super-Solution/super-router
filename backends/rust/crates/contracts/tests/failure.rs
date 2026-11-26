@@ -7,7 +7,7 @@ use super_router_contracts::classify_failure;
 
 #[test]
 fn failure_classification_matches_the_shared_cases() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/failure.v1.json");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../conformance/failure.v1.json");
     let data: Value = serde_json::from_slice(&std::fs::read(path).expect("read failure.v1.json")).expect("parse failure.v1.json");
     let cases = data["cases"].as_array().unwrap();
     assert!(cases.len() >= 40, "only {} cases", cases.len());

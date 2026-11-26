@@ -2093,6 +2093,75 @@
    ]
   },
   {
+   "name": "a request asks for a control no provider carries and is refused before reserving",
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "input": {
+      "sampling": {
+       "seed": 7
+      }
+     },
+     "error": {
+      "code": "unsupported_capability",
+      "status": 422
+     }
+    },
+    {
+     "op": "infer",
+     "input": {
+      "reasoning_effort": "high"
+     },
+     "key": "k2",
+     "error": {
+      "code": "unsupported_capability",
+      "status": 422
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 0
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "100000",
+       "held": "0",
+       "available": "100000"
+      }
+     ]
+    },
+    {
+     "op": "infer",
+     "key": "k3",
+     "expect": {
+      "execution_status": "succeeded",
+      "billing_status": "settled"
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 1
+    }
+   ]
+  },
+  {
    "name": "W5 lower-tier downgrade after primary rejection",
    "steps": [
     {
@@ -2261,6 +2330,95 @@
      "op": "provider_calls",
      "provider": "ok",
      "expect": 0
+    }
+   ]
+  },
+  {
+   "name": "an offering whose own failure repeats is skipped until its cooldown ends, and only it",
+   "health": {
+    "rate_limited_ms": 200
+   },
+   "steps": [
+    {
+     "op": "publish",
+     "service": "chat_two"
+    },
+    {
+     "op": "grant",
+     "kind": "customer_sale",
+     "asset": "credit:demo",
+     "amount": "100000",
+     "source": "g1"
+    },
+    {
+     "op": "infer",
+     "key": "k1",
+     "expect": {
+      "execution_status": "succeeded",
+      "billing_status": "settled"
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "bad",
+     "expect": 1
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 1
+    },
+    {
+     "op": "infer",
+     "key": "k2",
+     "expect": {
+      "execution_status": "succeeded",
+      "billing_status": "settled"
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "bad",
+     "expect": 1
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 2
+    },
+    {
+     "op": "advance",
+     "ms": 250
+    },
+    {
+     "op": "infer",
+     "key": "k3",
+     "expect": {
+      "execution_status": "succeeded",
+      "billing_status": "settled"
+     }
+    },
+    {
+     "op": "provider_calls",
+     "provider": "bad",
+     "expect": 2
+    },
+    {
+     "op": "provider_calls",
+     "provider": "ok",
+     "expect": 3
+    },
+    {
+     "op": "balance",
+     "expect": [
+      {
+       "kind": "customer_sale",
+       "asset": "credit:demo",
+       "balance": "99895",
+       "held": "0",
+       "available": "99895"
+      }
+     ]
     }
    ]
   }

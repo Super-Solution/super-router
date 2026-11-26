@@ -1,6 +1,6 @@
 {
  "version": 1,
- "description": "Retry-After header (delta-seconds form) to milliseconds, or null. Written by scripts/export-retry-after-conformance.mjs; Rust and Go only.",
+ "description": "Retry-After header (delta-seconds form) to milliseconds, or null. Written by scripts/export-retry-after-conformance.mjs; Shared by every backend that implements it (see conformance/README.md).",
  "cases": [
   {
    "header": "30",

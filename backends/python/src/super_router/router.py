@@ -31,6 +31,7 @@ from .contracts import (
     StreamEvent,
     Usage,
     canonical,
+    invocation_needs,
     parse_invocation,
     valid_meters,
 )
@@ -323,6 +324,17 @@ class Router:
             raise RouterError("no_eligible_offering", 422)
         if any(c.offering["provider"] not in self.providers for c in candidates):
             raise RouterError("provider_unavailable", 503)
+        # Refused here, before anything is reserved: a provider that cannot carry a control would answer without it.
+        needs = invocation_needs(inv)
+        capable = []
+        for c in candidates:
+            if needs <= getattr(self.providers[c.offering["provider"]], "capabilities", frozenset()):
+                capable.append(c)
+            else:
+                excluded.append({"id": c.offering["id"], "reason": "capability_unsupported"})
+        if not capable:
+            raise RouterError("unsupported_capability", 422)
+        candidates = capable
         max_input = max(c.offering["max_input_tokens"] for c in candidates)
         legs = await self.store.accounts(principal, service)
         for leg in legs:

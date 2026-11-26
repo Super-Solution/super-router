@@ -1,6 +1,6 @@
 {
  "version": 1,
- "description": "Offering health book: scripted incidents of admit / fail / succeed with the expected answers. Written by scripts/export-health-conformance.mjs; Rust and Go only.",
+ "description": "Offering health book: scripted incidents of admit / fail / succeed with the expected answers. Written by scripts/export-health-conformance.mjs; Shared by every backend that implements it (see conformance/README.md).",
  "cases": [
   {
    "name": "an unknown offering is open",

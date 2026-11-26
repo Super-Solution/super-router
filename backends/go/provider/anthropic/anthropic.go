@@ -9,8 +9,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/Super-Solution/super-router/backends/go/contracts"
@@ -30,7 +30,8 @@ var _ contracts.CapableProvider = (*Provider)(nil)
 
 // Capabilities implements contracts.CapableProvider: tool calling and image input.
 func (p *Provider) Capabilities() contracts.ProviderCapabilities {
-	return contracts.ProviderCapabilities{Tools: true, Images: true}
+	// The Messages API call here has no seed and no reasoning effort: a request that asks for them is refused before reserving.
+	return contracts.ProviderCapabilities{Tools: true, Images: true, Temperature: true, TopP: true, Stop: true, StructuredOutput: true}
 }
 
 // Option configures New.
@@ -77,16 +78,6 @@ func perr(definitive, retryable bool, code string) error {
 	return &contracts.ProviderError{Definitive: definitive, Retryable: retryable, Code: code}
 }
 
-// withRetryAfter adds the wait the provider asked for in its Retry-After header, in milliseconds, to a refusal.
-func withRetryAfter(err error, res *http.Response) error {
-	if pe, ok := err.(*contracts.ProviderError); ok {
-		if ms, ok := contracts.ParseRetryAfter(res.Header.Get("Retry-After")); ok {
-			pe.RetryAfterMs = ms
-		}
-	}
-	return err
-}
-
 var errStop = errors.New("stop")
 
 // Invoke implements contracts.Provider.
@@ -114,6 +105,27 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 		fields["system"] = joined
 	}
 	toolFields(fields, in.Input)
+	if sm := in.Sampling; sm != nil {
+		if sm.Temperature != nil {
+			fields["temperature"] = *sm.Temperature
+		}
+		if sm.TopP != nil {
+			fields["top_p"] = *sm.TopP
+		}
+		if sm.Stop != nil {
+			fields["stop_sequences"] = sm.Stop
+		}
+	}
+	if rf := in.ResponseFormat; rf != nil {
+		// The Messages API has no place for the format's name, description or strict flag (a schema is always enforced):
+		// only the schema is sent. A refusal or an output cut by max_tokens need not match it.
+		fields["output_config"] = map[string]any{"format": map[string]any{"type": "json_schema", "schema": rf.JSONSchema.Schema}}
+	}
+	// Automatic prompt caching (5 minutes, written at 1.25 times the input price): only when asked for. Absent and "none"
+	// send nothing, so nothing is cached and no write is billed. The Anthropic API only: Amazon Bedrock refuses it.
+	if in.Cache != nil && in.Cache.Mode == "auto" {
+		fields["cache_control"] = map[string]string{"type": "ephemeral"}
+	}
 	body, err := json.Marshal(fields)
 	if err != nil {
 		return perr(true, false, "request_invalid") // tool-call arguments that are not JSON, from a hand-built invocation
@@ -131,13 +143,11 @@ func (p *Provider) Invoke(ctx context.Context, in contracts.Invocation, offering
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		switch res.StatusCode {
-		case 400, 401, 403, 404, 422:
-			return withRetryAfter(perr(true, false, "upstream_http_"+strconv.Itoa(res.StatusCode)), res)
-		case 429:
-			return withRetryAfter(perr(true, true, "upstream_http_429"), res)
+		var body []byte
+		if res.StatusCode >= 400 && res.StatusCode < 500 {
+			body, _ = io.ReadAll(io.LimitReader(res.Body, contracts.RefusalBodyLimit))
 		}
-		return withRetryAfter(perr(false, false, "upstream_http_"+strconv.Itoa(res.StatusCode)), res)
+		return contracts.RefusalFrom(res.StatusCode, res.Header.Get("Retry-After"), body)
 	}
 	var (
 		current    *usage

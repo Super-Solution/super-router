@@ -19,11 +19,18 @@ from typing import Any, Protocol
 
 from .pricing import MEDIA_KEYS, RouterError
 
+# The largest output one model call may be asked for (wide enough for 128,000-token models) and the longest a request
+# may run, in milliseconds. Same numbers in every backend (conformance/contracts.v1.json).
+MAX_OUTPUT_TOKENS = 131072
+MAX_TIMEOUT_MS = 600000
+
 KIND_METER = {"image": "images", "video": "video_ms", "audio": "audio_ms", "task": "tasks"}
 MAX_SAFE = 2**53 - 1
 
 _ID = re.compile(r"[a-zA-Z0-9_.:/-]+")
 _ATOMS = re.compile(r"0|[1-9][0-9]{0,29}")
+_SCHEMA_NAME = re.compile(r"[a-zA-Z0-9_-]{1,64}")
+_TAG_KEY = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
 
 Json = dict[str, Any]
 
@@ -46,7 +53,10 @@ def _has_null(value: Any) -> bool:
     if isinstance(value, list):
         return any(_has_null(v) for v in value)
     if isinstance(value, dict):
-        return any(_has_null(v) for v in value.values())
+        # A JSON Schema (a response format's `schema`, a tool's `input_schema`) may legitimately hold null.
+        return any(
+            _has_null(v) for k, v in value.items() if not (k in ("schema", "input_schema") and isinstance(v, dict))
+        )
     return False
 
 
@@ -161,7 +171,7 @@ def _offering(value: Any) -> Json:
         "enabled": _bool(obj["enabled"]),
         "source": obj["source"],
         "max_input_tokens": _int(obj["max_input_tokens"], 1, 1_000_000),
-        "max_output_tokens": _int(obj["max_output_tokens"], 1, 8192),
+        "max_output_tokens": _int(obj["max_output_tokens"], 1, MAX_OUTPUT_TOKENS),
         "price": _price(obj["price"]),
     }
     if out["source"] not in ("platform", "byok"):
@@ -223,7 +233,7 @@ def _service(value: Any) -> Json:
         "price": _price(obj["price"]),
         "max_attempts": _int(obj["max_attempts"], 1, 5),
         "max_provider_cost": _atoms(obj["max_provider_cost"]),
-        "max_output_tokens": _int(obj["max_output_tokens"], 1, 8192),
+        "max_output_tokens": _int(obj["max_output_tokens"], 1, MAX_OUTPUT_TOKENS),
         "weights": weights,
         "cost_scale": _atoms(obj["cost_scale"]),
         "latency_scale_ms": _number(obj["latency_scale_ms"]),
@@ -252,8 +262,63 @@ def _service(value: Any) -> Json:
     return out
 
 
+def _sampling(value: Any) -> Json:
+    obj = _object(value, (), ("temperature", "top_p", "stop", "seed"))
+    if not obj:
+        raise _fail()
+    out: Json = {}
+    for key, low, high in (("temperature", 0, 2), ("top_p", 0, 1)):
+        if key in obj:
+            number = _number(obj[key])
+            if not low <= number <= high or (key == "top_p" and number == 0):
+                raise _fail()
+            # An integral float prints as an integer in JSON.stringify, so it is stored as one.
+            out[key] = int(number) if isinstance(number, float) and number.is_integer() else number
+    if "stop" in obj:
+        out["stop"] = [_string(x, 1, 64) for x in _list(obj["stop"], 1, 4)]
+    if "seed" in obj:
+        out["seed"] = _int(obj["seed"])
+    return out
+
+
+def _tags(value: Any) -> Json:
+    if not isinstance(value, dict) or not 1 <= len(value) <= 16:
+        raise _fail()
+    out: Json = {}
+    for key, text in value.items():
+        if not isinstance(key, str) or _TAG_KEY.fullmatch(key) is None:
+            raise _fail()
+        out[key] = _string(text, 1, 256)
+        if any(ord(c) < 0x20 or ord(c) == 0x7F for c in text):
+            raise _fail()
+    return out
+
+
+def _response_format(value: Any) -> Json:
+    obj = _object(value, ("type", "json_schema"))
+    if obj["type"] != "json_schema":
+        raise _fail()
+    js = _object(obj["json_schema"], ("name", "schema"), ("description", "strict"))
+    name = _string(js["name"])
+    if _SCHEMA_NAME.fullmatch(name) is None or not isinstance(js["schema"], dict):
+        raise _fail()
+    out: Json = {"name": name, "schema": js["schema"]}
+    if "description" in js:
+        out["description"] = _string(js["description"], 0, 1024)
+    if "strict" in js:
+        # A schema is always enforced; `false` would ask for a best effort the router cannot promise.
+        if js["strict"] is not True:
+            raise _fail()
+        out["strict"] = True
+    return {"type": "json_schema", "json_schema": out}
+
+
 def _invocation(value: Any) -> Json:
-    obj = _object(value, ("service", "customer_id", "input", "limits"), ("service_version", "payer_mode", "stream"))
+    obj = _object(
+        value,
+        ("service", "customer_id", "input", "limits"),
+        ("service_version", "payer_mode", "stream", "response_format", "sampling", "reasoning_effort", "tags", "cache"),
+    )
     inp = _object(obj["input"], (), ("messages", "task"))
     messages = []
     for m in _list(inp.get("messages", []), 0, 100):
@@ -267,8 +332,8 @@ def _invocation(value: Any) -> Json:
         parsed_input["task"] = {"kind": _task_kind(task["kind"]), "prompt": _string(task["prompt"], 1, 32000)}
     limits = _object(obj["limits"], (), ("max_output_tokens", "max_usage", "timeout_ms", "max_charge"))
     parsed_limits: Json = {
-        "max_output_tokens": _int(limits.get("max_output_tokens", 1), 1, 8192),
-        "timeout_ms": _int(limits.get("timeout_ms", 30000), 100, 120000),
+        "max_output_tokens": _int(limits.get("max_output_tokens", 1), 1, MAX_OUTPUT_TOKENS),
+        "timeout_ms": _int(limits.get("timeout_ms", 30000), 100, MAX_TIMEOUT_MS),
     }
     if "max_usage" in limits:
         parsed_limits["max_usage"] = _media_meters(limits["max_usage"])
@@ -289,7 +354,36 @@ def _invocation(value: Any) -> Json:
         raise _fail()
     if "service_version" in obj:
         out["service_version"] = _int(obj["service_version"], 1)
+    if "response_format" in obj:
+        if "task" in parsed_input:
+            raise _fail()
+        out["response_format"] = _response_format(obj["response_format"])
+    if "sampling" in obj:
+        out["sampling"] = _sampling(obj["sampling"])
+    if "reasoning_effort" in obj:
+        if obj["reasoning_effort"] not in ("low", "medium", "high"):
+            raise _fail()
+        out["reasoning_effort"] = obj["reasoning_effort"]
+    if "tags" in obj:
+        out["tags"] = _tags(obj["tags"])
+    if "cache" in obj:
+        cache = _object(obj["cache"], ("mode",), ())
+        if cache["mode"] not in ("auto", "none"):
+            raise _fail()
+        out["cache"] = {"mode": cache["mode"]}
     return out
+
+
+def invocation_needs(inv: Mapping[str, Any]) -> frozenset[str]:
+    """What a request needs from a provider beyond plain text (the names a provider lists in ``capabilities``):
+    ``structured_output`` for a ``response_format``, one per sampling control set, and ``reasoning_effort``. (Tools and
+    images are refused at parsing: this backend has no tool calling yet.)"""
+    needs = {key for key in ("temperature", "top_p", "stop", "seed") if key in inv.get("sampling", {})}
+    if "response_format" in inv:
+        needs.add("structured_output")
+    if "reasoning_effort" in inv:
+        needs.add("reasoning_effort")
+    return frozenset(needs)
 
 
 def parse_service(value: Any) -> Json:
@@ -366,11 +460,15 @@ class ProviderError(Exception):
     """A failed upstream call. ``definitive`` means the provider certainly did no work, so the reservation can be
     released; ``retryable`` means another offering may be tried."""
 
-    def __init__(self, definitive: bool, retryable: bool, code: str = "upstream_failed") -> None:
+    def __init__(
+        self, definitive: bool, retryable: bool, code: str = "upstream_failed", retry_after_ms: int | None = None
+    ) -> None:
         super().__init__(code)
         self.definitive = definitive
         self.retryable = retryable
         self.code = code
+        # How long the provider asked callers to wait (its Retry-After), in milliseconds. Only a hint.
+        self.retry_after_ms = retry_after_ms
 
 
 @dataclass
@@ -397,6 +495,10 @@ class Provider(Protocol):
     The router cancels the iteration (asyncio cancellation) on timeout, cancel request or client disconnect."""
 
     def invoke(self, invocation: Mapping[str, Any], offering: Mapping[str, Any]) -> AsyncIterator[ProviderEvent]: ...
+
+    # Optional attribute ``capabilities: frozenset[str]``: the request features beyond plain text the provider carries
+    # (see :func:`invocation_needs`). A provider without it carries none, so such a request is refused before anything
+    # is reserved rather than answered without them.
 
 
 @dataclass

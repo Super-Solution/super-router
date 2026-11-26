@@ -351,7 +351,9 @@ export class Router {
     const needs = invocationNeeds(input);
     const candidates = decision.candidates.filter((c) => {
       const can = this.providerFor(c.offering.provider)?.capabilities;
-      const ok = (!needs.tools || can?.tools) && (!needs.images || can?.images);
+      const ok = (Object.keys(needs) as (keyof typeof needs)[]).every(
+        (k) => !needs[k] || can?.[k],
+      );
       if (!ok)
         decision.excluded.push({
           id: c.offering.id,

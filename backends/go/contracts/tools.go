@@ -288,12 +288,17 @@ type Needs struct {
 	Images bool
 	// StructuredOutput: the request carries a response_format, so the answer must follow a JSON Schema.
 	StructuredOutput bool
+	// Each sampling control and the reasoning effort the request sets.
+	Temperature, TopP, Stop, Seed, ReasoningEffort bool
 }
 
 // InvocationNeeds reports whether a request declares tools or carries tool history, whether it carries images, and
 // whether it asks for structured output.
 func InvocationNeeds(in Invocation) Needs {
-	n := Needs{Tools: in.Input.Tools != nil, StructuredOutput: in.ResponseFormat != nil}
+	n := Needs{Tools: in.Input.Tools != nil, StructuredOutput: in.ResponseFormat != nil, ReasoningEffort: in.ReasoningEffort != nil}
+	if s := in.Sampling; s != nil {
+		n.Temperature, n.TopP, n.Stop, n.Seed = s.Temperature != nil, s.TopP != nil, s.Stop != nil, s.Seed != nil
+	}
 	for _, m := range in.Input.Messages {
 		if m.Role == "tool" || m.ToolCalls != nil {
 			n.Tools = true
@@ -315,6 +320,9 @@ type ProviderCapabilities struct {
 	// StructuredOutput: the provider writes a request's response_format schema into its call. A provider that does
 	// not say so is never sent one: the answer would silently ignore the schema.
 	StructuredOutput bool
+	// Each sampling control and the reasoning effort is carried only when the provider says so: otherwise the request
+	// is refused before reserving, never sent without it.
+	Temperature, TopP, Stop, Seed, ReasoningEffort bool
 }
 
 // CapableProvider is a Provider that declares its capabilities. A provider that does not implement it carries text
@@ -334,7 +342,9 @@ func CapabilitiesOf(p Provider) ProviderCapabilities {
 
 // Can reports whether capabilities cover a request's needs.
 func (c ProviderCapabilities) Can(n Needs) bool {
-	return (!n.Tools || c.Tools) && (!n.Images || c.Images) && (!n.StructuredOutput || c.StructuredOutput)
+	return (!n.Tools || c.Tools) && (!n.Images || c.Images) && (!n.StructuredOutput || c.StructuredOutput) &&
+		(!n.Temperature || c.Temperature) && (!n.TopP || c.TopP) && (!n.Stop || c.Stop) && (!n.Seed || c.Seed) &&
+		(!n.ReasoningEffort || c.ReasoningEffort)
 }
 
 var (

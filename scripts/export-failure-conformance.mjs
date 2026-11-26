@@ -1,4 +1,4 @@
-// Writes backends/rust/conformance/failure.v1.json: what an upstream refusal means for the next offering.
+// Writes conformance/failure.v1.json: what an upstream refusal means for the next offering.
 //
 // Each case is an HTTP status and the error's own message, and the expected class with what it implies: whether the
 // provider certainly did no work (`definitive`), whether another offering may be tried (`retryable`) and the error
@@ -11,7 +11,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const file = join(dirname(fileURLToPath(import.meta.url)), "..", "backends", "rust", "conformance", "failure.v1.json");
+const file = join(dirname(fileURLToPath(import.meta.url)), "..", "conformance", "failure.v1.json");
 
 // Messages are lower-cased and `_` / `-` read as spaces; a class matches when one of its phrases is contained.
 const phrases = {
@@ -82,5 +82,53 @@ add("a server error that names quota", 503, "quota backend unavailable");
 add("overloaded", 529, "Overloaded");
 add("case and separators", 400, "Api-Key-Not-Valid");
 
-writeFileSync(file, JSON.stringify({ version: 1, description: "Upstream refusal classification (status + message -> class, definitive, retryable, code). Written by scripts/export-failure-conformance.mjs; Rust and Go only.", cases }, null, 1) + "\n");
-console.log(`failure: ${cases.length} cases`);
+// What the HTTP providers that read `error.message` (OpenAI Responses, Anthropic Messages) make of a refusal: the
+// status, the Retry-After header and the body. Only a client error's body is read, and only `error.message` of it.
+const parseMessage = (body) => {
+  try {
+    const m = JSON.parse(body)?.error?.message;
+    return typeof m === "string" ? m : "";
+  } catch {
+    return "";
+  }
+};
+const retryAfterMs = (header) => {
+  const m = /^([0-9]+)(?:\.([0-9]+))?$/.exec((header ?? "").replace(/^[ \t]+|[ \t]+$/g, ""));
+  if (!m) return null;
+  const seconds = m[1].length > 9 ? 86400 : Number(m[1]);
+  return Math.min(seconds * 1000 + Number((m[2] ?? "").slice(0, 3).padEnd(3, "0")), 86_400_000);
+};
+const providerResponses = [];
+const respond = (name, status, body, retryAfter) => {
+  const message = status >= 400 && status < 500 ? parseMessage(body) : "";
+  const cls = classOf(status, message);
+  providerResponses.push({
+    name,
+    status,
+    retry_after: retryAfter ?? null,
+    body,
+    expect: { ...(({ definitive, retryable, code }) => ({ definitive, retryable, code }))(implies(cls, status)), retry_after_ms: retryAfterMs(retryAfter) },
+  });
+};
+const openaiBody = (message, type = "invalid_request_error") => JSON.stringify({ error: { message, type, param: null, code: null } });
+const anthropicBody = (message, type) => JSON.stringify({ type: "error", error: { type, message } });
+respond("openai wrong key", 401, openaiBody("Incorrect API key provided: sk-abc***", "invalid_request_error"));
+respond("anthropic wrong key", 401, anthropicBody("invalid x-api-key", "authentication_error"));
+respond("anthropic permission", 403, anthropicBody("Your API key does not have permission to use the specified resource.", "permission_error"));
+respond("anthropic model not found", 404, anthropicBody("model: claude-gone", "not_found_error"));
+respond("openai model behind a 400", 400, openaiBody("The model `gpt-9` does not exist or you do not have access to it."));
+respond("anthropic malformed request", 400, anthropicBody("messages: Input should be a valid list", "invalid_request_error"));
+respond("openai rate limit with a wait", 429, openaiBody("Rate limit reached for requests", "requests"), "12");
+respond("anthropic rate limit with a fractional wait", 429, anthropicBody("This request would exceed your rate limit", "rate_limit_error"), "1.5");
+respond("openai empty balance behind a 429", 429, openaiBody("You exceeded your current quota, please check your plan and billing details.", "insufficient_quota"));
+respond("anthropic credit balance", 400, anthropicBody("Your credit balance is too low to access the Anthropic API.", "invalid_request_error"));
+respond("a rate limit whose body is not JSON", 429, "slow down", "3");
+respond("a body past the limit is cut before it is read", 400, openaiBody("x".repeat(20000)));
+respond("too large", 413, anthropicBody("Request exceeds the maximum allowed number of bytes.", "request_too_large"));
+respond("a timeout the provider may have acted on", 408, "");
+respond("server error keeps the hold and its wait", 500, openaiBody("invalid api key"), "5");
+respond("overloaded keeps the hold", 529, anthropicBody("Overloaded", "overloaded_error"));
+respond("unavailable with a date wait", 503, "", "Wed, 21 Oct 2026 07:28:00 GMT");
+
+writeFileSync(file, JSON.stringify({ version: 1, description: "Upstream refusal classification (status + message -> class, definitive, retryable, code). Written by scripts/export-failure-conformance.mjs; Shared by every backend that implements it (see conformance/README.md).", cases, provider_responses: providerResponses }, null, 1) + "\n");
+console.log(`failure: ${cases.length} cases, ${providerResponses.length} provider responses`);

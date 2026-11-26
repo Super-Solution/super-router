@@ -6,11 +6,11 @@ reproduces the data in [`conformance`](conformance), the same checks the Go and 
 
 > **Its own schema and conformance data.** This backend carries its own PostgreSQL migrations
 > ([`crates/store-postgres/migrations`](crates/store-postgres/migrations)) and its own copy of the shared data
-> ([`conformance`](conformance)). It supports custom billing units, structured output routing, a downgrade policy,
-> label evidence, quality metadata and offering capabilities, which the TypeScript and Python backends in this
-> repository do not have yet; Go has them too and tests against this copy. Use a database of its own: the other backends' migration history is different. Ten crates are prepared for
-> crates.io (`super-router-*`, released together; see [`docs/CRATES-PUBLISHING.md`](../../docs/CRATES-PUBLISHING.md));
-> the first release has not been made yet, so until then depend on them as a git dependency pinned to one commit.
+> ([`conformance`](conformance)). It has features the TypeScript and Python backends in this repository do not have
+> yet (see the language table in [`../README.md`](../README.md)); Go has most of them too and tests against this copy.
+> Use a database of its own: the other backends' migration history is different.
+> Eleven crates are on crates.io (`super-router-*`, released together at one version; see
+> [`docs/CRATES-PUBLISHING.md`](../../docs/CRATES-PUBLISHING.md) and `Cargo.toml` for the current version).
 > `super-router-cli` and `super-router-dataplane-test` are not published.
 
 ```
@@ -49,11 +49,12 @@ backends/rust
 - **A refusal says whose fault it was.** `classify_failure(status, message)` returns a `FailureClass`: a failure that
   belongs to the offering (rejected key, retired model, empty account, blocked region, rate limit) is definitive and
   retryable, so the router tries the next offering; a refused request stops the call; a server error stays uncertain
-  and keeps the hold (`conformance/failure.v1.json`). `routing::HealthBook` plus `Router::with_health` skip offerings
+  and keeps the hold (`../../conformance/failure.v1.json`, shared with every backend; the OpenAI, Anthropic and Gemini
+  providers all read their refusals through it). `routing::HealthBook` plus `Router::with_health` skip offerings
   whose own failure is repeating, with class-based cooldowns and one half-open probe, and fail open when every
-  candidate is cooling; off by default (`conformance/health.v1.json`). `ProviderCapabilities::structured_output` says
+  candidate is cooling; off by default (`conformance/health.v1.json`, Rust and Go only). `ProviderCapabilities::structured_output` says
   whether a provider writes a `response_format` schema; a provider that ends an answer by content policy emits
-  completion `filtered` and the result's `finish_reason` is `content_filter`. All Rust and Go only.
+  completion `filtered` and the result's `finish_reason` is `content_filter`. The health book is Rust and Go only.
 - **Time is milliseconds since the epoch** (`i64`) at every port, so no date library is needed in the core.
 - **Money is `BigInt` and decimal strings**, never floats. Scores are `f64` and match the reference bit for bit.
 - Internal failures (`StoreError::Internal`) never reach a customer; they surface as `internal_error` or, once funds

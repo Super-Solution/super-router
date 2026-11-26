@@ -115,7 +115,7 @@ func TestFailures(t *testing.T) {
 		definitive, retry bool
 		code              string
 	}{
-		{"rate limited", status(429), "k", invocation(), true, true, "upstream_http_429"},
+		{"rate limited", status(429), "k", invocation(), true, true, "rate_limited"},
 		{"bad request", status(400), "k", invocation(), true, false, "upstream_http_400"},
 		{"overloaded is unknown", status(529), "k", invocation(), false, false, "upstream_http_529"},
 		{"no credentials", status(200), "", invocation(), true, false, "credentials_missing"},
@@ -175,6 +175,12 @@ func TestNullCounterCannotZeroARealCount(t *testing.T) {
 
 func TestToolsConformance(t *testing.T) {
 	providertest.Run(t, "anthropic", func(base string) contracts.Provider {
+		return anthropic.New(func() string { return "test-key" }, anthropic.WithBaseURL(base))
+	})
+}
+
+func TestRefusalsConformance(t *testing.T) {
+	providertest.RunRefusals(t, func(base string) contracts.Provider {
 		return anthropic.New(func() string { return "test-key" }, anthropic.WithBaseURL(base))
 	})
 }
