@@ -1,0 +1,187 @@
+{
+ "_about": "Hand-authored and normative for the pure parts of super-router-campaign. Serial codes: 11 symbols of Crockford base32 (0-9 A-Z without I L O U) read 5 bits at a time from the random bytes, then one check symbol = (sum of (2*i+1)*value_i) mod 32. Invite codes: 8 symbols the same way. Typing is forgiving: case, spaces, hyphens and underscores ignored, O reads 0, I and L read 1. Hash = HMAC-SHA256(key, kind + ':' + canonical). Rebate = floor(base*bps/10000), 0 for a negative base or a rate outside 0..10000.",
+ "hmac_key": "0123456789abcdef0123456789abcdef-test-secret",
+ "generate_serial": [
+  {
+   "random": "00000000000000",
+   "serial": "000000000000"
+  },
+  {
+   "random": "ffffffffffffff",
+   "serial": "ZZZZZZZZZZZ7"
+  },
+  {
+   "random": "123456789abcde",
+   "serial": "28T5CY4TQKFT"
+  },
+  {
+   "random": "07c81f6304fa01",
+   "serial": "0Z41YRR4Z809"
+  }
+ ],
+ "generate_invite": [
+  {
+   "random": "0000000000",
+   "invite": "00000000"
+  },
+  {
+   "random": "ffffffffff",
+   "invite": "ZZZZZZZZ"
+  },
+  {
+   "random": "123456789a",
+   "invite": "28T5CY4T"
+  },
+  {
+   "random": "07c81f6304",
+   "invite": "0Z41YRR4"
+  }
+ ],
+ "normalize_serial": [
+  {
+   "input": "28T5CY4TQKFT",
+   "serial": "28T5CY4TQKFT"
+  },
+  {
+   "input": "28T5-cy4t QKFT",
+   "serial": "28T5CY4TQKFT"
+  },
+  {
+   "input": "OOOOOOOOOOOO",
+   "serial": "000000000000"
+  },
+  {
+   "input": "ABC",
+   "serial": null
+  },
+  {
+   "input": "",
+   "serial": null
+  },
+  {
+   "input": "0Z41YRR4Z800",
+   "serial": null
+  }
+ ],
+ "normalize_custom": [
+  {
+   "input": "spring-2027",
+   "custom": "SPRING2027"
+  },
+  {
+   "input": "SPRING 2027",
+   "custom": "SPRING2027"
+  },
+  {
+   "input": "abc",
+   "custom": null
+  },
+  {
+   "input": "hello!",
+   "custom": null
+  },
+  {
+   "input": "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+   "custom": null
+  },
+  {
+   "input": "a_b c-d1",
+   "custom": "ABCD1"
+  }
+ ],
+ "hash": [
+  {
+   "kind": "serial",
+   "canonical": "28T5CY4TQKFT",
+   "hmac_sha256_hex": "fdc89f27e7d9bbc70db3e951a51dd4949d9c84215679e386179159f860298738"
+  },
+  {
+   "kind": "custom",
+   "canonical": "SPRING2027",
+   "hmac_sha256_hex": "d8d88b882ddffdfa1f2ea6c2df91f832747e9956da92b4648c240a6e40f69cca"
+  }
+ ],
+ "rebate": [
+  {
+   "base": 1000,
+   "bps": 300,
+   "rebate": 30
+  },
+  {
+   "base": 1000,
+   "bps": 500,
+   "rebate": 50
+  },
+  {
+   "base": 33,
+   "bps": 300,
+   "rebate": 0
+  },
+  {
+   "base": 34,
+   "bps": 300,
+   "rebate": 1
+  },
+  {
+   "base": 9223372036854775807,
+   "bps": 10000,
+   "rebate": 9223372036854775807
+  },
+  {
+   "base": 9223372036854775807,
+   "bps": 1,
+   "rebate": 922337203685477
+  },
+  {
+   "base": -5,
+   "bps": 300,
+   "rebate": 0
+  },
+  {
+   "base": 1000,
+   "bps": 10001,
+   "rebate": 0
+  },
+  {
+   "base": 1000,
+   "bps": 0,
+   "rebate": 0
+  }
+ ],
+ "normalize_email": [
+  {
+   "input": " Zou.Foo+promo@Gmail.com ",
+   "email": "zoufoo@gmail.com"
+  },
+  {
+   "input": "zoufoo@googlemail.com",
+   "email": "zoufoo@gmail.com"
+  },
+  {
+   "input": "A.B+x@example.org",
+   "email": "a.b@example.org"
+  },
+  {
+   "input": "nope",
+   "email": null
+  },
+  {
+   "input": "+x@example.org",
+   "email": null
+  }
+ ],
+ "network_prefix": [
+  {
+   "input": "203.0.113.77",
+   "network": "203.0.113.0/24"
+  },
+  {
+   "input": "2001:db8:1:2:3:4:5:6",
+   "network": "2001:db8:1:2::/64"
+  },
+  {
+   "input": "not an ip",
+   "network": null
+  }
+ ]
+}

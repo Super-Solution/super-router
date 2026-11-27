@@ -24,6 +24,7 @@ super-router-provider-openai = { path = "crates/provider-openai", version = "0.5
 super-router-provider-anthropic = { path = "crates/provider-anthropic", version = "0.5.0" }
 super-router-provider-gemini = { path = "crates/provider-gemini", version = "0.5.0" }
 super-router-server = { path = "crates/server", version = "0.5.0" }
+super-router-campaign = { path = "crates/campaign", version = "0.5.0" }
 
 # External.
 serde = { version = "1", features = ["derive"] }
