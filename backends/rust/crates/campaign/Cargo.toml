@@ -15,8 +15,8 @@ exclude = ["/tests"]
 build = "build.rs"
 
 [dependencies]
-super-router-contracts.workspace = true
-super-router-router.workspace = true
+super-router-contracts = { workspace = true, optional = true }
+super-router-router = { workspace = true, optional = true }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "derive"] }
 include_dir = "0.7"
 serde.workspace = true
@@ -27,6 +27,11 @@ hmac.workspace = true
 sha2.workspace = true
 hex.workspace = true
 getrandom = "0.2"
+
+[features]
+default = ["router"]
+# `DataStoreSink`, a ready sink for any router `DataStore`. Off, the crate depends on nothing of the core at all.
+router = ["dep:super-router-contracts", "dep:super-router-router"]
 
 [dev-dependencies]
 super-router-store-memory.workspace = true

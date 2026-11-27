@@ -1,3 +1,4 @@
+#![cfg(feature = "router")]
 //! The blanket sink on the router's own in-memory store: the grant lands as a funding bucket and a repeated key does
 //! not fund twice.
 

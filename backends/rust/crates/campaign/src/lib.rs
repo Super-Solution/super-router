@@ -30,6 +30,8 @@ pub use error::Error;
 pub use migrate::embedded_migrations;
 pub use referral::{Released, Review};
 pub use signals::Signal;
-pub use sink::{Cause, DataStoreSink, Grant, GrantKind, GrantSink, SinkError};
+#[cfg(feature = "router")]
+pub use sink::DataStoreSink;
+pub use sink::{Cause, Grant, GrantKind, GrantSink, SinkError};
 pub use store::Campaigns;
 pub use types::*;

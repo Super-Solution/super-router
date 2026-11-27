@@ -18,7 +18,7 @@ host facts ──►  Campaigns  ──►  GrantSink  ──►  the router's l
 - **Facts in:** the host reports `attach` (a new customer arrived with an invite code), `purchase` (a customer paid),
   `redeem` (a customer typed a code), and calls `release_due` on a timer.
 - **Effects out:** one `Grant { customer, amount, kind, expires_ms, key }` through a [`GrantSink`] the host
-  provides. `DataStoreSink` is a ready sink for any router `DataStore`; a host whose ledger wants the bucket kind
+  provides. `DataStoreSink` (feature `router`, on by default) is a ready sink for any router `DataStore`; with the feature off the crate depends on nothing of the core; a host whose ledger wants the bucket kind
   writes its own (about twenty lines).
 - **Its own tables.** `Campaigns::migrate(&pool)` creates `sc_*` tables in the schema the pool's `search_path` names,
   with its own `sc_migrations` history. It never reads or writes the router's tables.
