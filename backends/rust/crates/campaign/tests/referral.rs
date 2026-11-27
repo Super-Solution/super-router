@@ -109,6 +109,10 @@ async fn look_alike_accounts_earn_nothing_until_a_person_clears_them() {
     assert!(f.c.review("alt", Review::Approve, T0).await.unwrap());
     assert_eq!(f.c.purchase("alt", "cs_alt2", 1000, T0).await.unwrap(), PurchaseOutcome::Rebate { amount: 30, held: true });
 
+    // A friend on the inviter's own network (a household, a campus) is not the inviter's other account.
+    let friend = invited(&f, "alice", "friend", std::slice::from_ref(&net)).await;
+    assert_eq!(friend, AttachOutcome::Attached);
+
     // A crowd on one network: the fourth is flagged (three are allowed by default).
     let crowd = Signal::network("198.51.100.4").unwrap();
     for who in ["c1", "c2", "c3"] {

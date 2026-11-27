@@ -46,6 +46,9 @@ CREATE INDEX sc_referrals_referrer ON sc_referrals (referrer, attached_at);
 CREATE TABLE sc_signals (
  customer text NOT NULL,
  signal bytea NOT NULL,
+ -- A weak signal (a network prefix) is shared by many honest people: it counts toward a crowd, never as "the same
+ -- person as the inviter".
+ weak boolean NOT NULL DEFAULT false,
  seen_at bigint NOT NULL,
  PRIMARY KEY (customer, signal)
 );

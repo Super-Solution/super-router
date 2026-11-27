@@ -41,9 +41,10 @@ impl Campaigns {
 
     async fn put_signals(&self, conn: &mut PgConnection, customer: &str, signals: &[Signal], now_ms: i64) -> Result<(), Error> {
         for s in signals {
-            sqlx::query("INSERT INTO sc_signals (customer, signal, seen_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING")
+            sqlx::query("INSERT INTO sc_signals (customer, signal, weak, seen_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING")
                 .bind(customer)
                 .bind(digest(&self.key, s))
+                .bind(s.is_weak())
                 .bind(now_ms)
                 .execute(&mut *conn)
                 .await?;
@@ -191,11 +192,12 @@ impl Campaigns {
         if digests.is_empty() {
             return Ok(None);
         }
-        let same: Option<i32> = sqlx::query_scalar("SELECT 1 FROM sc_signals WHERE customer = $1 AND signal = ANY($2) LIMIT 1")
-            .bind(referrer)
-            .bind(digests)
-            .fetch_optional(&mut *conn)
-            .await?;
+        let same: Option<i32> =
+            sqlx::query_scalar("SELECT 1 FROM sc_signals WHERE customer = $1 AND signal = ANY($2) AND NOT weak LIMIT 1")
+                .bind(referrer)
+                .bind(digests)
+                .fetch_optional(&mut *conn)
+                .await?;
         if same.is_some() {
             return Ok(Some("shares_a_signal_with_inviter".into()));
         }

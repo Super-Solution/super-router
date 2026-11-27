@@ -27,6 +27,14 @@ impl Signal {
     }
 }
 
+impl Signal {
+    /// Shared by many honest people (a network prefix, a campus, a family): enough to notice a crowd of invitees,
+    /// never enough to call an invitee the inviter's other account.
+    pub fn is_weak(&self) -> bool {
+        self.kind == "network"
+    }
+}
+
 /// The address with the tricks that make one mailbox look like many removed: lower case, no `+tag`, and for Gmail
 /// no dots and one domain. `None` when it has no `@`.
 pub fn normalize_email(address: &str) -> Option<String> {
