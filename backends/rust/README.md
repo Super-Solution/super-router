@@ -25,6 +25,7 @@ backends/rust
 ├── crates/provider-openai/    Responses API
 ├── crates/provider-anthropic/ Messages API
 ├── crates/provider-gemini/    generateContent (Gemini API, Vertex AI)
+├── crates/campaign/           extension: referral rebates and redeem codes on top of `grant` (not core, not published)
 ├── crates/server/             the HTTP API as an axum Router
 ├── crates/cli/                the `super-router-server` binary
 └── crates/dataplane-test/     runs conformance/dataplane.v1.json against any DataStore, and tools.v1.json against providers

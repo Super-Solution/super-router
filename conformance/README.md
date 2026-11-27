@@ -45,3 +45,5 @@ Python port) and `provider-gemini.v1.json` (the Gemini request and stream mappin
 have yet. Python additionally has no tool calling, images or rate cards (it refuses them before
 reserving). `backends/README.md` has the per-language table. Closing this lag is tracked in
 `docs/engineering/improvement-log.md`.
+
+`backends/rust/conformance/campaign.v1.json` pins the pure parts of the campaign extension (`super-router-campaign`): serial and invite code generation from fixed random bytes, typing rules, keyed hashes, rebate arithmetic, e-mail and network normalisation. It is hand-authored and was produced by an independent implementation of the written rules; only the Rust crate reads it so far.

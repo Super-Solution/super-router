@@ -19,6 +19,7 @@ before it can have a trusted publisher, so that release is published by hand, on
 | `super-router-provider-anthropic` | yes | Anthropic Messages provider |
 | `super-router-provider-gemini` | yes | Google Gemini provider (Gemini API and Vertex AI). Its first version (0.3.0) was published by hand, after the other ten, with a short-lived `publish-new` token; its trusted publisher and owner were added afterwards, so the next release publishes all eleven |
 | `super-router-server` | yes | the HTTP API as an axum `Router` |
+| `super-router-campaign` | **no** (`publish = false`) | an extension (referral rebates, redeem codes) on top of the router's `grant`. Not published until the owner decides; before it is, add LICENSE and NOTICE like the others, list it in `PUBLISH_ORDER` after `super-router-router` and `super-router-store-memory`, and remove `publish = false` |
 | `super-router-cli` | **no** (`publish = false`) | a binary; undecided, see below |
 | `super-router-dataplane-test` | **no** (`publish = false`) | cannot be published as it is, see below |
 
