@@ -47,7 +47,9 @@ impl Campaigns {
 
     pub async fn rate_classes(&self) -> Result<Vec<RateClass>, Error> {
         Ok(sqlx::query_as::<_, RateClass>(
-            "SELECT name, rate_bps, is_default, updated_at FROM sc_rate_classes ORDER BY is_default DESC, name",
+            "SELECT c.name, c.rate_bps, c.is_default, c.updated_at,
+                    (SELECT count(*) FROM sc_referrers r WHERE r.class = c.name) AS members
+               FROM sc_rate_classes c ORDER BY c.is_default DESC, c.name",
         )
         .fetch_all(&self.pool)
         .await?)
