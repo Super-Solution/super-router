@@ -53,6 +53,8 @@ async fn a_partner_class_pays_more_and_a_rate_change_does_not_touch_decided_reba
     f.c.ensure_rate_class("kol", 900, T0).await.unwrap();
     assert_eq!(f.c.rate_classes().await.unwrap().iter().find(|c| c.name == "kol").unwrap().rate_bps, 500, "ensure keeps an existing rate");
     f.c.set_class("alice", "kol", T0).await.unwrap();
+    let classes = f.c.rate_classes().await.unwrap();
+    assert_eq!(classes.iter().map(|c| (c.name.as_str(), c.members)).collect::<Vec<_>>(), vec![("default", 0), ("kol", 1)]);
     assert_eq!(invited(&f, "alice", "bob", &[]).await, AttachOutcome::Attached);
     assert_eq!(f.c.purchase("bob", "cs_1", 2000, T0).await.unwrap(), PurchaseOutcome::Rebate { amount: 100, held: true });
     f.c.set_rate("kol", 1000, T0 + 1).await.unwrap();

@@ -32,6 +32,8 @@ pub struct RateClass {
     pub rate_bps: i32,
     pub is_default: bool,
     pub updated_at: i64,
+    /// Inviters in this class.
+    pub members: i64,
 }
 
 /// What a person sees of their own invitation.
